@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FPS Prototype</title>
+<title>FPS Builder</title>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -11,41 +11,73 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
   #app { width: 100vw; height: 100vh; display: block; }
-  #overlay {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; z-index: 10;
-    transition: opacity 0.2s;
-  }
-  #overlay h1 { font-size: 22px; font-weight: 600; margin-bottom: 12px; letter-spacing: 0.5px; }
-  #overlay p { font-size: 14px; opacity: 0.75; line-height: 1.7; text-align: center; }
-  #overlay kbd {
-    background: #222; border: 1px solid #444; border-radius: 4px;
-    padding: 2px 7px; font-size: 12px; margin: 0 2px;
-  }
-  #hud {
-    position: absolute; top: 12px; left: 12px; z-index: 5;
-    color: #7dd3fc; font-size: 12px; font-family: monospace;
-    background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px;
-    line-height: 1.6; pointer-events: none;
-  }
-  #crosshair {
-    position: absolute; top: 50%; left: 50%; z-index: 5;
-    width: 6px; height: 6px; margin: -3px 0 0 -3px;
-    border-radius: 50%; background: rgba(255,255,255,0.85);
-    pointer-events: none; display: none;
-  }
+
+  #mode { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6;
+    font-size: 13px; font-weight: 600; color: #fff; padding: 5px 14px; border-radius: 999px;
+    background: rgba(0,0,0,0.55); letter-spacing: 0.5px; pointer-events: none; }
+  #mode.edit { background: rgba(52,152,219,0.85); }
+  #mode.play { background: rgba(46,204,113,0.85); }
+
+  #hud { position: absolute; top: 12px; left: 12px; z-index: 5; color: #7dd3fc; font-size: 12px;
+    font-family: monospace; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px;
+    line-height: 1.6; pointer-events: none; white-space: pre; }
+
+  #crosshair { position: absolute; top: 50%; left: 50%; z-index: 5; width: 6px; height: 6px;
+    margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,0.85);
+    pointer-events: none; display: none; }
+
+  #toolbar { position: absolute; top: 12px; right: 12px; z-index: 7; display: none;
+    flex-direction: column; gap: 6px; width: 210px; }
+  #toolbar .row { display: flex; gap: 6px; }
+  #toolbar button { flex: 1; padding: 7px 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+    border: 1px solid #3a4553; border-radius: 6px; background: #1c2530; color: #cdd6e0; }
+  #toolbar button:hover { background: #26313f; }
+  #toolbar button.on { background: #2d7dd2; border-color: #2d7dd2; color: #fff; }
+
+  #props { position: absolute; bottom: 12px; right: 12px; z-index: 7; display: none;
+    width: 210px; background: rgba(18,24,32,0.94); border: 1px solid #2a3542; border-radius: 8px;
+    padding: 10px; color: #cdd6e0; font-size: 12px; }
+  #props h3 { font-size: 12px; margin-bottom: 8px; color: #7dd3fc; }
+  #props .grid { display: grid; grid-template-columns: 16px 1fr 16px 1fr 16px 1fr; gap: 5px 4px; align-items: center; }
+  #props label { opacity: 0.7; text-align: center; }
+  #props input[type=number] { width: 100%; background: #0f151d; border: 1px solid #2a3542; color: #e6edf3;
+    border-radius: 4px; padding: 3px 4px; font-size: 11px; }
+  #props .colorrow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  #props input[type=color] { width: 34px; height: 24px; border: none; background: none; cursor: pointer; }
+  #props .empty { opacity: 0.5; text-align: center; padding: 8px 0; }
+
+  #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; z-index: 10; }
+  #overlay h1 { font-size: 22px; font-weight: 600; margin-bottom: 12px; }
+  #overlay p { font-size: 14px; opacity: 0.8; line-height: 1.8; text-align: center; }
+  #overlay kbd { background: #222; border: 1px solid #444; border-radius: 4px; padding: 2px 7px; font-size: 12px; margin: 0 2px; }
 </style>
 </head>
 <body>
 <canvas id="app"></canvas>
 <div id="crosshair"></div>
 <div id="hud"></div>
+<div id="mode" class="play">PLAY</div>
+
+<div id="toolbar">
+  <div class="row"><button id="btnAdd">＋ 파트</button><button id="btnDup">복제</button></div>
+  <div class="row"><button id="btnDel">삭제</button><button id="btnSnap" class="on">스냅 1</button></div>
+  <div class="row"><button id="btnSave">저장</button><button id="btnLoad">불러오기</button></div>
+  <div class="row"><button id="btnExport">내보내기</button><button id="btnImport">가져오기</button></div>
+  <div class="row"><button id="btnReset">초기화</button></div>
+</div>
+
+<div id="props">
+  <h3>속성</h3>
+  <div id="propsBody"><div class="empty">파트를 클릭해 선택</div></div>
+</div>
+
 <div id="overlay">
   <h1>클릭해서 시작</h1>
   <p>
-    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 &nbsp;·&nbsp; 마우스 시점 &nbsp;·&nbsp; <kbd>Shift</kbd> 달리기 &nbsp;·&nbsp; <kbd>Space</kbd> 점프<br>
-    <kbd>ESC</kbd> 마우스 잠금 해제
+    <kbd>Tab</kbd> 편집 / 플레이 전환<br>
+    플레이: <kbd>WASD</kbd> · 마우스 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프<br>
+    편집: 드래그 회전 · 휠 줌 · 파트 클릭 선택 · 바닥 드래그로 이동
   </p>
 </div>
 
@@ -55,148 +87,336 @@ const canvas = document.getElementById('app');
 const overlay = document.getElementById('overlay');
 const hud = document.getElementById('hud');
 const crosshair = document.getElementById('crosshair');
+const modeBadge = document.getElementById('mode');
+const toolbar = document.getElementById('toolbar');
+const propsEl = document.getElementById('props');
+const propsBody = document.getElementById('propsBody');
 
-// --- Scene ---
+// ---------- Scene ----------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87b8e8);
-scene.fog = new THREE.Fog(0x87b8e8, 40, 120);
+scene.fog = new THREE.Fog(0x87b8e8, 60, 160);
 
-// --- Camera (eye) ---
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const EYE_HEIGHT = 1.7;
-camera.position.set(0, EYE_HEIGHT, 0);
-
-// yaw/pitch container so we control look cleanly
-const yawObject = new THREE.Object3D();   // rotates left/right
-const pitchObject = new THREE.Object3D(); // rotates up/down
-yawObject.position.copy(camera.position);
-yawObject.add(pitchObject);
-pitchObject.add(camera);
-camera.position.set(0, 0, 0);
-scene.add(yawObject);
-
-// --- Renderer ---
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 
-// --- Lights ---
 scene.add(new THREE.HemisphereLight(0xffffff, 0x556677, 0.9));
 const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-sun.position.set(30, 50, 20);
-sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
-sun.shadow.camera.left = -60; sun.shadow.camera.right = 60;
-sun.shadow.camera.top = 60; sun.shadow.camera.bottom = -60;
+sun.position.set(40, 60, 25); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -110; sun.shadow.camera.right = 110;
+sun.shadow.camera.top = 110; sun.shadow.camera.bottom = -110;
 scene.add(sun);
 
-// --- Ground ---
 const groundSize = 200;
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(groundSize, groundSize),
   new THREE.MeshStandardMaterial({ color: 0x4a7a4a })
 );
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
-
-// grid so movement is readable
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
 const grid = new THREE.GridHelper(groundSize, 100, 0x336633, 0x3d6b3d);
-grid.position.y = 0.01;
-scene.add(grid);
+grid.position.y = 0.01; scene.add(grid);
 
-// --- World geometry ---
+// ---------- Parts (data-driven world) ----------
 const boxMat = [0xe74c3c, 0xf39c12, 0x3498db, 0x9b59b6, 0x1abc9c];
-const colliders = []; // 3D AABB: { minX,maxX, minY,maxY, minZ,maxZ }
+const parts = [];
+let colliders = [];
 
-function addBox(x, y, z, w, h, d, color) {
-  const box = new THREE.Mesh(
+function addPart(x, y, z, w, h, d, color) {
+  const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
     new THREE.MeshStandardMaterial({ color })
   );
-  box.position.set(x, y, z);
-  box.castShadow = true;
-  box.receiveShadow = true;
-  scene.add(box);
-  colliders.push({
-    minX: x - w/2, maxX: x + w/2,
-    minY: y - h/2, maxY: y + h/2,
-    minZ: z - d/2, maxZ: z + d/2
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  scene.add(mesh);
+  const p = { mesh, w, h, d, color };
+  parts.push(p);
+  return p;
+}
+function removePart(p) {
+  scene.remove(p.mesh);
+  p.mesh.geometry.dispose(); p.mesh.material.dispose();
+  const i = parts.indexOf(p); if (i >= 0) parts.splice(i, 1);
+}
+function rebuildColliders() {
+  colliders = parts.map(p => {
+    const x = p.mesh.position.x, y = p.mesh.position.y, z = p.mesh.position.z;
+    return { minX: x-p.w/2, maxX: x+p.w/2, minY: y-p.h/2, maxY: y+p.h/2, minZ: z-p.d/2, maxZ: z+p.d/2 };
   });
-  return box;
 }
 
-// 외벽 4개 (맵 경계, 높이 5)
-const WALL = 96, WH = 5;
-addBox( 0, WH/2,  WALL,  WALL*2, WH, 2, 0x8a8a8a);
-addBox( 0, WH/2, -WALL,  WALL*2, WH, 2, 0x8a8a8a);
-addBox(  WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a);
-addBox(-WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a);
-
-// 계단식 플랫폼 (높이 0.8씩 상승)
-for (let i = 0; i < 5; i++) {
-  const h = 0.8 * (i + 1);
-  addBox(-14 + i * 5, h/2, 20, 4, h, 4, boxMat[i % boxMat.length]);
+function buildDefaultWorld() {
+  while (parts.length) removePart(parts[0]);
+  const WALL = 96, WH = 5;
+  addPart( 0, WH/2,  WALL, WALL*2, WH, 2, 0x8a8a8a);
+  addPart( 0, WH/2, -WALL, WALL*2, WH, 2, 0x8a8a8a);
+  addPart( WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a);
+  addPart(-WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a);
+  for (let i = 0; i < 5; i++) { const h = 0.8*(i+1); addPart(-14+i*5, h/2, 20, 4, h, 4, boxMat[i%5]); }
+  addPart(20, 1.5, -18, 10, 3, 10, 0x2ecc71);
+  addPart(20, 4.5, -18, 4, 3, 4, 0x27ae60);
+  addPart(-25, 2, -25, 12, 4, 12, 0x16a085);
+  for (let i = 0; i < 12; i++) {
+    const w = 1.5+Math.random()*3, h = 1+Math.random()*4;
+    const a = Math.random()*Math.PI*2, dist = 30+Math.random()*45;
+    addPart(Math.cos(a)*dist, h/2, Math.sin(a)*dist, w, h, w, boxMat[i%5]);
+  }
 }
 
-// 넓은 단 3개
-addBox(20, 1.5, -18, 10, 3, 10, 0x2ecc71);
-addBox(20, 4.5, -18, 4, 3, 4, 0x27ae60);
-addBox(-25, 2, -25, 12, 4, 12, 0x16a085);
+// ---------- Cameras ----------
+const aspect = () => window.innerWidth / window.innerHeight;
+const EYE_HEIGHT = 1.7;
 
-// 랜덤 박스 (다양한 높이)
-for (let i = 0; i < 16; i++) {
-  const w = 1.5 + Math.random() * 3;
-  const h = 1 + Math.random() * 4;
-  const angle = Math.random() * Math.PI * 2;
-  const dist = 30 + Math.random() * 45;
-  addBox(Math.cos(angle) * dist, h/2, Math.sin(angle) * dist, w, h, w, boxMat[i % boxMat.length]);
+const playCam = new THREE.PerspectiveCamera(75, aspect(), 0.1, 1000);
+const yawObject = new THREE.Object3D();
+const pitchObject = new THREE.Object3D();
+yawObject.position.set(0, EYE_HEIGHT, 0);
+yawObject.add(pitchObject); pitchObject.add(playCam);
+scene.add(yawObject);
+
+const editCam = new THREE.PerspectiveCamera(60, aspect(), 0.1, 2000);
+const orbit = { target: new THREE.Vector3(0, 2, 0), radius: 45, theta: 0.6, phi: 1.0 };
+function updateEditCam() {
+  const { target, radius, theta, phi } = orbit;
+  editCam.position.set(
+    target.x + radius * Math.sin(phi) * Math.sin(theta),
+    target.y + radius * Math.cos(phi),
+    target.z + radius * Math.sin(phi) * Math.cos(theta)
+  );
+  editCam.lookAt(target);
+}
+updateEditCam();
+
+// ---------- Mode ----------
+let mode = 'play';
+function setMode(m) {
+  mode = m;
+  const editing = m === 'edit';
+  modeBadge.textContent = editing ? 'EDIT' : 'PLAY';
+  modeBadge.className = editing ? 'edit' : 'play';
+  toolbar.style.display = editing ? 'flex' : 'none';
+  propsEl.style.display = editing ? 'block' : 'none';
+  if (editing) {
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
+    overlay.style.display = 'none';
+    crosshair.style.display = 'none';
+  } else {
+    rebuildColliders();
+    deselect();
+    overlay.style.display = 'flex';
+  }
 }
 
-// --- Pointer lock ---
+// ---------- Play input ----------
 let locked = false;
-overlay.addEventListener('click', () => canvas.requestPointerLock());
+overlay.addEventListener('click', () => { if (mode === 'play') canvas.requestPointerLock(); });
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
-  overlay.style.display = locked ? 'none' : 'flex';
-  crosshair.style.display = locked ? 'block' : 'none';
+  if (mode === 'play') { overlay.style.display = locked ? 'none' : 'flex'; crosshair.style.display = locked ? 'block' : 'none'; }
 });
 
-// --- Mouse look ---
-const PITCH_LIMIT = Math.PI / 2 - 0.05;
-document.addEventListener('mousemove', (e) => {
-  if (!locked) return;
-  const sens = 0.0022;
-  yawObject.rotation.y -= e.movementX * sens;
-  pitchObject.rotation.x -= e.movementY * sens;
-  pitchObject.rotation.x = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitchObject.rotation.x));
-});
-
-// --- Keyboard ---
 const keys = {};
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') e.preventDefault();
+  if (e.code === 'Tab') { e.preventDefault(); setMode(mode === 'play' ? 'edit' : 'play'); return; }
+  if (mode === 'edit' && e.code === 'Delete' && selected) { removePart(selected); deselect(); return; }
   keys[e.code] = true;
 });
 document.addEventListener('keyup', (e) => keys[e.code] = false);
 
-// --- Movement ---
-const WALK = 6, RUN = 11;
-const GRAVITY = 24;      // m/s^2
-const JUMP_SPEED = 8;    // 초기 상승 속도
-let vertVel = 0;         // 수직 속도
-let onGround = true;
+const PITCH_LIMIT = Math.PI/2 - 0.05;
+document.addEventListener('mousemove', (e) => {
+  if (mode !== 'play' || !locked) return;
+  const s = 0.0022;
+  yawObject.rotation.y -= e.movementX * s;
+  pitchObject.rotation.x -= e.movementY * s;
+  pitchObject.rotation.x = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitchObject.rotation.x));
+});
+
+// ---------- Edit input ----------
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let selected = null;
+let outline = null;
+let dragging = false;
+let orbiting = false;
+let lastX = 0, lastY = 0;
+let snap = true;
+const dragPlane = new THREE.Plane();
+const hitPoint = new THREE.Vector3();
+const grabOffset = new THREE.Vector3();
+
+function setNDC(e) { ndc.x = (e.clientX/window.innerWidth)*2-1; ndc.y = -(e.clientY/window.innerHeight)*2+1; }
+
+function select(p) {
+  selected = p;
+  if (outline) scene.remove(outline);
+  outline = new THREE.BoxHelper(p.mesh, 0xffee00);
+  scene.add(outline);
+  renderProps();
+}
+function deselect() { selected = null; if (outline) { scene.remove(outline); outline = null; } renderProps(); }
+
+canvas.addEventListener('mousedown', (e) => {
+  if (mode !== 'edit') return;
+  setNDC(e);
+  if (e.button === 0) {
+    ray.setFromCamera(ndc, editCam);
+    const hits = ray.intersectObjects(parts.map(p => p.mesh));
+    if (hits.length) {
+      const p = parts.find(pp => pp.mesh === hits[0].object);
+      select(p);
+      dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0,1,0), p.mesh.position);
+      ray.ray.intersectPlane(dragPlane, hitPoint);
+      grabOffset.copy(p.mesh.position).sub(hitPoint);
+      dragging = true;
+    } else {
+      deselect();
+      orbiting = true; lastX = e.clientX; lastY = e.clientY;
+    }
+  } else if (e.button === 2) {
+    orbiting = true; lastX = e.clientX; lastY = e.clientY;
+  }
+});
+window.addEventListener('mousemove', (e) => {
+  if (mode !== 'edit') return;
+  if (dragging && selected) {
+    setNDC(e);
+    ray.setFromCamera(ndc, editCam);
+    if (ray.ray.intersectPlane(dragPlane, hitPoint)) {
+      let nx = hitPoint.x + grabOffset.x, nz = hitPoint.z + grabOffset.z;
+      if (snap) { nx = Math.round(nx); nz = Math.round(nz); }
+      selected.mesh.position.x = nx; selected.mesh.position.z = nz;
+      if (outline) outline.update();
+      renderProps();
+    }
+  } else if (orbiting) {
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    orbit.theta -= dx * 0.005;
+    orbit.phi = Math.max(0.15, Math.min(Math.PI/2 + 0.2, orbit.phi - dy * 0.005));
+    updateEditCam();
+  }
+});
+window.addEventListener('mouseup', () => { dragging = false; orbiting = false; });
+canvas.addEventListener('wheel', (e) => {
+  if (mode !== 'edit') return;
+  e.preventDefault();
+  orbit.radius = Math.max(5, Math.min(150, orbit.radius + e.deltaY * 0.03));
+  updateEditCam();
+}, { passive: false });
+canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit') e.preventDefault(); });
+
+// ---------- Properties ----------
+function renderProps() {
+  if (!selected) { propsBody.innerHTML = '<div class="empty">파트를 클릭해 선택</div>'; return; }
+  const p = selected, m = p.mesh.position;
+  const f = (v) => v.toFixed(2);
+  propsBody.innerHTML =
+    '<div class="grid">' +
+    '<label>X</label><input type="number" step="1" id="pX" value="'+f(m.x)+'">' +
+    '<label>Y</label><input type="number" step="1" id="pY" value="'+f(m.y)+'">' +
+    '<label>Z</label><input type="number" step="1" id="pZ" value="'+f(m.z)+'">' +
+    '<label>W</label><input type="number" step="0.5" min="0.2" id="pW" value="'+p.w+'">' +
+    '<label>H</label><input type="number" step="0.5" min="0.2" id="pH" value="'+p.h+'">' +
+    '<label>D</label><input type="number" step="0.5" min="0.2" id="pD" value="'+p.d+'">' +
+    '</div>' +
+    '<div class="colorrow"><span>색</span>' +
+    '<input type="color" id="pC" value="#'+p.color.toString(16).padStart(6,'0')+'"></div>';
+  const bind = (id, fn) => document.getElementById(id).addEventListener('input', (e) => { fn(parseFloat(e.target.value)); if (outline) outline.update(); });
+  bind('pX', v => selected.mesh.position.x = v);
+  bind('pY', v => selected.mesh.position.y = v);
+  bind('pZ', v => selected.mesh.position.z = v);
+  const resize = () => {
+    const p = selected;
+    p.mesh.geometry.dispose();
+    p.mesh.geometry = new THREE.BoxGeometry(p.w, p.h, p.d);
+    if (outline) outline.update();
+  };
+  bind('pW', v => { selected.w = Math.max(0.2, v); resize(); });
+  bind('pH', v => { selected.h = Math.max(0.2, v); resize(); });
+  bind('pD', v => { selected.d = Math.max(0.2, v); resize(); });
+  document.getElementById('pC').addEventListener('input', (e) => {
+    const c = parseInt(e.target.value.slice(1), 16);
+    selected.color = c; selected.mesh.material.color.setHex(c);
+  });
+}
+
+// ---------- Toolbar ----------
+document.getElementById('btnAdd').onclick = () => {
+  const t = orbit.target;
+  const p = addPart(Math.round(t.x), 1, Math.round(t.z), 4, 2, 4, 0x3498db);
+  select(p);
+};
+document.getElementById('btnDup').onclick = () => {
+  if (!selected) return;
+  const s = selected, m = s.mesh.position;
+  const p = addPart(m.x + (snap?1:0.5), m.y, m.z + (snap?1:0.5), s.w, s.h, s.d, s.color);
+  select(p);
+};
+document.getElementById('btnDel').onclick = () => { if (selected) { removePart(selected); deselect(); } };
+const btnSnap = document.getElementById('btnSnap');
+btnSnap.onclick = () => { snap = !snap; btnSnap.textContent = snap ? '스냅 1' : '스냅 off'; btnSnap.classList.toggle('on', snap); };
+
+function serialize() {
+  return JSON.stringify(parts.map(p => ({
+    x: +p.mesh.position.x.toFixed(3), y: +p.mesh.position.y.toFixed(3), z: +p.mesh.position.z.toFixed(3),
+    w: p.w, h: p.h, d: p.d, color: p.color
+  })));
+}
+function loadFromData(arr) {
+  while (parts.length) removePart(parts[0]);
+  deselect();
+  arr.forEach(o => addPart(o.x, o.y, o.z, o.w, o.h, o.d, o.color));
+}
+
+document.getElementById('btnSave').onclick = () => {
+  try { localStorage.setItem('fpsWorld', serialize()); flash('저장됨'); }
+  catch (e) { flash('저장 불가(미리보기)'); }
+};
+document.getElementById('btnLoad').onclick = () => {
+  try {
+    const s = localStorage.getItem('fpsWorld');
+    if (s) { loadFromData(JSON.parse(s)); flash('불러옴'); } else flash('저장본 없음');
+  } catch (e) { flash('불러오기 실패'); }
+};
+document.getElementById('btnExport').onclick = () => {
+  const blob = new Blob([serialize()], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'world.json'; a.click();
+};
+document.getElementById('btnImport').onclick = () => {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'application/json';
+  inp.onchange = () => {
+    const file = inp.files[0]; if (!file) return;
+    const r = new FileReader();
+    r.onload = () => { try { loadFromData(JSON.parse(r.result)); flash('가져옴'); } catch (e) { flash('파일 오류'); } };
+    r.readAsText(file);
+  };
+  inp.click();
+};
+document.getElementById('btnReset').onclick = () => { buildDefaultWorld(); deselect(); flash('초기화'); };
+
+let flashTimer = null;
+function flash(msg) {
+  modeBadge.textContent = msg;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { modeBadge.textContent = mode === 'edit' ? 'EDIT' : 'PLAY'; }, 900);
+}
+
+// ---------- Physics ----------
+const WALK = 6, RUN = 11, GRAVITY = 24, JUMP_SPEED = 8;
+let vertVel = 0, onGround = true;
 const velocity = new THREE.Vector3();
-const forward = new THREE.Vector3();
-const right = new THREE.Vector3();
+const forward = new THREE.Vector3(), right = new THREE.Vector3();
 const clock = new THREE.Clock();
 
-function update(dt) {
+function physics(dt) {
   const speed = keys['ShiftLeft'] || keys['ShiftRight'] ? RUN : WALK;
-
-  // direction from yaw only (stay on ground plane)
-  // W = look dir, S = back, D = right, A = left
   const y = yawObject.rotation.y;
   forward.set(-Math.sin(y), 0, -Math.cos(y));
   right.set(Math.cos(y), 0, -Math.sin(y));
@@ -208,67 +428,57 @@ function update(dt) {
   if (keys['KeyA']) move.sub(right);
   if (move.lengthSq() > 0) move.normalize().multiplyScalar(speed);
 
-  // smooth accel/decel
   velocity.lerp(move, 1 - Math.pow(0.001, dt));
   yawObject.position.addScaledVector(velocity, dt);
 
-  const pos = yawObject.position;
-  const R = 0.4;
-  const H = EYE_HEIGHT;
+  const pos = yawObject.position, R = 0.4, H = EYE_HEIGHT;
 
-  // 수평 충돌: 발~머리 y구간이 박스와 겹칠 때만 옆면 밀어내기
   for (const c of colliders) {
     const feetY = pos.y - H, headY = pos.y;
     if (feetY >= c.maxY - 0.05 || headY <= c.minY) continue;
-    const minX = c.minX - R, maxX = c.maxX + R;
-    const minZ = c.minZ - R, maxZ = c.maxZ + R;
+    const minX = c.minX-R, maxX = c.maxX+R, minZ = c.minZ-R, maxZ = c.maxZ+R;
     if (pos.x > minX && pos.x < maxX && pos.z > minZ && pos.z < maxZ) {
-      const pushL = pos.x - minX, pushR = maxX - pos.x;
-      const pushD = pos.z - minZ, pushU = maxZ - pos.z;
-      const m = Math.min(pushL, pushR, pushD, pushU);
-      if (m === pushL) pos.x = minX;
-      else if (m === pushR) pos.x = maxX;
-      else if (m === pushD) pos.z = minZ;
-      else pos.z = maxZ;
+      const pL = pos.x-minX, pR = maxX-pos.x, pD = pos.z-minZ, pU = maxZ-pos.z;
+      const m = Math.min(pL, pR, pD, pU);
+      if (m === pL) pos.x = minX; else if (m === pR) pos.x = maxX;
+      else if (m === pD) pos.z = minZ; else pos.z = maxZ;
     }
   }
-
-  // clamp inside ground
-  const lim = groundSize / 2 - 1;
+  const lim = groundSize/2 - 1;
   pos.x = Math.max(-lim, Math.min(lim, pos.x));
   pos.z = Math.max(-lim, Math.min(lim, pos.z));
 
-  // 점프 + 중력
   if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
   vertVel -= GRAVITY * dt;
   pos.y += vertVel * dt;
-
-  // 수직 충돌: 박스 위 착지
   let groundY = EYE_HEIGHT;
   for (const c of colliders) {
-    if (pos.x > c.minX - R && pos.x < c.maxX + R &&
-        pos.z > c.minZ - R && pos.z < c.maxZ + R) {
+    if (pos.x > c.minX-R && pos.x < c.maxX+R && pos.z > c.minZ-R && pos.z < c.maxZ+R) {
       const top = c.maxY + EYE_HEIGHT;
       if (vertVel <= 0 && pos.y <= top + 0.1 && top > groundY) groundY = top;
     }
   }
-  if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; }
-  else { onGround = false; }
+  if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; } else onGround = false;
 
-  const p = yawObject.position;
-  hud.textContent = `pos  x:${p.x.toFixed(1)}  z:${p.z.toFixed(1)}\nspeed ${velocity.length().toFixed(1)} m/s\n${onGround ? 'ground' : 'air'}`;
+  const p = pos;
+  hud.textContent = 'x:'+p.x.toFixed(1)+'  z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+'\n'+(onGround?'ground':'air');
 }
+
+// ---------- Loop ----------
+buildDefaultWorld();
+rebuildColliders();
 
 function animate() {
   requestAnimationFrame(animate);
-  update(Math.min(clock.getDelta(), 0.05));
-  renderer.render(scene, camera);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (mode === 'play') { physics(dt); renderer.render(scene, playCam); hud.style.display = 'block'; }
+  else { if (outline) outline.update(); renderer.render(scene, editCam); hud.style.display = 'none'; }
 }
 animate();
 
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
+  playCam.aspect = aspect(); playCam.updateProjectionMatrix();
+  editCam.aspect = aspect(); editCam.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 </script>
