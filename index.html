@@ -54,7 +54,7 @@
 </style>
 </head>
 <body>
-<canvas id="app"></canvas>
+<canvas id="app" tabindex="0"></canvas>
 <div id="crosshair"></div>
 <div id="hud"></div>
 <div id="mode" class="play">PLAY</div>
@@ -219,7 +219,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 const keys = {};
-document.addEventListener('keydown', (e) => {
+window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') e.preventDefault();
   if (e.code === 'Tab') { e.preventDefault(); setMode(mode === 'play' ? 'edit' : 'play'); return; }
   if (mode === 'edit' && e.code === 'Delete' && selected) { removePart(selected); deselect(); return; }
@@ -475,6 +475,9 @@ function animate() {
   else { if (outline) outline.update(); renderer.render(scene, editCam); hud.style.display = 'none'; }
 }
 animate();
+
+canvas.focus();
+window.addEventListener('click', () => canvas.focus());
 
 window.addEventListener('resize', () => {
   playCam.aspect = aspect(); playCam.updateProjectionMatrix();
