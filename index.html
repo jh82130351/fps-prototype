@@ -154,8 +154,10 @@ function update(dt) {
   const speed = keys['ShiftLeft'] || keys['ShiftRight'] ? RUN : WALK;
 
   // direction from yaw only (stay on ground plane)
-  forward.set(Math.sin(yawObject.rotation.y), 0, Math.cos(yawObject.rotation.y)).negate();
-  right.set(forward.z, 0, -forward.x);
+  // W = look direction, S = back, D = right, A = left
+  const y = yawObject.rotation.y;
+  forward.set(-Math.sin(y), 0, -Math.cos(y));
+  right.set(Math.cos(y), 0, -Math.sin(y));
 
   const move = new THREE.Vector3();
   if (keys['KeyW']) move.add(forward);
