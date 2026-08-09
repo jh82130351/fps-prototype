@@ -41,7 +41,7 @@
 <div id="overlay">
   <h1>클릭해서 시작</h1>
   <p>
-    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 &nbsp;·&nbsp; 마우스 시점 &nbsp;·&nbsp; <kbd>Shift</kbd> 달리기<br>
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 &nbsp;·&nbsp; 마우스 시점 &nbsp;·&nbsp; <kbd>Shift</kbd> 달리기 &nbsp;·&nbsp; <kbd>Space</kbd> 점프<br>
     <kbd>ESC</kbd> 마우스 잠금 해제
   </p>
 </div>
@@ -140,11 +140,18 @@ document.addEventListener('mousemove', (e) => {
 
 // --- Keyboard ---
 const keys = {};
-document.addEventListener('keydown', (e) => keys[e.code] = true);
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') e.preventDefault();
+  keys[e.code] = true;
+});
 document.addEventListener('keyup', (e) => keys[e.code] = false);
 
 // --- Movement ---
 const WALK = 6, RUN = 11;
+const GRAVITY = 24;      // m/s^2
+const JUMP_SPEED = 8;    // 초기 상승 속도
+let vertVel = 0;         // 수직 속도
+let onGround = true;
 const velocity = new THREE.Vector3();
 const forward = new THREE.Vector3();
 const right = new THREE.Vector3();
@@ -154,7 +161,7 @@ function update(dt) {
   const speed = keys['ShiftLeft'] || keys['ShiftRight'] ? RUN : WALK;
 
   // direction from yaw only (stay on ground plane)
-  // W = look direction, S = back, D = right, A = left
+  // W = look dir, S = back, D = right, A = left
   const y = yawObject.rotation.y;
   forward.set(-Math.sin(y), 0, -Math.cos(y));
   right.set(Math.cos(y), 0, -Math.sin(y));
@@ -174,10 +181,19 @@ function update(dt) {
   const lim = groundSize / 2 - 1;
   yawObject.position.x = Math.max(-lim, Math.min(lim, yawObject.position.x));
   yawObject.position.z = Math.max(-lim, Math.min(lim, yawObject.position.z));
-  yawObject.position.y = EYE_HEIGHT;
+
+  // 점프 + 중력
+  if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
+  vertVel -= GRAVITY * dt;
+  yawObject.position.y += vertVel * dt;
+  if (yawObject.position.y <= EYE_HEIGHT) {   // 바닥 착지
+    yawObject.position.y = EYE_HEIGHT;
+    vertVel = 0;
+    onGround = true;
+  }
 
   const p = yawObject.position;
-  hud.textContent = `pos  x:${p.x.toFixed(1)}  z:${p.z.toFixed(1)}\nspeed ${velocity.length().toFixed(1)} m/s`;
+  hud.textContent = `pos  x:${p.x.toFixed(1)}  z:${p.z.toFixed(1)}\nspeed ${velocity.length().toFixed(1)} m/s\n${onGround ? 'ground' : 'air'}`;
 }
 
 function animate() {
