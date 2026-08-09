@@ -105,6 +105,7 @@ scene.add(grid);
 
 // --- Reference boxes ---
 const boxMat = [0xe74c3c, 0xf39c12, 0x3498db, 0x9b59b6, 0x1abc9c];
+const colliders = [];  // 충돌용 박스 정보 { x, z, half }
 for (let i = 0; i < 24; i++) {
   const s = 1 + Math.random() * 3;
   const box = new THREE.Mesh(
@@ -117,6 +118,7 @@ for (let i = 0; i < 24; i++) {
   box.castShadow = true;
   box.receiveShadow = true;
   scene.add(box);
+  colliders.push({ x: box.position.x, z: box.position.z, half: s / 2 });
 }
 
 // --- Pointer lock ---
@@ -176,6 +178,23 @@ function update(dt) {
   // smooth accel/decel
   velocity.lerp(move, 1 - Math.pow(0.001, dt));
   yawObject.position.addScaledVector(velocity, dt);
+
+  // 박스 충돌 (AABB + 플레이어 반지름, 최소 침투축으로 밀어내기)
+  const R = 0.4;  // 플레이어 반지름
+  const px = yawObject.position, pz = yawObject.position;
+  for (const c of colliders) {
+    const minX = c.x - c.half - R, maxX = c.x + c.half + R;
+    const minZ = c.z - c.half - R, maxZ = c.z + c.half + R;
+    if (px.x > minX && px.x < maxX && pz.z > minZ && pz.z < maxZ) {
+      const pushL = px.x - minX, pushR = maxX - px.x;   // x 밀어낼 거리
+      const pushD = pz.z - minZ, pushU = maxZ - pz.z;   // z 밀어낼 거리
+      const minPush = Math.min(pushL, pushR, pushD, pushU);
+      if (minPush === pushL) px.x = minX;
+      else if (minPush === pushR) px.x = maxX;
+      else if (minPush === pushD) pz.z = minZ;
+      else pz.z = maxZ;
+    }
+  }
 
   // clamp inside ground
   const lim = groundSize / 2 - 1;
