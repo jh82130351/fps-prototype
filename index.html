@@ -157,7 +157,7 @@ function update(dt) {
   // W = look direction, S = back, D = right, A = left
   const y = yawObject.rotation.y;
   forward.set(-Math.sin(y), 0, -Math.cos(y));
-  right.set(-Math.cos(y), 0, Math.sin(y));
+  right.set(Math.cos(y), 0, -Math.sin(y));
 
   const move = new THREE.Vector3();
   if (keys['KeyW']) move.add(forward);
