@@ -106,22 +106,52 @@ const grid = new THREE.GridHelper(groundSize, 100, 0x336633, 0x3d6b3d);
 grid.position.y = 0.01;
 scene.add(grid);
 
-// --- Reference boxes ---
+// --- World geometry ---
 const boxMat = [0xe74c3c, 0xf39c12, 0x3498db, 0x9b59b6, 0x1abc9c];
-const colliders = [];  // 충돌용 박스 정보 { x, z, half }
-for (let i = 0; i < 24; i++) {
-  const s = 1 + Math.random() * 3;
+const colliders = []; // 3D AABB: { minX,maxX, minY,maxY, minZ,maxZ }
+
+function addBox(x, y, z, w, h, d, color) {
   const box = new THREE.Mesh(
-    new THREE.BoxGeometry(s, s, s),
-    new THREE.MeshStandardMaterial({ color: boxMat[i % boxMat.length] })
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color })
   );
-  const angle = Math.random() * Math.PI * 2;
-  const dist = 8 + Math.random() * 70;
-  box.position.set(Math.cos(angle) * dist, s / 2, Math.sin(angle) * dist);
+  box.position.set(x, y, z);
   box.castShadow = true;
   box.receiveShadow = true;
   scene.add(box);
-  colliders.push({ x: box.position.x, z: box.position.z, half: s / 2 });
+  colliders.push({
+    minX: x - w/2, maxX: x + w/2,
+    minY: y - h/2, maxY: y + h/2,
+    minZ: z - d/2, maxZ: z + d/2
+  });
+  return box;
+}
+
+// 외벽 4개 (맵 경계, 높이 5)
+const WALL = 96, WH = 5;
+addBox( 0, WH/2,  WALL,  WALL*2, WH, 2, 0x8a8a8a);
+addBox( 0, WH/2, -WALL,  WALL*2, WH, 2, 0x8a8a8a);
+addBox(  WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a);
+addBox(-WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a);
+
+// 계단식 플랫폼 (높이 0.8씩 상승)
+for (let i = 0; i < 5; i++) {
+  const h = 0.8 * (i + 1);
+  addBox(-14 + i * 5, h/2, 20, 4, h, 4, boxMat[i % boxMat.length]);
+}
+
+// 넓은 단 3개
+addBox(20, 1.5, -18, 10, 3, 10, 0x2ecc71);
+addBox(20, 4.5, -18, 4, 3, 4, 0x27ae60);
+addBox(-25, 2, -25, 12, 4, 12, 0x16a085);
+
+// 랜덤 박스 (다양한 높이)
+for (let i = 0; i < 16; i++) {
+  const w = 1.5 + Math.random() * 3;
+  const h = 1 + Math.random() * 4;
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 30 + Math.random() * 45;
+  addBox(Math.cos(angle) * dist, h/2, Math.sin(angle) * dist, w, h, w, boxMat[i % boxMat.length]);
 }
 
 // --- Pointer lock ---
@@ -182,37 +212,48 @@ function update(dt) {
   velocity.lerp(move, 1 - Math.pow(0.001, dt));
   yawObject.position.addScaledVector(velocity, dt);
 
-  // 박스 충돌 (AABB + 플레이어 반지름, 최소 침투축으로 밀어내기)
-  const R = 0.4;  // 플레이어 반지름
-  const px = yawObject.position, pz = yawObject.position;
+  const pos = yawObject.position;
+  const R = 0.4;
+  const H = EYE_HEIGHT;
+
+  // 수평 충돌: 발~머리 y구간이 박스와 겹칠 때만 옆면 밀어내기
   for (const c of colliders) {
-    const minX = c.x - c.half - R, maxX = c.x + c.half + R;
-    const minZ = c.z - c.half - R, maxZ = c.z + c.half + R;
-    if (px.x > minX && px.x < maxX && pz.z > minZ && pz.z < maxZ) {
-      const pushL = px.x - minX, pushR = maxX - px.x;   // x 밀어낼 거리
-      const pushD = pz.z - minZ, pushU = maxZ - pz.z;   // z 밀어낼 거리
-      const minPush = Math.min(pushL, pushR, pushD, pushU);
-      if (minPush === pushL) px.x = minX;
-      else if (minPush === pushR) px.x = maxX;
-      else if (minPush === pushD) pz.z = minZ;
-      else pz.z = maxZ;
+    const feetY = pos.y - H, headY = pos.y;
+    if (feetY >= c.maxY - 0.05 || headY <= c.minY) continue;
+    const minX = c.minX - R, maxX = c.maxX + R;
+    const minZ = c.minZ - R, maxZ = c.maxZ + R;
+    if (pos.x > minX && pos.x < maxX && pos.z > minZ && pos.z < maxZ) {
+      const pushL = pos.x - minX, pushR = maxX - pos.x;
+      const pushD = pos.z - minZ, pushU = maxZ - pos.z;
+      const m = Math.min(pushL, pushR, pushD, pushU);
+      if (m === pushL) pos.x = minX;
+      else if (m === pushR) pos.x = maxX;
+      else if (m === pushD) pos.z = minZ;
+      else pos.z = maxZ;
     }
   }
 
   // clamp inside ground
   const lim = groundSize / 2 - 1;
-  yawObject.position.x = Math.max(-lim, Math.min(lim, yawObject.position.x));
-  yawObject.position.z = Math.max(-lim, Math.min(lim, yawObject.position.z));
+  pos.x = Math.max(-lim, Math.min(lim, pos.x));
+  pos.z = Math.max(-lim, Math.min(lim, pos.z));
 
   // 점프 + 중력
   if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
   vertVel -= GRAVITY * dt;
-  yawObject.position.y += vertVel * dt;
-  if (yawObject.position.y <= EYE_HEIGHT) {   // 바닥 착지
-    yawObject.position.y = EYE_HEIGHT;
-    vertVel = 0;
-    onGround = true;
+  pos.y += vertVel * dt;
+
+  // 수직 충돌: 박스 위 착지
+  let groundY = EYE_HEIGHT;
+  for (const c of colliders) {
+    if (pos.x > c.minX - R && pos.x < c.maxX + R &&
+        pos.z > c.minZ - R && pos.z < c.maxZ + R) {
+      const top = c.maxY + EYE_HEIGHT;
+      if (vertVel <= 0 && pos.y <= top + 0.1 && top > groundY) groundY = top;
+    }
   }
+  if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; }
+  else { onGround = false; }
 
   const p = yawObject.position;
   hud.textContent = `pos  x:${p.x.toFixed(1)}  z:${p.z.toFixed(1)}\nspeed ${velocity.length().toFixed(1)} m/s\n${onGround ? 'ground' : 'air'}`;
