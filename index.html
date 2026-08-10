@@ -38,10 +38,13 @@
     width: 210px; background: rgba(18,24,32,0.94); border: 1px solid #2a3542; border-radius: 8px;
     padding: 10px; color: #cdd6e0; font-size: 12px; }
   #props h3 { font-size: 12px; margin-bottom: 8px; color: #7dd3fc; }
+  #props .hint { font-size: 10px; opacity: 0.5; margin-top: 7px; }
   #props .grid { display: grid; grid-template-columns: 16px 1fr 16px 1fr 16px 1fr; gap: 5px 4px; align-items: center; }
   #props label { opacity: 0.7; text-align: center; }
   #props input[type=number] { width: 100%; background: #0f151d; border: 1px solid #2a3542; color: #e6edf3;
     border-radius: 4px; padding: 3px 4px; font-size: 11px; }
+  #props .rotrow { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  #props .rotrow input { flex: 1; }
   #props .colorrow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
   #props input[type=color] { width: 34px; height: 24px; border: none; background: none; cursor: pointer; }
   #props .empty { opacity: 0.5; text-align: center; padding: 8px 0; }
@@ -77,7 +80,7 @@
   <p>
     <kbd>Tab</kbd> 편집 / 플레이 전환<br>
     플레이: <kbd>WASD</kbd> · 마우스 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프<br>
-    편집: 드래그 회전 · 휠 줌 · 파트 클릭 선택 · 바닥 드래그로 이동
+    편집: 드래그 회전 · 휠 줌 · 파트 클릭 · 바닥 드래그 이동 · <kbd>Q</kbd><kbd>E</kbd> 회전
   </p>
 </div>
 
@@ -119,24 +122,27 @@ ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground)
 const grid = new THREE.GridHelper(groundSize, 100, 0x336633, 0x3d6b3d);
 grid.position.y = 0.01; scene.add(grid);
 
-// ---------- Parts (data-driven world) ----------
+// ---------- Parts ----------
 const boxMat = [0xe74c3c, 0xf39c12, 0x3498db, 0x9b59b6, 0x1abc9c];
 const parts = [];
 let colliders = [];
 
-function addPart(x, y, z, w, h, d, color) {
+function addPart(x, y, z, w, h, d, color, rot) {
+  rot = rot || 0;
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
     new THREE.MeshStandardMaterial({ color })
   );
   mesh.position.set(x, y, z);
+  mesh.rotation.y = rot;
   mesh.castShadow = true; mesh.receiveShadow = true;
   scene.add(mesh);
-  const p = { mesh, w, h, d, color };
+  const p = { mesh, w, h, d, color, rot };
   parts.push(p);
   return p;
 }
 function removePart(p) {
+  if (selected === p) deselect();
   scene.remove(p.mesh);
   p.mesh.geometry.dispose(); p.mesh.material.dispose();
   const i = parts.indexOf(p); if (i >= 0) parts.splice(i, 1);
@@ -144,7 +150,7 @@ function removePart(p) {
 function rebuildColliders() {
   colliders = parts.map(p => {
     const x = p.mesh.position.x, y = p.mesh.position.y, z = p.mesh.position.z;
-    return { minX: x-p.w/2, maxX: x+p.w/2, minY: y-p.h/2, maxY: y+p.h/2, minZ: z-p.d/2, maxZ: z+p.d/2 };
+    return { cx:x, cz:z, y0:y-p.h/2, y1:y+p.h/2, hw:p.w/2, hd:p.d/2, a:p.rot };
   });
 }
 
@@ -222,10 +228,19 @@ const keys = {};
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') e.preventDefault();
   if (e.code === 'Tab') { e.preventDefault(); setMode(mode === 'play' ? 'edit' : 'play'); return; }
-  if (mode === 'edit' && e.code === 'Delete' && selected) { removePart(selected); deselect(); return; }
+  if (mode === 'edit' && selected) {
+    if (e.code === 'Delete') { removePart(selected); return; }
+    if (e.code === 'KeyQ' || e.code === 'KeyE') {
+      const step = Math.PI / 12; // 15도
+      selected.rot += (e.code === 'KeyE' ? step : -step);
+      selected.mesh.rotation.y = selected.rot;
+      refreshOutline(); renderProps();
+      return;
+    }
+  }
   keys[e.code] = true;
 });
-document.addEventListener('keyup', (e) => keys[e.code] = false);
+window.addEventListener('keyup', (e) => keys[e.code] = false);
 
 const PITCH_LIMIT = Math.PI/2 - 0.05;
 document.addEventListener('mousemove', (e) => {
@@ -251,14 +266,15 @@ const grabOffset = new THREE.Vector3();
 
 function setNDC(e) { ndc.x = (e.clientX/window.innerWidth)*2-1; ndc.y = -(e.clientY/window.innerHeight)*2+1; }
 
-function select(p) {
-  selected = p;
-  if (outline) scene.remove(outline);
-  outline = new THREE.BoxHelper(p.mesh, 0xffee00);
-  scene.add(outline);
-  renderProps();
+function refreshOutline() {
+  if (outline) { if (outline.parent) outline.parent.remove(outline); outline.geometry.dispose(); outline.material.dispose(); outline = null; }
+  if (!selected) return;
+  const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(selected.w, selected.h, selected.d));
+  outline = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffee00 }));
+  selected.mesh.add(outline);  // 자식 → 위치·회전 자동 추종
 }
-function deselect() { selected = null; if (outline) { scene.remove(outline); outline = null; } renderProps(); }
+function select(p) { selected = p; refreshOutline(); renderProps(); }
+function deselect() { selected = null; refreshOutline(); renderProps(); }
 
 canvas.addEventListener('mousedown', (e) => {
   if (mode !== 'edit') return;
@@ -290,7 +306,6 @@ window.addEventListener('mousemove', (e) => {
       let nx = hitPoint.x + grabOffset.x, nz = hitPoint.z + grabOffset.z;
       if (snap) { nx = Math.round(nx); nz = Math.round(nz); }
       selected.mesh.position.x = nx; selected.mesh.position.z = nz;
-      if (outline) outline.update();
       renderProps();
     }
   } else if (orbiting) {
@@ -315,6 +330,7 @@ function renderProps() {
   if (!selected) { propsBody.innerHTML = '<div class="empty">파트를 클릭해 선택</div>'; return; }
   const p = selected, m = p.mesh.position;
   const f = (v) => v.toFixed(2);
+  const deg = Math.round(p.rot * 180 / Math.PI);
   propsBody.innerHTML =
     '<div class="grid">' +
     '<label>X</label><input type="number" step="1" id="pX" value="'+f(m.x)+'">' +
@@ -324,9 +340,11 @@ function renderProps() {
     '<label>H</label><input type="number" step="0.5" min="0.2" id="pH" value="'+p.h+'">' +
     '<label>D</label><input type="number" step="0.5" min="0.2" id="pD" value="'+p.d+'">' +
     '</div>' +
+    '<div class="rotrow"><span>회전°</span><input type="number" step="15" id="pR" value="'+deg+'"></div>' +
     '<div class="colorrow"><span>색</span>' +
-    '<input type="color" id="pC" value="#'+p.color.toString(16).padStart(6,'0')+'"></div>';
-  const bind = (id, fn) => document.getElementById(id).addEventListener('input', (e) => { fn(parseFloat(e.target.value)); if (outline) outline.update(); });
+    '<input type="color" id="pC" value="#'+p.color.toString(16).padStart(6,'0')+'"></div>' +
+    '<div class="hint">Q / E 로도 15° 회전</div>';
+  const bind = (id, fn) => document.getElementById(id).addEventListener('input', (e) => { fn(parseFloat(e.target.value)); });
   bind('pX', v => selected.mesh.position.x = v);
   bind('pY', v => selected.mesh.position.y = v);
   bind('pZ', v => selected.mesh.position.z = v);
@@ -334,11 +352,12 @@ function renderProps() {
     const p = selected;
     p.mesh.geometry.dispose();
     p.mesh.geometry = new THREE.BoxGeometry(p.w, p.h, p.d);
-    if (outline) outline.update();
+    refreshOutline();
   };
   bind('pW', v => { selected.w = Math.max(0.2, v); resize(); });
   bind('pH', v => { selected.h = Math.max(0.2, v); resize(); });
   bind('pD', v => { selected.d = Math.max(0.2, v); resize(); });
+  bind('pR', v => { selected.rot = (v || 0) * Math.PI / 180; selected.mesh.rotation.y = selected.rot; refreshOutline(); });
   document.getElementById('pC').addEventListener('input', (e) => {
     const c = parseInt(e.target.value.slice(1), 16);
     selected.color = c; selected.mesh.material.color.setHex(c);
@@ -348,29 +367,27 @@ function renderProps() {
 // ---------- Toolbar ----------
 document.getElementById('btnAdd').onclick = () => {
   const t = orbit.target;
-  const p = addPart(Math.round(t.x), 1, Math.round(t.z), 4, 2, 4, 0x3498db);
-  select(p);
+  select(addPart(Math.round(t.x), 1, Math.round(t.z), 4, 2, 4, 0x3498db));
 };
 document.getElementById('btnDup').onclick = () => {
   if (!selected) return;
   const s = selected, m = s.mesh.position;
-  const p = addPart(m.x + (snap?1:0.5), m.y, m.z + (snap?1:0.5), s.w, s.h, s.d, s.color);
-  select(p);
+  select(addPart(m.x + (snap?1:0.5), m.y, m.z + (snap?1:0.5), s.w, s.h, s.d, s.color, s.rot));
 };
-document.getElementById('btnDel').onclick = () => { if (selected) { removePart(selected); deselect(); } };
+document.getElementById('btnDel').onclick = () => { if (selected) removePart(selected); };
 const btnSnap = document.getElementById('btnSnap');
 btnSnap.onclick = () => { snap = !snap; btnSnap.textContent = snap ? '스냅 1' : '스냅 off'; btnSnap.classList.toggle('on', snap); };
 
 function serialize() {
   return JSON.stringify(parts.map(p => ({
     x: +p.mesh.position.x.toFixed(3), y: +p.mesh.position.y.toFixed(3), z: +p.mesh.position.z.toFixed(3),
-    w: p.w, h: p.h, d: p.d, color: p.color
+    w: p.w, h: p.h, d: p.d, color: p.color, rot: +p.rot.toFixed(4)
   })));
 }
 function loadFromData(arr) {
   while (parts.length) removePart(parts[0]);
   deselect();
-  arr.forEach(o => addPart(o.x, o.y, o.z, o.w, o.h, o.d, o.color));
+  arr.forEach(o => addPart(o.x, o.y, o.z, o.w, o.h, o.d, o.color, o.rot || 0));
 }
 
 document.getElementById('btnSave').onclick = () => {
@@ -433,28 +450,38 @@ function physics(dt) {
 
   const pos = yawObject.position, R = 0.4, H = EYE_HEIGHT;
 
+  // 수평 충돌 (회전 박스: 로컬 공간에서 AABB 밀어내기)
   for (const c of colliders) {
     const feetY = pos.y - H, headY = pos.y;
-    if (feetY >= c.maxY - 0.05 || headY <= c.minY) continue;
-    const minX = c.minX-R, maxX = c.maxX+R, minZ = c.minZ-R, maxZ = c.maxZ+R;
-    if (pos.x > minX && pos.x < maxX && pos.z > minZ && pos.z < maxZ) {
-      const pL = pos.x-minX, pR = maxX-pos.x, pD = pos.z-minZ, pU = maxZ-pos.z;
+    if (feetY >= c.y1 - 0.05 || headY <= c.y0) continue;
+    const ca = Math.cos(c.a), sa = Math.sin(c.a);
+    const dx = pos.x - c.cx, dz = pos.z - c.cz;
+    let lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;   // 월드→로컬
+    const bx = c.hw + R, bz = c.hd + R;
+    if (lx > -bx && lx < bx && lz > -bz && lz < bz) {
+      const pL = lx+bx, pR = bx-lx, pD = lz+bz, pU = bz-lz;
       const m = Math.min(pL, pR, pD, pU);
-      if (m === pL) pos.x = minX; else if (m === pR) pos.x = maxX;
-      else if (m === pD) pos.z = minZ; else pos.z = maxZ;
+      if (m === pL) lx = -bx; else if (m === pR) lx = bx;
+      else if (m === pD) lz = -bz; else lz = bz;
+      pos.x = c.cx + (lx*ca - lz*sa);            // 로컬→월드
+      pos.z = c.cz + (lx*sa + lz*ca);
     }
   }
   const lim = groundSize/2 - 1;
   pos.x = Math.max(-lim, Math.min(lim, pos.x));
   pos.z = Math.max(-lim, Math.min(lim, pos.z));
 
+  // 수직 충돌 (착지)
   if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
   vertVel -= GRAVITY * dt;
   pos.y += vertVel * dt;
   let groundY = EYE_HEIGHT;
   for (const c of colliders) {
-    if (pos.x > c.minX-R && pos.x < c.maxX+R && pos.z > c.minZ-R && pos.z < c.maxZ+R) {
-      const top = c.maxY + EYE_HEIGHT;
+    const ca = Math.cos(c.a), sa = Math.sin(c.a);
+    const dx = pos.x - c.cx, dz = pos.z - c.cz;
+    const lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
+    if (lx > -(c.hw+R) && lx < (c.hw+R) && lz > -(c.hd+R) && lz < (c.hd+R)) {
+      const top = c.y1 + EYE_HEIGHT;
       if (vertVel <= 0 && pos.y <= top + 0.1 && top > groundY) groundY = top;
     }
   }
@@ -472,7 +499,7 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
   if (mode === 'play') { physics(dt); renderer.render(scene, playCam); hud.style.display = 'block'; }
-  else { if (outline) outline.update(); renderer.render(scene, editCam); hud.style.display = 'none'; }
+  else { renderer.render(scene, editCam); hud.style.display = 'none'; }
 }
 animate();
 
