@@ -323,6 +323,7 @@ function setMode(m) {
     crosshair.style.display = 'none';
   } else {
     rebuildColliders();
+    saveWorld();
     deselect();
     // 플레이 시작: 스폰 초기화
     respawnPoint.set(0, EYE_HEIGHT, 0);
@@ -574,25 +575,42 @@ const btnSnap = document.getElementById('btnSnap');
 btnSnap.onclick = () => { snap = !snap; btnSnap.textContent = snap ? '스냅 1' : '스냅 off'; btnSnap.classList.toggle('on', snap); };
 
 function serialize() {
-  return JSON.stringify(parts.map(p => ({
+  return JSON.stringify({ v: 1, parts: parts.map(p => ({
     x: +p.mesh.position.x.toFixed(3), y: +p.mesh.position.y.toFixed(3), z: +p.mesh.position.z.toFixed(3),
     w: p.w, h: p.h, d: p.d, color: p.color, rot: +p.rot.toFixed(4), type: p.type
-  })));
+  })) });
+}
+// 버전 무관 파싱: 예전 형식(배열)도, 새 형식({v,parts})도 모두 지원
+function worldFromJSON(str) {
+  const data = JSON.parse(str);
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.parts)) return data.parts;
+  return null;
 }
 function loadFromData(arr) {
+  if (!Array.isArray(arr)) return false;
   while (parts.length) removePart(parts[0]);
   deselect();
-  arr.forEach(o => addPart(o.x, o.y, o.z, o.w, o.h, o.d, o.color, o.rot || 0, o.type || 'solid'));
+  for (const o of arr) {
+    if (!o) continue;
+    const x = +o.x || 0, y = +o.y || 0, z = +o.z || 0;
+    const w = Math.max(0.2, +o.w || 1), h = Math.max(0.2, +o.h || 1), d = Math.max(0.2, +o.d || 1);
+    const color = (typeof o.color === 'number') ? o.color : 0x3498db;
+    const rot = +o.rot || 0;
+    const type = TYPES.includes(o.type) ? o.type : 'solid';
+    addPart(x, y, z, w, h, d, color, rot, type);
+  }
+  rebuildColliders();
+  return true;
 }
+function saveWorld() { try { localStorage.setItem('fpsWorld', serialize()); return true; } catch (e) { return false; } }
 
-document.getElementById('btnSave').onclick = () => {
-  try { localStorage.setItem('fpsWorld', serialize()); flash('저장됨'); }
-  catch (e) { flash('저장 불가(미리보기)'); }
-};
+document.getElementById('btnSave').onclick = () => { flash(saveWorld() ? '저장됨' : '저장 불가(미리보기)'); };
 document.getElementById('btnLoad').onclick = () => {
   try {
     const s = localStorage.getItem('fpsWorld');
-    if (s) { loadFromData(JSON.parse(s)); flash('불러옴'); } else flash('저장본 없음');
+    const arr = s ? worldFromJSON(s) : null;
+    if (arr && loadFromData(arr)) flash('불러옴'); else flash('저장본 없음');
   } catch (e) { flash('불러오기 실패'); }
 };
 document.getElementById('btnExport').onclick = () => {
@@ -602,16 +620,22 @@ document.getElementById('btnExport').onclick = () => {
 };
 document.getElementById('btnImport').onclick = () => {
   const inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = 'application/json';
+  inp.type = 'file'; inp.accept = 'application/json,.json';
   inp.onchange = () => {
     const file = inp.files[0]; if (!file) return;
     const r = new FileReader();
-    r.onload = () => { try { loadFromData(JSON.parse(r.result)); flash('가져옴'); } catch (e) { flash('파일 오류'); } };
+    r.onload = () => {
+      try {
+        const arr = worldFromJSON(r.result);
+        if (arr && loadFromData(arr)) { saveWorld(); flash('가져옴'); }
+        else flash('파일 형식 오류');
+      } catch (e) { flash('파일 오류'); }
+    };
     r.readAsText(file);
   };
   inp.click();
 };
-document.getElementById('btnReset').onclick = () => { buildDefaultWorld(); deselect(); flash('초기화'); };
+document.getElementById('btnReset').onclick = () => { buildDefaultWorld(); rebuildColliders(); saveWorld(); deselect(); flash('초기화'); };
 
 let flashTimer = null;
 function flash(msg) {
@@ -725,9 +749,18 @@ function physics(dt) {
 }
 
 // ---------- Loop ----------
-buildDefaultWorld();
-rebuildColliders();
+// 시작 시 저장본 자동 불러오기 (없으면 기본 월드)
+(function initWorld() {
+  let loaded = false;
+  try {
+    const s = localStorage.getItem('fpsWorld');
+    if (s) { const arr = worldFromJSON(s); if (arr && arr.length) loaded = loadFromData(arr); }
+  } catch (e) {}
+  if (!loaded) buildDefaultWorld();
+  rebuildColliders();
+})();
 
+let autoSaveT = 0;
 let glowT = 0;
 function updateGlow(dt) {
   glowT += dt;
@@ -742,6 +775,7 @@ function animate() {
   const dt = Math.min(clock.getDelta(), 0.05);
   updateGlow(dt);
   waterOverlay.style.opacity = (mode === 'play' && inWater) ? '1' : '0';
+  if (mode === 'edit') { autoSaveT += dt; if (autoSaveT > 3) { autoSaveT = 0; saveWorld(); } }
   if (mode === 'play') {
     gizmo.visible = false;
     scaleGizmo.visible = false;
