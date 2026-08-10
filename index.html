@@ -569,6 +569,7 @@ function flash(msg) {
 
 // ---------- Physics ----------
 const WALK = 6, RUN = 11, GRAVITY = 24, JUMP_SPEED = 8, WATER_FACTOR = 0.45;
+const SWIM_UP = 5, SINK_SPEED = 1.6;
 let vertVel = 0, onGround = true, inWater = false;
 const velocity = new THREE.Vector3();
 const forward = new THREE.Vector3(), right = new THREE.Vector3();
@@ -623,10 +624,17 @@ function physics(dt) {
   pos.x = Math.max(-lim, Math.min(lim, pos.x));
   pos.z = Math.max(-lim, Math.min(lim, pos.z));
 
-  // 중력 + 착지 (solid + checkpoint)
-  if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
-  vertVel -= GRAVITY * dt;
-  pos.y += vertVel * dt;
+  // 수직: 물속이면 수영, 아니면 중력+점프
+  if (inWater) {
+    if (keys['Space']) vertVel = SWIM_UP;        // 위로 떠오름
+    else if (shift) vertVel = 0;                 // 유지 (안 가라앉음)
+    else vertVel = -SINK_SPEED;                  // 천천히 가라앉음
+    pos.y += vertVel * dt;
+  } else {
+    if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
+    vertVel -= GRAVITY * dt;
+    pos.y += vertVel * dt;
+  }
   let groundY = EYE_HEIGHT;
   for (const c of colliders) {
     if (c.type !== 'solid' && c.type !== 'checkpoint') continue;
