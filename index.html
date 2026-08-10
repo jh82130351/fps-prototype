@@ -32,6 +32,8 @@
   #crosshair { position: absolute; top: 50%; left: 50%; z-index: 5; width: 6px; height: 6px;
     margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,0.85);
     pointer-events: none; display: none; }
+  #splash { position: absolute; inset: 0; z-index: 8; pointer-events: none; opacity: 0;
+    transition: opacity 0.15s; }
 
   #toolbar { position: absolute; top: 12px; right: 12px; z-index: 7; display: none;
     flex-direction: column; gap: 6px; width: 210px; }
@@ -50,10 +52,11 @@
   #props label { opacity: 0.7; text-align: center; }
   #props input[type=number] { width: 100%; background: #0f151d; border: 1px solid #2a3542; color: #e6edf3;
     border-radius: 4px; padding: 3px 4px; font-size: 11px; }
-  #props .rotrow { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-  #props .rotrow input { flex: 1; }
-  #props .colorrow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-  #props input[type=color] { width: 34px; height: 24px; border: none; background: none; cursor: pointer; }
+  #props .row2 { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  #props .row2 span { opacity: 0.7; width: 34px; }
+  #props .row2 input, #props .row2 select { flex: 1; background: #0f151d; border: 1px solid #2a3542;
+    color: #e6edf3; border-radius: 4px; padding: 3px 4px; font-size: 11px; }
+  #props input[type=color] { flex: none; width: 34px; height: 24px; border: none; background: none; cursor: pointer; padding: 0; }
   #props .empty { opacity: 0.5; text-align: center; padding: 8px 0; }
 
   #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
@@ -66,6 +69,7 @@
 <body>
 <canvas id="app" tabindex="0"></canvas>
 <div id="crosshair"></div>
+<div id="splash"></div>
 <div id="hud"></div>
 <div id="mode" class="play">PLAY</div>
 
@@ -93,7 +97,7 @@
   <p>
     <kbd>Tab</kbd> 편집 / 플레이 전환<br>
     플레이: <kbd>WASD</kbd> · 마우스 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프<br>
-    편집: 파트 클릭 → 축 화살표 드래그로 이동 · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 툴
+    편집: 파트 클릭 → 축 화살표 드래그 · 속성의 "종류"로 블록 타입 변경
   </p>
 </div>
 
@@ -103,6 +107,7 @@ const canvas = document.getElementById('app');
 const overlay = document.getElementById('overlay');
 const hud = document.getElementById('hud');
 const crosshair = document.getElementById('crosshair');
+const splash = document.getElementById('splash');
 const modeBadge = document.getElementById('mode');
 const toolbar = document.getElementById('toolbar');
 const propsEl = document.getElementById('props');
@@ -146,11 +151,30 @@ grid.position.y = 0.01; scene.add(grid);
 
 // ---------- Parts ----------
 const boxMat = [0xe74c3c, 0xf39c12, 0x3498db, 0x9b59b6, 0x1abc9c];
+const TYPES = ['solid', 'water', 'checkpoint', 'lava'];
 const parts = [];
 let colliders = [];
 
-function addPart(x, y, z, w, h, d, color, rot) {
-  rot = rot || 0;
+function applyAppearance(p) {
+  const mat = p.mesh.material;
+  if (p.type === 'water') {
+    mat.color.setHex(0x2e8fd8); mat.transparent = true; mat.opacity = 0.5;
+    mat.emissive.setHex(0x0a2a44); mat.emissiveIntensity = 0.3;
+  } else if (p.type === 'checkpoint') {
+    mat.color.setHex(0xffffff); mat.transparent = false; mat.opacity = 1;
+    mat.emissive.setHex(0xfff0a0); mat.emissiveIntensity = 0.9;
+  } else if (p.type === 'lava') {
+    mat.color.setHex(0x5a1000); mat.transparent = false; mat.opacity = 1;
+    mat.emissive.setHex(0xff4400); mat.emissiveIntensity = 1.0;
+  } else {
+    mat.color.setHex(p.color); mat.transparent = false; mat.opacity = 1;
+    mat.emissive.setHex(0x000000); mat.emissiveIntensity = 0;
+  }
+  mat.needsUpdate = true;
+}
+
+function addPart(x, y, z, w, h, d, color, rot, type) {
+  rot = rot || 0; type = type || 'solid';
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
     new THREE.MeshStandardMaterial({ color })
@@ -159,7 +183,8 @@ function addPart(x, y, z, w, h, d, color, rot) {
   mesh.rotation.y = rot;
   mesh.castShadow = true; mesh.receiveShadow = true;
   scene.add(mesh);
-  const p = { mesh, w, h, d, color, rot };
+  const p = { mesh, w, h, d, color, rot, type };
+  applyAppearance(p);
   parts.push(p);
   return p;
 }
@@ -172,7 +197,7 @@ function removePart(p) {
 function rebuildColliders() {
   colliders = parts.map(p => {
     const x = p.mesh.position.x, y = p.mesh.position.y, z = p.mesh.position.z;
-    return { cx:x, cz:z, y0:y-p.h/2, y1:y+p.h/2, hw:p.w/2, hd:p.d/2, a:p.rot };
+    return { cx:x, cz:z, y0:y-p.h/2, y1:y+p.h/2, hw:p.w/2, hd:p.d/2, a:p.rot, type:p.type };
   });
 }
 
@@ -185,13 +210,16 @@ function buildDefaultWorld() {
   addPart(-WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a);
   for (let i = 0; i < 5; i++) { const h = 0.8*(i+1); addPart(-14+i*5, h/2, 20, 4, h, 4, boxMat[i%5]); }
   addPart(20, 1.5, -18, 10, 3, 10, 0x2ecc71);
-  addPart(20, 4.5, -18, 4, 3, 4, 0x27ae60);
   addPart(-25, 2, -25, 12, 4, 12, 0x16a085);
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 9; i++) {
     const w = 1.5+Math.random()*3, h = 1+Math.random()*4;
-    const a = Math.random()*Math.PI*2, dist = 30+Math.random()*45;
+    const a = Math.random()*Math.PI*2, dist = 34+Math.random()*40;
     addPart(Math.cos(a)*dist, h/2, Math.sin(a)*dist, w, h, w, boxMat[i%5]);
   }
+  // 특수 블록 데모
+  addPart(0, 0.5, -9, 4, 1, 4, 0xffffff, 0, 'checkpoint');   // 시작 앞 체크포인트
+  addPart(34, 1, 8, 14, 2, 14, 0x2e8fd8, 0, 'water');        // 물웅덩이
+  addPart(-12, 0.6, 36, 12, 1.2, 12, 0x5a1000, 0, 'lava');   // 용암 웅덩이
 }
 
 // ---------- Cameras ----------
@@ -218,7 +246,7 @@ function updateEditCam() {
 }
 updateEditCam();
 
-// ---------- Move gizmo (3-axis arrows) ----------
+// ---------- Move gizmo ----------
 const gizmo = new THREE.Group();
 gizmo.visible = false;
 scene.add(gizmo);
@@ -243,6 +271,7 @@ gizmo.add(makeArrow('z', 0x4488ff));
 
 // ---------- Mode ----------
 let mode = 'play';
+const respawnPoint = new THREE.Vector3(0, EYE_HEIGHT, 0);
 function setMode(m) {
   mode = m;
   const editing = m === 'edit';
@@ -258,6 +287,10 @@ function setMode(m) {
   } else {
     rebuildColliders();
     deselect();
+    // 플레이 시작: 스폰 초기화
+    respawnPoint.set(0, EYE_HEIGHT, 0);
+    yawObject.position.copy(respawnPoint);
+    vertVel = 0; velocity.set(0,0,0);
     overlay.style.display = 'flex';
   }
 }
@@ -307,9 +340,9 @@ const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
 let selected = null;
 let outline = null;
-let dragging = false;      // rotate/scale body drag
+let dragging = false;
 let orbiting = false;
-let draggingAxis = false;  // gizmo axis drag
+let draggingAxis = false;
 let axisName = null;
 let lastX = 0, lastY = 0;
 let snap = true;
@@ -322,8 +355,6 @@ const tmpW = new THREE.Vector3();
 let sc0 = 0, startComp = 0;
 
 function setNDC(e) { ndc.x = (e.clientX/window.innerWidth)*2-1; ndc.y = -(e.clientY/window.innerHeight)*2+1; }
-
-// 축선 A+t*u 위에서 마우스 레이에 가장 가까운 파라미터 t
 function closestAxisParam(r, A, u) {
   const O = r.origin, v = r.direction;
   tmpW.copy(A).sub(O);
@@ -332,7 +363,6 @@ function closestAxisParam(r, A, u) {
   if (Math.abs(denom) < 1e-6) return 0;
   return (b*e - d) / denom;
 }
-
 function refreshOutline() {
   if (outline) { if (outline.parent) outline.parent.remove(outline); outline.geometry.dispose(); outline.material.dispose(); outline = null; }
   if (!selected) return;
@@ -348,7 +378,6 @@ canvas.addEventListener('mousedown', (e) => {
   setNDC(e);
   ray.setFromCamera(ndc, editCam);
   if (e.button === 0) {
-    // 1) 이동 툴 + 기즈모 화살표 먼저
     if (activeTool === 'move' && gizmo.visible) {
       const gh = ray.intersectObjects(gizmoHandles, false);
       if (gh.length) {
@@ -361,7 +390,6 @@ canvas.addEventListener('mousedown', (e) => {
         return;
       }
     }
-    // 2) 파트 선택
     const hits = ray.intersectObjects(parts.map(p => p.mesh));
     if (hits.length) {
       const p = parts.find(pp => pp.mesh === hits[0].object);
@@ -430,6 +458,9 @@ function renderProps() {
   const p = selected, m = p.mesh.position;
   const f = (v) => v.toFixed(2);
   const deg = Math.round(p.rot * 180 / Math.PI);
+  const typeNames = { solid:'일반', water:'물', checkpoint:'체크포인트', lava:'용암' };
+  let opts = '';
+  TYPES.forEach(t => { opts += '<option value="'+t+'"'+(p.type===t?' selected':'')+'>'+typeNames[t]+'</option>'; });
   propsBody.innerHTML =
     '<div class="grid">' +
     '<label>X</label><input type="number" step="1" id="pX" value="'+f(m.x)+'">' +
@@ -439,9 +470,9 @@ function renderProps() {
     '<label>H</label><input type="number" step="0.5" min="0.2" id="pH" value="'+p.h+'">' +
     '<label>D</label><input type="number" step="0.5" min="0.2" id="pD" value="'+p.d+'">' +
     '</div>' +
-    '<div class="rotrow"><span>회전°</span><input type="number" step="15" id="pR" value="'+deg+'"></div>' +
-    '<div class="colorrow"><span>색</span>' +
-    '<input type="color" id="pC" value="#'+p.color.toString(16).padStart(6,'0')+'"></div>' +
+    '<div class="row2"><span>회전°</span><input type="number" step="15" id="pR" value="'+deg+'"></div>' +
+    '<div class="row2"><span>종류</span><select id="pType">'+opts+'</select></div>' +
+    '<div class="row2"><span>색</span><input type="color" id="pC" value="#'+p.color.toString(16).padStart(6,'0')+'"></div>' +
     '<div class="hint">화살표로 이동 · Q/E 회전</div>';
   const bind = (id, fn) => document.getElementById(id).addEventListener('input', (e) => { fn(parseFloat(e.target.value)); });
   bind('pX', v => selected.mesh.position.x = v);
@@ -457,9 +488,12 @@ function renderProps() {
   bind('pH', v => { selected.h = Math.max(0.2, v); resize(); });
   bind('pD', v => { selected.d = Math.max(0.2, v); resize(); });
   bind('pR', v => { selected.rot = (v || 0) * Math.PI / 180; selected.mesh.rotation.y = selected.rot; refreshOutline(); });
+  document.getElementById('pType').addEventListener('change', (e) => {
+    selected.type = e.target.value; applyAppearance(selected);
+  });
   document.getElementById('pC').addEventListener('input', (e) => {
     const c = parseInt(e.target.value.slice(1), 16);
-    selected.color = c; selected.mesh.material.color.setHex(c);
+    selected.color = c; if (selected.type === 'solid') selected.mesh.material.color.setHex(c);
   });
 }
 
@@ -471,7 +505,7 @@ document.getElementById('btnAdd').onclick = () => {
 document.getElementById('btnDup').onclick = () => {
   if (!selected) return;
   const s = selected, m = s.mesh.position;
-  select(addPart(m.x + (snap?1:0.5), m.y, m.z + (snap?1:0.5), s.w, s.h, s.d, s.color, s.rot));
+  select(addPart(m.x + (snap?1:0.5), m.y, m.z + (snap?1:0.5), s.w, s.h, s.d, s.color, s.rot, s.type));
 };
 document.getElementById('btnDel').onclick = () => { if (selected) removePart(selected); };
 const btnSnap = document.getElementById('btnSnap');
@@ -480,13 +514,13 @@ btnSnap.onclick = () => { snap = !snap; btnSnap.textContent = snap ? '스냅 1' 
 function serialize() {
   return JSON.stringify(parts.map(p => ({
     x: +p.mesh.position.x.toFixed(3), y: +p.mesh.position.y.toFixed(3), z: +p.mesh.position.z.toFixed(3),
-    w: p.w, h: p.h, d: p.d, color: p.color, rot: +p.rot.toFixed(4)
+    w: p.w, h: p.h, d: p.d, color: p.color, rot: +p.rot.toFixed(4), type: p.type
   })));
 }
 function loadFromData(arr) {
   while (parts.length) removePart(parts[0]);
   deselect();
-  arr.forEach(o => addPart(o.x, o.y, o.z, o.w, o.h, o.d, o.color, o.rot || 0));
+  arr.forEach(o => addPart(o.x, o.y, o.z, o.w, o.h, o.d, o.color, o.rot || 0, o.type || 'solid'));
 }
 
 document.getElementById('btnSave').onclick = () => {
@@ -525,14 +559,23 @@ function flash(msg) {
 }
 
 // ---------- Physics ----------
-const WALK = 6, RUN = 11, GRAVITY = 24, JUMP_SPEED = 8;
-let vertVel = 0, onGround = true;
+const WALK = 6, RUN = 11, GRAVITY = 24, JUMP_SPEED = 8, WATER_FACTOR = 0.45;
+let vertVel = 0, onGround = true, inWater = false;
 const velocity = new THREE.Vector3();
 const forward = new THREE.Vector3(), right = new THREE.Vector3();
 const clock = new THREE.Clock();
 
+function respawn() {
+  yawObject.position.copy(respawnPoint);
+  vertVel = 0; velocity.set(0,0,0);
+  splash.style.background = 'rgba(200,0,0,0.5)';
+  splash.style.opacity = '1';
+  setTimeout(() => { splash.style.opacity = '0'; }, 120);
+}
+
 function physics(dt) {
-  const speed = keys['ShiftLeft'] || keys['ShiftRight'] ? RUN : WALK;
+  const shift = keys['ShiftLeft'] || keys['ShiftRight'];
+  const speed = inWater ? (shift ? WALK : WALK * WATER_FACTOR) : (shift ? RUN : WALK);
   const y = yawObject.rotation.y;
   forward.set(-Math.sin(y), 0, -Math.cos(y));
   right.set(Math.cos(y), 0, -Math.sin(y));
@@ -549,7 +592,9 @@ function physics(dt) {
 
   const pos = yawObject.position, R = 0.4, H = EYE_HEIGHT;
 
+  // 수평 충돌 (solid + checkpoint만 막힘)
   for (const c of colliders) {
+    if (c.type !== 'solid' && c.type !== 'checkpoint') continue;
     const feetY = pos.y - H, headY = pos.y;
     if (feetY >= c.y1 - 0.05 || headY <= c.y0) continue;
     const ca = Math.cos(c.a), sa = Math.sin(c.a);
@@ -569,11 +614,13 @@ function physics(dt) {
   pos.x = Math.max(-lim, Math.min(lim, pos.x));
   pos.z = Math.max(-lim, Math.min(lim, pos.z));
 
+  // 중력 + 착지 (solid + checkpoint)
   if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
   vertVel -= GRAVITY * dt;
   pos.y += vertVel * dt;
   let groundY = EYE_HEIGHT;
   for (const c of colliders) {
+    if (c.type !== 'solid' && c.type !== 'checkpoint') continue;
     const ca = Math.cos(c.a), sa = Math.sin(c.a);
     const dx = pos.x - c.cx, dz = pos.z - c.cz;
     const lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
@@ -584,17 +631,46 @@ function physics(dt) {
   }
   if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; } else onGround = false;
 
+  // 트리거 판정 (물/체크포인트/용암)
+  let nowInWater = false;
+  const feetY = pos.y - H, headY = pos.y;
+  for (const c of colliders) {
+    const ca = Math.cos(c.a), sa = Math.sin(c.a);
+    const dx = pos.x - c.cx, dz = pos.z - c.cz;
+    const lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
+    const inside = lx > -(c.hw+R) && lx < (c.hw+R) && lz > -(c.hd+R) && lz < (c.hd+R);
+    if (!inside) continue;
+    const yOverlap = feetY < c.y1 && headY > c.y0;
+    if (c.type === 'water' && yOverlap) nowInWater = true;
+    else if (c.type === 'lava' && yOverlap) { respawn(); return; }
+    else if (c.type === 'checkpoint' && feetY <= c.y1 + 0.2 && headY > c.y0) {
+      respawnPoint.set(c.cx, c.y1 + EYE_HEIGHT, c.cz);
+    }
+  }
+  inWater = nowInWater;
+
   const p = pos;
-  hud.textContent = 'x:'+p.x.toFixed(1)+'  z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+'\n'+(onGround?'ground':'air');
+  hud.textContent = 'x:'+p.x.toFixed(1)+'  z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
+    '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'');
 }
 
 // ---------- Loop ----------
 buildDefaultWorld();
 rebuildColliders();
 
+let glowT = 0;
+function updateGlow(dt) {
+  glowT += dt;
+  for (const p of parts) {
+    if (p.type === 'checkpoint') p.mesh.material.emissiveIntensity = 0.6 + 0.4 * Math.sin(glowT * 3);
+    else if (p.type === 'lava') p.mesh.material.emissiveIntensity = 0.85 + 0.25 * Math.sin(glowT * 5);
+  }
+}
+
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
+  updateGlow(dt);
   if (mode === 'play') {
     gizmo.visible = false;
     physics(dt); renderer.render(scene, playCam); hud.style.display = 'block';
