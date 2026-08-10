@@ -389,6 +389,10 @@ let orbiting = false;
 let rmbDown = false;
 let marqueeActive = false;
 let marqueeX0 = 0, marqueeY0 = 0;
+let groupDragging = false;
+const groupPlane = new THREE.Plane();
+const groupStartHit = new THREE.Vector3();
+let groupStartPos = [];
 let draggingAxis = false;
 let scalingAxis = false;
 let scaleDim = null, startHalf = 0;
@@ -479,6 +483,13 @@ canvas.addEventListener('mousedown', (e) => {
       marqueeX0 = e.clientX; marqueeY0 = e.clientY;
       marqueeEl.style.display = 'block';
       updateMarqueeRect(e.clientX, e.clientY);
+    } else if (selection.length > 1) {   // 여러 개 선택 상태 → 우클릭 드래그로 그룹 이동
+      let cy = 0; for (const p of selection) cy += p.mesh.position.y; cy /= selection.length;
+      groupPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0,1,0), new THREE.Vector3(0, cy, 0));
+      if (ray.ray.intersectPlane(groupPlane, groupStartHit)) {
+        groupStartPos = selection.map(p => p.mesh.position.clone());
+        groupDragging = true;
+      }
     } else {
       orbiting = true; rmbDown = true; lastX = e.clientX; lastY = e.clientY;
     }
@@ -487,6 +498,19 @@ canvas.addEventListener('mousedown', (e) => {
 window.addEventListener('mousemove', (e) => {
   if (mode !== 'edit') return;
   if (marqueeActive) { updateMarqueeRect(e.clientX, e.clientY); return; }
+  if (groupDragging) {
+    setNDC(e);
+    ray.setFromCamera(ndc, editCam);
+    if (ray.ray.intersectPlane(groupPlane, hitPoint)) {
+      let dx = hitPoint.x - groupStartHit.x, dz = hitPoint.z - groupStartHit.z;
+      if (snap) { dx = Math.round(dx); dz = Math.round(dz); }
+      for (let i = 0; i < selection.length; i++) {
+        selection[i].mesh.position.x = groupStartPos[i].x + dx;
+        selection[i].mesh.position.z = groupStartPos[i].z + dz;
+      }
+    }
+    return;
+  }
   if (draggingAxis && selected) {
     setNDC(e);
     ray.setFromCamera(ndc, editCam);
@@ -532,7 +556,7 @@ window.addEventListener('mousemove', (e) => {
 });
 window.addEventListener('mouseup', (e) => {
   if (marqueeActive) { finishMarquee(e); }
-  dragging = false; orbiting = false; draggingAxis = false; scalingAxis = false; rmbDown = false;
+  dragging = false; orbiting = false; draggingAxis = false; scalingAxis = false; rmbDown = false; groupDragging = false;
 });
 const groundFocus = new THREE.Vector3();
 const focusObjs = [];
