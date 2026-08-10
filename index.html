@@ -278,25 +278,33 @@ gizmo.add(makeArrow('x', 0xff4444));
 gizmo.add(makeArrow('y', 0x44dd55));
 gizmo.add(makeArrow('z', 0x4488ff));
 
-// ---------- Scale gizmo (face handles) ----------
+// ---------- Scale gizmo (double-ended arrows, Blockbench style) ----------
 const scaleGizmo = new THREE.Group();
 scaleGizmo.visible = false;
 scene.add(scaleGizmo);
-const scaleHandles = [];
-function makeScaleHandle(dim, color) {
-  const m = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.5, 0.5),
-    new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true })
-  );
-  m.renderOrder = 999;
-  m.userData.dim = dim;
-  scaleHandles.push(m);
-  scaleGizmo.add(m);
-  return m;
+const scaleArrows = [];        // { group, dim, dir }
+const scaleHandleMeshes = [];
+function makeScaleArrow(dim, color, orient, dirLocal) {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.1, 8), mat);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 10), mat);
+  shaft.position.y = 0.55; tip.position.y = 1.35;
+  shaft.renderOrder = 999; tip.renderOrder = 999;
+  shaft.userData.dim = dim; tip.userData.dim = dim;
+  g.add(shaft); g.add(tip);
+  orient(g);
+  scaleGizmo.add(g);
+  scaleArrows.push({ group: g, dim, dir: dirLocal });
+  scaleHandleMeshes.push(shaft, tip);
+  return g;
 }
-const shW = makeScaleHandle('w', 0xff4444);
-const shH = makeScaleHandle('h', 0x44dd55);
-const shD = makeScaleHandle('d', 0x4488ff);
+makeScaleArrow('w', 0xff4444, g => g.rotation.z = -Math.PI/2, new THREE.Vector3(1,0,0));
+makeScaleArrow('w', 0xff4444, g => g.rotation.z =  Math.PI/2, new THREE.Vector3(-1,0,0));
+makeScaleArrow('h', 0x44dd55, g => {},                        new THREE.Vector3(0,1,0));
+makeScaleArrow('h', 0x44dd55, g => g.rotation.x =  Math.PI,   new THREE.Vector3(0,-1,0));
+makeScaleArrow('d', 0x4488ff, g => g.rotation.x =  Math.PI/2, new THREE.Vector3(0,0,1));
+makeScaleArrow('d', 0x4488ff, g => g.rotation.x = -Math.PI/2, new THREE.Vector3(0,0,-1));
 
 // ---------- Mode ----------
 let mode = 'play';
@@ -424,10 +432,10 @@ canvas.addEventListener('mousedown', (e) => {
       }
     }
     if (activeTool === 'scale' && scaleGizmo.visible) {
-      const sh = ray.intersectObjects(scaleHandles, false);
+      const sh = ray.intersectObjects(scaleHandleMeshes, false);
       if (sh.length) {
         scaleDim = sh[0].object.userData.dim;
-        const hw = new THREE.Vector3(); sh[0].object.getWorldPosition(hw);
+        const hw = new THREE.Vector3(); sh[0].object.parent.getWorldPosition(hw);
         scaleAxisDir.copy(hw).sub(selected.mesh.position).normalize();
         scaleOrigin.copy(selected.mesh.position);
         sc0 = closestAxisParam(ray.ray, scaleOrigin, scaleAxisDir);
@@ -470,12 +478,15 @@ window.addEventListener('mousemove', (e) => {
     setNDC(e);
     ray.setFromCamera(ndc, editCam);
     const sc = closestAxisParam(ray.ray, scaleOrigin, scaleAxisDir);
-    let nh = startHalf + (sc - sc0);
-    let dim = Math.max(0.2, nh * 2);
-    if (snap) dim = Math.max(0.5, Math.round(dim * 2) / 2);
+    let newHalf = startHalf + (sc - sc0);
+    if (newHalf < 0.1) newHalf = 0.1;
+    let dim = newHalf * 2;
+    if (snap) { dim = Math.max(0.5, Math.round(dim * 2) / 2); newHalf = dim / 2; }
+    const delta = newHalf - startHalf;   // 잡은 면만 이동, 반대 면 고정
     if (scaleDim === 'w') selected.w = dim; else if (scaleDim === 'h') selected.h = dim; else selected.d = dim;
     selected.mesh.geometry.dispose();
     selected.mesh.geometry = new THREE.BoxGeometry(selected.w, selected.h, selected.d);
+    selected.mesh.position.copy(scaleOrigin).addScaledVector(scaleAxisDir, delta);
     refreshOutline(); renderProps();
     return;
   }
@@ -749,11 +760,14 @@ function animate() {
       scaleGizmo.position.copy(selected.mesh.position);
       scaleGizmo.rotation.y = selected.rot;
       const dist = editCam.position.distanceTo(scaleGizmo.position);
-      const s = Math.max(0.5, dist / 40);
-      const pad = 0.5 * s;
-      shW.position.set(selected.w/2 + pad, 0, 0); shW.scale.setScalar(s);
-      shH.position.set(0, selected.h/2 + pad, 0); shH.scale.setScalar(s);
-      shD.position.set(0, 0, selected.d/2 + pad); shD.scale.setScalar(s);
+      const s = Math.max(0.5, dist / 45);
+      const pad = 0.3 * s;
+      const hw = selected.w/2, hh = selected.h/2, hd = selected.d/2;
+      for (const a of scaleArrows) {
+        const off = (a.dim==='w'?hw : a.dim==='h'?hh : hd) + pad;
+        a.group.position.set(a.dir.x*off, a.dir.y*off, a.dir.z*off);
+        a.group.scale.setScalar(s);
+      }
     } else {
       scaleGizmo.visible = false;
     }
