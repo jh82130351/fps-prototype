@@ -278,6 +278,26 @@ gizmo.add(makeArrow('x', 0xff4444));
 gizmo.add(makeArrow('y', 0x44dd55));
 gizmo.add(makeArrow('z', 0x4488ff));
 
+// ---------- Scale gizmo (face handles) ----------
+const scaleGizmo = new THREE.Group();
+scaleGizmo.visible = false;
+scene.add(scaleGizmo);
+const scaleHandles = [];
+function makeScaleHandle(dim, color) {
+  const m = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.5, 0.5),
+    new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true })
+  );
+  m.renderOrder = 999;
+  m.userData.dim = dim;
+  scaleHandles.push(m);
+  scaleGizmo.add(m);
+  return m;
+}
+const shW = makeScaleHandle('w', 0xff4444);
+const shH = makeScaleHandle('h', 0x44dd55);
+const shD = makeScaleHandle('d', 0x4488ff);
+
 // ---------- Mode ----------
 let mode = 'play';
 const respawnPoint = new THREE.Vector3(0, EYE_HEIGHT, 0);
@@ -352,6 +372,10 @@ let outline = null;
 let dragging = false;
 let orbiting = false;
 let draggingAxis = false;
+let scalingAxis = false;
+let scaleDim = null, startHalf = 0;
+const scaleAxisDir = new THREE.Vector3();
+const scaleOrigin = new THREE.Vector3();
 let axisName = null;
 let lastX = 0, lastY = 0;
 let snap = true;
@@ -399,11 +423,24 @@ canvas.addEventListener('mousedown', (e) => {
         return;
       }
     }
+    if (activeTool === 'scale' && scaleGizmo.visible) {
+      const sh = ray.intersectObjects(scaleHandles, false);
+      if (sh.length) {
+        scaleDim = sh[0].object.userData.dim;
+        const hw = new THREE.Vector3(); sh[0].object.getWorldPosition(hw);
+        scaleAxisDir.copy(hw).sub(selected.mesh.position).normalize();
+        scaleOrigin.copy(selected.mesh.position);
+        sc0 = closestAxisParam(ray.ray, scaleOrigin, scaleAxisDir);
+        startHalf = (scaleDim==='w'?selected.w : scaleDim==='h'?selected.h : selected.d) / 2;
+        scalingAxis = true;
+        return;
+      }
+    }
     const hits = ray.intersectObjects(parts.map(p => p.mesh));
     if (hits.length) {
       const p = parts.find(pp => pp.mesh === hits[0].object);
       select(p);
-      if (activeTool === 'rotate' || activeTool === 'scale') {
+      if (activeTool === 'rotate') {
         dragStart = { mx: e.clientX, my: e.clientY, w: p.w, h: p.h, rot: p.rot };
         dragging = true;
       }
@@ -429,19 +466,24 @@ window.addEventListener('mousemove', (e) => {
     renderProps();
     return;
   }
+  if (scalingAxis && selected) {
+    setNDC(e);
+    ray.setFromCamera(ndc, editCam);
+    const sc = closestAxisParam(ray.ray, scaleOrigin, scaleAxisDir);
+    let nh = startHalf + (sc - sc0);
+    let dim = Math.max(0.2, nh * 2);
+    if (snap) dim = Math.max(0.5, Math.round(dim * 2) / 2);
+    if (scaleDim === 'w') selected.w = dim; else if (scaleDim === 'h') selected.h = dim; else selected.d = dim;
+    selected.mesh.geometry.dispose();
+    selected.mesh.geometry = new THREE.BoxGeometry(selected.w, selected.h, selected.d);
+    refreshOutline(); renderProps();
+    return;
+  }
   if (dragging && selected) {
     if (activeTool === 'rotate') {
       let nr = dragStart.rot + (e.clientX - dragStart.mx) * 0.01;
       if (snap) nr = Math.round(nr / (Math.PI/12)) * (Math.PI/12);
       selected.rot = nr; selected.mesh.rotation.y = nr;
-      refreshOutline(); renderProps();
-    } else if (activeTool === 'scale') {
-      let nw = dragStart.w + (e.clientX - dragStart.mx) * 0.03;
-      let nh = dragStart.h + (dragStart.my - e.clientY) * 0.03;
-      if (snap) { nw = Math.round(nw*2)/2; nh = Math.round(nh*2)/2; }
-      selected.w = Math.max(0.2, nw); selected.h = Math.max(0.2, nh);
-      selected.mesh.geometry.dispose();
-      selected.mesh.geometry = new THREE.BoxGeometry(selected.w, selected.h, selected.d);
       refreshOutline(); renderProps();
     }
   } else if (orbiting) {
@@ -452,7 +494,7 @@ window.addEventListener('mousemove', (e) => {
     updateEditCam();
   }
 });
-window.addEventListener('mouseup', () => { dragging = false; orbiting = false; draggingAxis = false; });
+window.addEventListener('mouseup', () => { dragging = false; orbiting = false; draggingAxis = false; scalingAxis = false; });
 canvas.addEventListener('wheel', (e) => {
   if (mode !== 'edit') return;
   e.preventDefault();
@@ -691,6 +733,7 @@ function animate() {
   waterOverlay.style.opacity = (mode === 'play' && inWater) ? '1' : '0';
   if (mode === 'play') {
     gizmo.visible = false;
+    scaleGizmo.visible = false;
     physics(dt); renderer.render(scene, playCam); hud.style.display = 'block';
   } else {
     if (selected && activeTool === 'move') {
@@ -700,6 +743,19 @@ function animate() {
       gizmo.scale.setScalar(Math.max(0.5, dist / 32));
     } else {
       gizmo.visible = false;
+    }
+    if (selected && activeTool === 'scale') {
+      scaleGizmo.visible = true;
+      scaleGizmo.position.copy(selected.mesh.position);
+      scaleGizmo.rotation.y = selected.rot;
+      const dist = editCam.position.distanceTo(scaleGizmo.position);
+      const s = Math.max(0.5, dist / 40);
+      const pad = 0.5 * s;
+      shW.position.set(selected.w/2 + pad, 0, 0); shW.scale.setScalar(s);
+      shH.position.set(0, selected.h/2 + pad, 0); shH.scale.setScalar(s);
+      shD.position.set(0, 0, selected.d/2 + pad); shD.scale.setScalar(s);
+    } else {
+      scaleGizmo.visible = false;
     }
     renderer.render(scene, editCam); hud.style.display = 'none';
   }
