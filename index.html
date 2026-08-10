@@ -20,7 +20,7 @@
 
   #tools { position: absolute; top: 42px; left: 50%; transform: translateX(-50%); z-index: 7;
     display: none; gap: 5px; }
-  #tools button { padding: 7px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+  #tools button { padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
     border: 1px solid #3a4553; border-radius: 6px; background: rgba(28,37,48,0.92); color: #cdd6e0; }
   #tools button:hover { background: rgba(38,49,63,0.95); }
   #tools button.on { background: #2d7dd2; border-color: #2d7dd2; color: #fff; }
@@ -71,9 +71,8 @@
 
 <div id="tools">
   <button id="tMove" class="on" title="이동 (1)">✥ 이동</button>
-  <button id="tRaise" title="높이 (2)">↕ 높이</button>
-  <button id="tRot" title="회전 (3)">⟳ 회전</button>
-  <button id="tScale" title="크기 (4)">⤢ 크기</button>
+  <button id="tRot" title="회전 (2)">⟳ 회전</button>
+  <button id="tScale" title="크기 (3)">⤢ 크기</button>
 </div>
 
 <div id="toolbar">
@@ -94,7 +93,7 @@
   <p>
     <kbd>Tab</kbd> 편집 / 플레이 전환<br>
     플레이: <kbd>WASD</kbd> · 마우스 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프<br>
-    편집: 상단 툴 선택 · 파트 클릭 후 드래그 · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> 툴 전환
+    편집: 파트 클릭 → 축 화살표 드래그로 이동 · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 툴
   </p>
 </div>
 
@@ -110,7 +109,6 @@ const propsEl = document.getElementById('props');
 const propsBody = document.getElementById('propsBody');
 const toolBtns = {
   move: document.getElementById('tMove'),
-  raise: document.getElementById('tRaise'),
   rotate: document.getElementById('tRot'),
   scale: document.getElementById('tScale'),
 };
@@ -220,6 +218,29 @@ function updateEditCam() {
 }
 updateEditCam();
 
+// ---------- Move gizmo (3-axis arrows) ----------
+const gizmo = new THREE.Group();
+gizmo.visible = false;
+scene.add(gizmo);
+const gizmoHandles = [];
+function makeArrow(axis, color) {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 3, 8), mat);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.7, 12), mat);
+  shaft.position.y = 1.5; tip.position.y = 3.35;
+  shaft.userData.axis = axis; tip.userData.axis = axis;
+  shaft.renderOrder = 999; tip.renderOrder = 999;
+  g.add(shaft); g.add(tip);
+  if (axis === 'x') g.rotation.z = -Math.PI / 2;
+  if (axis === 'z') g.rotation.x = Math.PI / 2;
+  gizmoHandles.push(shaft, tip);
+  return g;
+}
+gizmo.add(makeArrow('x', 0xff4444));
+gizmo.add(makeArrow('y', 0x44dd55));
+gizmo.add(makeArrow('z', 0x4488ff));
+
 // ---------- Mode ----------
 let mode = 'play';
 function setMode(m) {
@@ -255,18 +276,17 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Tab') { e.preventDefault(); setMode(mode === 'play' ? 'edit' : 'play'); return; }
   if (mode === 'edit') {
     if (e.code === 'Digit1') { setTool('move'); return; }
-    if (e.code === 'Digit2') { setTool('raise'); return; }
-    if (e.code === 'Digit3') { setTool('rotate'); return; }
-    if (e.code === 'Digit4') { setTool('scale'); return; }
-  }
-  if (mode === 'edit' && selected) {
-    if (e.code === 'Delete') { removePart(selected); return; }
-    if (e.code === 'KeyQ' || e.code === 'KeyE') {
-      const step = Math.PI / 12; // 15도
-      selected.rot += (e.code === 'KeyE' ? step : -step);
-      selected.mesh.rotation.y = selected.rot;
-      refreshOutline(); renderProps();
-      return;
+    if (e.code === 'Digit2') { setTool('rotate'); return; }
+    if (e.code === 'Digit3') { setTool('scale'); return; }
+    if (selected) {
+      if (e.code === 'Delete') { removePart(selected); return; }
+      if (e.code === 'KeyQ' || e.code === 'KeyE') {
+        const step = Math.PI / 12;
+        selected.rot += (e.code === 'KeyE' ? step : -step);
+        selected.mesh.rotation.y = selected.rot;
+        refreshOutline(); renderProps();
+        return;
+      }
     }
   }
   keys[e.code] = true;
@@ -287,23 +307,38 @@ const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
 let selected = null;
 let outline = null;
-let dragging = false;
+let dragging = false;      // rotate/scale body drag
 let orbiting = false;
+let draggingAxis = false;  // gizmo axis drag
+let axisName = null;
 let lastX = 0, lastY = 0;
 let snap = true;
 const dragPlane = new THREE.Plane();
 const hitPoint = new THREE.Vector3();
-const grabOffset = new THREE.Vector3();
 let dragStart = null;
+const axisDir = new THREE.Vector3();
+const axisOrigin = new THREE.Vector3();
+const tmpW = new THREE.Vector3();
+let sc0 = 0, startComp = 0;
 
 function setNDC(e) { ndc.x = (e.clientX/window.innerWidth)*2-1; ndc.y = -(e.clientY/window.innerHeight)*2+1; }
+
+// 축선 A+t*u 위에서 마우스 레이에 가장 가까운 파라미터 t
+function closestAxisParam(r, A, u) {
+  const O = r.origin, v = r.direction;
+  tmpW.copy(A).sub(O);
+  const b = u.dot(v), d = u.dot(tmpW), e = v.dot(tmpW);
+  const denom = 1 - b*b;
+  if (Math.abs(denom) < 1e-6) return 0;
+  return (b*e - d) / denom;
+}
 
 function refreshOutline() {
   if (outline) { if (outline.parent) outline.parent.remove(outline); outline.geometry.dispose(); outline.material.dispose(); outline = null; }
   if (!selected) return;
   const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(selected.w, selected.h, selected.d));
   outline = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffee00 }));
-  selected.mesh.add(outline);  // 자식 → 위치·회전 자동 추종
+  selected.mesh.add(outline);
 }
 function select(p) { selected = p; refreshOutline(); renderProps(); }
 function deselect() { selected = null; refreshOutline(); renderProps(); }
@@ -311,19 +346,30 @@ function deselect() { selected = null; refreshOutline(); renderProps(); }
 canvas.addEventListener('mousedown', (e) => {
   if (mode !== 'edit') return;
   setNDC(e);
+  ray.setFromCamera(ndc, editCam);
   if (e.button === 0) {
-    ray.setFromCamera(ndc, editCam);
+    // 1) 이동 툴 + 기즈모 화살표 먼저
+    if (activeTool === 'move' && gizmo.visible) {
+      const gh = ray.intersectObjects(gizmoHandles, false);
+      if (gh.length) {
+        axisName = gh[0].object.userData.axis;
+        axisDir.set(axisName==='x'?1:0, axisName==='y'?1:0, axisName==='z'?1:0);
+        axisOrigin.copy(selected.mesh.position);
+        sc0 = closestAxisParam(ray.ray, axisOrigin, axisDir);
+        startComp = axisName==='x' ? selected.mesh.position.x : axisName==='y' ? selected.mesh.position.y : selected.mesh.position.z;
+        draggingAxis = true;
+        return;
+      }
+    }
+    // 2) 파트 선택
     const hits = ray.intersectObjects(parts.map(p => p.mesh));
     if (hits.length) {
       const p = parts.find(pp => pp.mesh === hits[0].object);
       select(p);
-      dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0,1,0), p.mesh.position);
-      ray.ray.intersectPlane(dragPlane, hitPoint);
-      grabOffset.copy(p.mesh.position).sub(hitPoint);
-      dragStart = { mx: e.clientX, my: e.clientY,
-        x: p.mesh.position.x, y: p.mesh.position.y, z: p.mesh.position.z,
-        w: p.w, h: p.h, d: p.d, rot: p.rot };
-      dragging = true;
+      if (activeTool === 'rotate' || activeTool === 'scale') {
+        dragStart = { mx: e.clientX, my: e.clientY, w: p.w, h: p.h, rot: p.rot };
+        dragging = true;
+      }
     } else {
       deselect();
       orbiting = true; lastX = e.clientX; lastY = e.clientY;
@@ -334,30 +380,28 @@ canvas.addEventListener('mousedown', (e) => {
 });
 window.addEventListener('mousemove', (e) => {
   if (mode !== 'edit') return;
+  if (draggingAxis && selected) {
+    setNDC(e);
+    ray.setFromCamera(ndc, editCam);
+    const sc = closestAxisParam(ray.ray, axisOrigin, axisDir);
+    let val = startComp + (sc - sc0);
+    if (snap) val = axisName==='y' ? Math.round(val*2)/2 : Math.round(val);
+    if (axisName === 'x') selected.mesh.position.x = val;
+    else if (axisName === 'y') selected.mesh.position.y = Math.max(selected.h/2, val);
+    else selected.mesh.position.z = val;
+    renderProps();
+    return;
+  }
   if (dragging && selected) {
-    if (activeTool === 'move') {
-      setNDC(e);
-      ray.setFromCamera(ndc, editCam);
-      if (ray.ray.intersectPlane(dragPlane, hitPoint)) {
-        let nx = hitPoint.x + grabOffset.x, nz = hitPoint.z + grabOffset.z;
-        if (snap) { nx = Math.round(nx); nz = Math.round(nz); }
-        selected.mesh.position.x = nx; selected.mesh.position.z = nz;
-        renderProps();
-      }
-    } else if (activeTool === 'raise') {
-      let ny = dragStart.y + (dragStart.my - e.clientY) * 0.05;
-      if (snap) ny = Math.round(ny * 2) / 2;
-      selected.mesh.position.y = Math.max(selected.h / 2, ny);
-      renderProps();
-    } else if (activeTool === 'rotate') {
+    if (activeTool === 'rotate') {
       let nr = dragStart.rot + (e.clientX - dragStart.mx) * 0.01;
-      if (snap) nr = Math.round(nr / (Math.PI / 12)) * (Math.PI / 12);
+      if (snap) nr = Math.round(nr / (Math.PI/12)) * (Math.PI/12);
       selected.rot = nr; selected.mesh.rotation.y = nr;
       refreshOutline(); renderProps();
     } else if (activeTool === 'scale') {
       let nw = dragStart.w + (e.clientX - dragStart.mx) * 0.03;
       let nh = dragStart.h + (dragStart.my - e.clientY) * 0.03;
-      if (snap) { nw = Math.round(nw * 2) / 2; nh = Math.round(nh * 2) / 2; }
+      if (snap) { nw = Math.round(nw*2)/2; nh = Math.round(nh*2)/2; }
       selected.w = Math.max(0.2, nw); selected.h = Math.max(0.2, nh);
       selected.mesh.geometry.dispose();
       selected.mesh.geometry = new THREE.BoxGeometry(selected.w, selected.h, selected.d);
@@ -371,7 +415,7 @@ window.addEventListener('mousemove', (e) => {
     updateEditCam();
   }
 });
-window.addEventListener('mouseup', () => { dragging = false; orbiting = false; });
+window.addEventListener('mouseup', () => { dragging = false; orbiting = false; draggingAxis = false; });
 canvas.addEventListener('wheel', (e) => {
   if (mode !== 'edit') return;
   e.preventDefault();
@@ -398,7 +442,7 @@ function renderProps() {
     '<div class="rotrow"><span>회전°</span><input type="number" step="15" id="pR" value="'+deg+'"></div>' +
     '<div class="colorrow"><span>색</span>' +
     '<input type="color" id="pC" value="#'+p.color.toString(16).padStart(6,'0')+'"></div>' +
-    '<div class="hint">Q / E 로도 15° 회전</div>';
+    '<div class="hint">화살표로 이동 · Q/E 회전</div>';
   const bind = (id, fn) => document.getElementById(id).addEventListener('input', (e) => { fn(parseFloat(e.target.value)); });
   bind('pX', v => selected.mesh.position.x = v);
   bind('pY', v => selected.mesh.position.y = v);
@@ -505,20 +549,19 @@ function physics(dt) {
 
   const pos = yawObject.position, R = 0.4, H = EYE_HEIGHT;
 
-  // 수평 충돌 (회전 박스: 로컬 공간에서 AABB 밀어내기)
   for (const c of colliders) {
     const feetY = pos.y - H, headY = pos.y;
     if (feetY >= c.y1 - 0.05 || headY <= c.y0) continue;
     const ca = Math.cos(c.a), sa = Math.sin(c.a);
     const dx = pos.x - c.cx, dz = pos.z - c.cz;
-    let lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;   // 월드→로컬
+    let lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
     const bx = c.hw + R, bz = c.hd + R;
     if (lx > -bx && lx < bx && lz > -bz && lz < bz) {
       const pL = lx+bx, pR = bx-lx, pD = lz+bz, pU = bz-lz;
       const m = Math.min(pL, pR, pD, pU);
       if (m === pL) lx = -bx; else if (m === pR) lx = bx;
       else if (m === pD) lz = -bz; else lz = bz;
-      pos.x = c.cx + (lx*ca - lz*sa);            // 로컬→월드
+      pos.x = c.cx + (lx*ca - lz*sa);
       pos.z = c.cz + (lx*sa + lz*ca);
     }
   }
@@ -526,7 +569,6 @@ function physics(dt) {
   pos.x = Math.max(-lim, Math.min(lim, pos.x));
   pos.z = Math.max(-lim, Math.min(lim, pos.z));
 
-  // 수직 충돌 (착지)
   if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
   vertVel -= GRAVITY * dt;
   pos.y += vertVel * dt;
@@ -553,8 +595,20 @@ rebuildColliders();
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
-  if (mode === 'play') { physics(dt); renderer.render(scene, playCam); hud.style.display = 'block'; }
-  else { renderer.render(scene, editCam); hud.style.display = 'none'; }
+  if (mode === 'play') {
+    gizmo.visible = false;
+    physics(dt); renderer.render(scene, playCam); hud.style.display = 'block';
+  } else {
+    if (selected && activeTool === 'move') {
+      gizmo.visible = true;
+      gizmo.position.copy(selected.mesh.position);
+      const dist = editCam.position.distanceTo(gizmo.position);
+      gizmo.scale.setScalar(Math.max(0.5, dist / 32));
+    } else {
+      gizmo.visible = false;
+    }
+    renderer.render(scene, editCam); hud.style.display = 'none';
+  }
 }
 animate();
 
