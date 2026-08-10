@@ -34,6 +34,9 @@
     pointer-events: none; display: none; }
   #splash { position: absolute; inset: 0; z-index: 8; pointer-events: none; opacity: 0;
     transition: opacity 0.15s; }
+  #water { position: absolute; inset: 0; z-index: 4; pointer-events: none; opacity: 0;
+    transition: opacity 0.2s; background: radial-gradient(circle at 50% 45%,
+      rgba(30,120,200,0.22), rgba(12,60,110,0.5)); }
 
   #toolbar { position: absolute; top: 12px; right: 12px; z-index: 7; display: none;
     flex-direction: column; gap: 6px; width: 210px; }
@@ -69,6 +72,7 @@
 <body>
 <canvas id="app" tabindex="0"></canvas>
 <div id="crosshair"></div>
+<div id="water"></div>
 <div id="splash"></div>
 <div id="hud"></div>
 <div id="mode" class="play">PLAY</div>
@@ -108,6 +112,7 @@ const overlay = document.getElementById('overlay');
 const hud = document.getElementById('hud');
 const crosshair = document.getElementById('crosshair');
 const splash = document.getElementById('splash');
+const waterOverlay = document.getElementById('water');
 const modeBadge = document.getElementById('mode');
 const toolbar = document.getElementById('toolbar');
 const propsEl = document.getElementById('props');
@@ -675,6 +680,7 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
   updateGlow(dt);
+  waterOverlay.style.opacity = (mode === 'play' && inWater) ? '1' : '0';
   if (mode === 'play') {
     gizmo.visible = false;
     physics(dt); renderer.render(scene, playCam); hud.style.display = 'block';
