@@ -160,15 +160,19 @@ function applyAppearance(p) {
   if (p.type === 'water') {
     mat.color.setHex(0x2e8fd8); mat.transparent = true; mat.opacity = 0.5;
     mat.emissive.setHex(0x0a2a44); mat.emissiveIntensity = 0.3;
+    mat.side = THREE.DoubleSide; mat.depthWrite = false;
   } else if (p.type === 'checkpoint') {
     mat.color.setHex(0xffffff); mat.transparent = false; mat.opacity = 1;
     mat.emissive.setHex(0xfff0a0); mat.emissiveIntensity = 0.9;
+    mat.side = THREE.FrontSide; mat.depthWrite = true;
   } else if (p.type === 'lava') {
     mat.color.setHex(0x5a1000); mat.transparent = false; mat.opacity = 1;
     mat.emissive.setHex(0xff4400); mat.emissiveIntensity = 1.0;
+    mat.side = THREE.FrontSide; mat.depthWrite = true;
   } else {
     mat.color.setHex(p.color); mat.transparent = false; mat.opacity = 1;
     mat.emissive.setHex(0x000000); mat.emissiveIntensity = 0;
+    mat.side = THREE.FrontSide; mat.depthWrite = true;
   }
   mat.needsUpdate = true;
 }
