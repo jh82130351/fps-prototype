@@ -18,6 +18,13 @@
   #mode.edit { background: rgba(52,152,219,0.85); }
   #mode.play { background: rgba(46,204,113,0.85); }
 
+  #tools { position: absolute; top: 42px; left: 50%; transform: translateX(-50%); z-index: 7;
+    display: none; gap: 5px; }
+  #tools button { padding: 7px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+    border: 1px solid #3a4553; border-radius: 6px; background: rgba(28,37,48,0.92); color: #cdd6e0; }
+  #tools button:hover { background: rgba(38,49,63,0.95); }
+  #tools button.on { background: #2d7dd2; border-color: #2d7dd2; color: #fff; }
+
   #hud { position: absolute; top: 12px; left: 12px; z-index: 5; color: #7dd3fc; font-size: 12px;
     font-family: monospace; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px;
     line-height: 1.6; pointer-events: none; white-space: pre; }
@@ -62,6 +69,13 @@
 <div id="hud"></div>
 <div id="mode" class="play">PLAY</div>
 
+<div id="tools">
+  <button id="tMove" class="on" title="이동 (1)">✥ 이동</button>
+  <button id="tRaise" title="높이 (2)">↕ 높이</button>
+  <button id="tRot" title="회전 (3)">⟳ 회전</button>
+  <button id="tScale" title="크기 (4)">⤢ 크기</button>
+</div>
+
 <div id="toolbar">
   <div class="row"><button id="btnAdd">＋ 파트</button><button id="btnDup">복제</button></div>
   <div class="row"><button id="btnDel">삭제</button><button id="btnSnap" class="on">스냅 1</button></div>
@@ -80,7 +94,7 @@
   <p>
     <kbd>Tab</kbd> 편집 / 플레이 전환<br>
     플레이: <kbd>WASD</kbd> · 마우스 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프<br>
-    편집: 드래그 회전 · 휠 줌 · 파트 클릭 · 바닥 드래그 이동 · <kbd>Q</kbd><kbd>E</kbd> 회전
+    편집: 상단 툴 선택 · 파트 클릭 후 드래그 · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> 툴 전환
   </p>
 </div>
 
@@ -94,6 +108,16 @@ const modeBadge = document.getElementById('mode');
 const toolbar = document.getElementById('toolbar');
 const propsEl = document.getElementById('props');
 const propsBody = document.getElementById('propsBody');
+const toolBtns = {
+  move: document.getElementById('tMove'),
+  raise: document.getElementById('tRaise'),
+  rotate: document.getElementById('tRot'),
+  scale: document.getElementById('tScale'),
+};
+const toolsEl = document.getElementById('tools');
+let activeTool = 'move';
+function setTool(t) { activeTool = t; for (const k in toolBtns) toolBtns[k].classList.toggle('on', k === t); }
+for (const k in toolBtns) toolBtns[k].onclick = () => setTool(k);
 
 // ---------- Scene ----------
 const scene = new THREE.Scene();
@@ -204,6 +228,7 @@ function setMode(m) {
   modeBadge.textContent = editing ? 'EDIT' : 'PLAY';
   modeBadge.className = editing ? 'edit' : 'play';
   toolbar.style.display = editing ? 'flex' : 'none';
+  toolsEl.style.display = editing ? 'flex' : 'none';
   propsEl.style.display = editing ? 'block' : 'none';
   if (editing) {
     if (document.pointerLockElement === canvas) document.exitPointerLock();
@@ -228,6 +253,12 @@ const keys = {};
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') e.preventDefault();
   if (e.code === 'Tab') { e.preventDefault(); setMode(mode === 'play' ? 'edit' : 'play'); return; }
+  if (mode === 'edit') {
+    if (e.code === 'Digit1') { setTool('move'); return; }
+    if (e.code === 'Digit2') { setTool('raise'); return; }
+    if (e.code === 'Digit3') { setTool('rotate'); return; }
+    if (e.code === 'Digit4') { setTool('scale'); return; }
+  }
   if (mode === 'edit' && selected) {
     if (e.code === 'Delete') { removePart(selected); return; }
     if (e.code === 'KeyQ' || e.code === 'KeyE') {
@@ -263,6 +294,7 @@ let snap = true;
 const dragPlane = new THREE.Plane();
 const hitPoint = new THREE.Vector3();
 const grabOffset = new THREE.Vector3();
+let dragStart = null;
 
 function setNDC(e) { ndc.x = (e.clientX/window.innerWidth)*2-1; ndc.y = -(e.clientY/window.innerHeight)*2+1; }
 
@@ -288,6 +320,9 @@ canvas.addEventListener('mousedown', (e) => {
       dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0,1,0), p.mesh.position);
       ray.ray.intersectPlane(dragPlane, hitPoint);
       grabOffset.copy(p.mesh.position).sub(hitPoint);
+      dragStart = { mx: e.clientX, my: e.clientY,
+        x: p.mesh.position.x, y: p.mesh.position.y, z: p.mesh.position.z,
+        w: p.w, h: p.h, d: p.d, rot: p.rot };
       dragging = true;
     } else {
       deselect();
@@ -300,13 +335,33 @@ canvas.addEventListener('mousedown', (e) => {
 window.addEventListener('mousemove', (e) => {
   if (mode !== 'edit') return;
   if (dragging && selected) {
-    setNDC(e);
-    ray.setFromCamera(ndc, editCam);
-    if (ray.ray.intersectPlane(dragPlane, hitPoint)) {
-      let nx = hitPoint.x + grabOffset.x, nz = hitPoint.z + grabOffset.z;
-      if (snap) { nx = Math.round(nx); nz = Math.round(nz); }
-      selected.mesh.position.x = nx; selected.mesh.position.z = nz;
+    if (activeTool === 'move') {
+      setNDC(e);
+      ray.setFromCamera(ndc, editCam);
+      if (ray.ray.intersectPlane(dragPlane, hitPoint)) {
+        let nx = hitPoint.x + grabOffset.x, nz = hitPoint.z + grabOffset.z;
+        if (snap) { nx = Math.round(nx); nz = Math.round(nz); }
+        selected.mesh.position.x = nx; selected.mesh.position.z = nz;
+        renderProps();
+      }
+    } else if (activeTool === 'raise') {
+      let ny = dragStart.y + (dragStart.my - e.clientY) * 0.05;
+      if (snap) ny = Math.round(ny * 2) / 2;
+      selected.mesh.position.y = Math.max(selected.h / 2, ny);
       renderProps();
+    } else if (activeTool === 'rotate') {
+      let nr = dragStart.rot + (e.clientX - dragStart.mx) * 0.01;
+      if (snap) nr = Math.round(nr / (Math.PI / 12)) * (Math.PI / 12);
+      selected.rot = nr; selected.mesh.rotation.y = nr;
+      refreshOutline(); renderProps();
+    } else if (activeTool === 'scale') {
+      let nw = dragStart.w + (e.clientX - dragStart.mx) * 0.03;
+      let nh = dragStart.h + (dragStart.my - e.clientY) * 0.03;
+      if (snap) { nw = Math.round(nw * 2) / 2; nh = Math.round(nh * 2) / 2; }
+      selected.w = Math.max(0.2, nw); selected.h = Math.max(0.2, nh);
+      selected.mesh.geometry.dispose();
+      selected.mesh.geometry = new THREE.BoxGeometry(selected.w, selected.h, selected.d);
+      refreshOutline(); renderProps();
     }
   } else if (orbiting) {
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
