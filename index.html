@@ -37,6 +37,8 @@
   #water { position: absolute; inset: 0; z-index: 4; pointer-events: none; opacity: 0;
     transition: opacity 0.2s; background: radial-gradient(circle at 50% 45%,
       rgba(30,120,200,0.22), rgba(12,60,110,0.5)); }
+  #marquee { position: absolute; z-index: 9; pointer-events: none; display: none;
+    border: 1.5px solid #ff8c42; background: rgba(255,140,66,0.15); }
 
   #toolbar { position: absolute; top: 12px; right: 12px; z-index: 7; display: none;
     flex-direction: column; gap: 6px; width: 210px; }
@@ -74,6 +76,7 @@
 <div id="crosshair"></div>
 <div id="water"></div>
 <div id="splash"></div>
+<div id="marquee"></div>
 <div id="hud"></div>
 <div id="mode" class="play">PLAY</div>
 
@@ -182,7 +185,7 @@ function applyAppearance(p) {
   mat.needsUpdate = true;
 }
 
-function addPart(x, y, z, w, h, d, color, rot, type) {
+function addPart(x, y, z, w, h, d, color, rot, type, locked) {
   rot = rot || 0; type = type || 'solid';
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
@@ -192,7 +195,7 @@ function addPart(x, y, z, w, h, d, color, rot, type) {
   mesh.rotation.y = rot;
   mesh.castShadow = true; mesh.receiveShadow = true;
   scene.add(mesh);
-  const p = { mesh, w, h, d, color, rot, type };
+  const p = { mesh, w, h, d, color, rot, type, locked: !!locked };
   applyAppearance(p);
   parts.push(p);
   return p;
@@ -213,10 +216,10 @@ function rebuildColliders() {
 function buildDefaultWorld() {
   while (parts.length) removePart(parts[0]);
   const WALL = 96, WH = 5;
-  addPart( 0, WH/2,  WALL, WALL*2, WH, 2, 0x8a8a8a);
-  addPart( 0, WH/2, -WALL, WALL*2, WH, 2, 0x8a8a8a);
-  addPart( WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a);
-  addPart(-WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a);
+  addPart( 0, WH/2,  WALL, WALL*2, WH, 2, 0x8a8a8a, 0, 'solid', true);
+  addPart( 0, WH/2, -WALL, WALL*2, WH, 2, 0x8a8a8a, 0, 'solid', true);
+  addPart( WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a, 0, 'solid', true);
+  addPart(-WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a, 0, 'solid', true);
   for (let i = 0; i < 5; i++) { const h = 0.8*(i+1); addPart(-14+i*5, h/2, 20, 4, h, 4, boxMat[i%5]); }
   addPart(20, 1.5, -18, 10, 3, 10, 0x2ecc71);
   addPart(-25, 2, -25, 12, 4, 12, 0x16a085);
@@ -349,8 +352,10 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'Digit1') { setTool('move'); return; }
     if (e.code === 'Digit2') { setTool('rotate'); return; }
     if (e.code === 'Digit3') { setTool('scale'); return; }
+    if (selection.length) {
+      if (e.code === 'Delete') { const list = selection.slice(); deselect(); for (const p of list) removePart(p); return; }
+    }
     if (selected) {
-      if (e.code === 'Delete') { removePart(selected); return; }
       if (e.code === 'KeyQ' || e.code === 'KeyE') {
         const step = Math.PI / 12;
         selected.rot += (e.code === 'KeyE' ? step : -step);
@@ -377,10 +382,13 @@ document.addEventListener('mousemove', (e) => {
 const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
 let selected = null;
-let outline = null;
+let selection = [];
+const outlines = [];
 let dragging = false;
 let orbiting = false;
 let rmbDown = false;
+let marqueeActive = false;
+let marqueeX0 = 0, marqueeY0 = 0;
 let draggingAxis = false;
 let scalingAxis = false;
 let scaleDim = null, startHalf = 0;
@@ -407,14 +415,21 @@ function closestAxisParam(r, A, u) {
   return (b*e - d) / denom;
 }
 function refreshOutline() {
-  if (outline) { if (outline.parent) outline.parent.remove(outline); outline.geometry.dispose(); outline.material.dispose(); outline = null; }
-  if (!selected) return;
-  const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(selected.w, selected.h, selected.d));
-  outline = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffee00 }));
-  selected.mesh.add(outline);
+  for (const o of outlines) { if (o.parent) o.parent.remove(o); o.geometry.dispose(); o.material.dispose(); }
+  outlines.length = 0;
+  for (const p of selection) {
+    const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(p.w, p.h, p.d));
+    const o = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffee00 }));
+    p.mesh.add(o); outlines.push(o);
+  }
 }
-function select(p) { selected = p; refreshOutline(); renderProps(); }
-function deselect() { selected = null; refreshOutline(); renderProps(); }
+function setSelection(arr) {
+  selection = arr.slice();
+  selected = selection.length === 1 ? selection[0] : null;
+  refreshOutline(); renderProps();
+}
+function select(p) { setSelection([p]); }
+function deselect() { setSelection([]); }
 
 canvas.addEventListener('mousedown', (e) => {
   if (mode !== 'edit') return;
@@ -446,7 +461,7 @@ canvas.addEventListener('mousedown', (e) => {
         return;
       }
     }
-    const hits = ray.intersectObjects(parts.map(p => p.mesh));
+    const hits = ray.intersectObjects(parts.filter(p => !p.locked).map(p => p.mesh));
     if (hits.length) {
       const p = parts.find(pp => pp.mesh === hits[0].object);
       select(p);
@@ -459,11 +474,19 @@ canvas.addEventListener('mousedown', (e) => {
       orbiting = true; lastX = e.clientX; lastY = e.clientY;
     }
   } else if (e.button === 2) {
-    orbiting = true; rmbDown = true; lastX = e.clientX; lastY = e.clientY;
+    if (e.shiftKey) {   // Left Shift + 우클릭 → 박스 선택(마퀴)
+      marqueeActive = true;
+      marqueeX0 = e.clientX; marqueeY0 = e.clientY;
+      marqueeEl.style.display = 'block';
+      updateMarqueeRect(e.clientX, e.clientY);
+    } else {
+      orbiting = true; rmbDown = true; lastX = e.clientX; lastY = e.clientY;
+    }
   }
 });
 window.addEventListener('mousemove', (e) => {
   if (mode !== 'edit') return;
+  if (marqueeActive) { updateMarqueeRect(e.clientX, e.clientY); return; }
   if (draggingAxis && selected) {
     setNDC(e);
     ray.setFromCamera(ndc, editCam);
@@ -507,9 +530,44 @@ window.addEventListener('mousemove', (e) => {
     updateEditCam();
   }
 });
-window.addEventListener('mouseup', () => { dragging = false; orbiting = false; draggingAxis = false; scalingAxis = false; rmbDown = false; });
+window.addEventListener('mouseup', (e) => {
+  if (marqueeActive) { finishMarquee(e); }
+  dragging = false; orbiting = false; draggingAxis = false; scalingAxis = false; rmbDown = false;
+});
 const groundFocus = new THREE.Vector3();
 const focusObjs = [];
+const marqueeEl = document.getElementById('marquee');
+function updateMarqueeRect(x, y) {
+  const l = Math.min(marqueeX0, x), t = Math.min(marqueeY0, y);
+  const w = Math.abs(x - marqueeX0), h = Math.abs(y - marqueeY0);
+  marqueeEl.style.left = l + 'px'; marqueeEl.style.top = t + 'px';
+  marqueeEl.style.width = w + 'px'; marqueeEl.style.height = h + 'px';
+}
+const _corner = new THREE.Vector3();
+function partFullyInside(p, x0, y0, x1, y1) {
+  p.mesh.updateMatrixWorld();
+  const hw = p.w/2, hh = p.h/2, hd = p.d/2;
+  const W = window.innerWidth, H = window.innerHeight;
+  for (let sx = -1; sx <= 1; sx += 2)
+  for (let sy = -1; sy <= 1; sy += 2)
+  for (let sz = -1; sz <= 1; sz += 2) {
+    _corner.set(sx*hw, sy*hh, sz*hd).applyMatrix4(p.mesh.matrixWorld).project(editCam);
+    if (_corner.z > 1) return false;           // 카메라 뒤
+    const px = (_corner.x * 0.5 + 0.5) * W;
+    const py = (-_corner.y * 0.5 + 0.5) * H;
+    if (px < x0 || px > x1 || py < y0 || py > y1) return false;  // 하나라도 밖이면 제외
+  }
+  return true;
+}
+function finishMarquee(e) {
+  marqueeEl.style.display = 'none';
+  marqueeActive = false;
+  const x0 = Math.min(marqueeX0, e.clientX), x1 = Math.max(marqueeX0, e.clientX);
+  const y0 = Math.min(marqueeY0, e.clientY), y1 = Math.max(marqueeY0, e.clientY);
+  if (x1 - x0 < 4 && y1 - y0 < 4) { return; }   // 너무 작으면 무시
+  const picked = parts.filter(p => !p.locked && partFullyInside(p, x0, y0, x1, y1));
+  setSelection(picked);
+}
 function raycastFocus(e) {
   setNDC(e);
   ray.setFromCamera(ndc, editCam);
@@ -538,7 +596,11 @@ canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit') e.preventDe
 
 // ---------- Properties ----------
 function renderProps() {
-  if (!selected) { propsBody.innerHTML = '<div class="empty">파트를 클릭해 선택</div>'; return; }
+  if (!selected) {
+    if (selection.length > 1) propsBody.innerHTML = '<div class="empty">'+selection.length+'개 선택됨 · 복제/삭제 가능</div>';
+    else propsBody.innerHTML = '<div class="empty">파트를 클릭해 선택</div>';
+    return;
+  }
   const p = selected, m = p.mesh.position;
   const f = (v) => v.toFixed(2);
   const deg = Math.round(p.rot * 180 / Math.PI);
@@ -587,18 +649,25 @@ document.getElementById('btnAdd').onclick = () => {
   select(addPart(Math.round(t.x), 1, Math.round(t.z), 4, 2, 4, 0x3498db));
 };
 document.getElementById('btnDup').onclick = () => {
-  if (!selected) return;
-  const s = selected, m = s.mesh.position;
-  select(addPart(m.x + (snap?1:0.5), m.y, m.z + (snap?1:0.5), s.w, s.h, s.d, s.color, s.rot, s.type));
+  if (selection.length === 0) return;
+  const off = snap ? 1 : 0.5;
+  const copies = selection.map(s => addPart(
+    s.mesh.position.x + off, s.mesh.position.y, s.mesh.position.z + off,
+    s.w, s.h, s.d, s.color, s.rot, s.type, s.locked));
+  setSelection(copies);
 };
-document.getElementById('btnDel').onclick = () => { if (selected) removePart(selected); };
+document.getElementById('btnDel').onclick = () => {
+  if (selection.length === 0) return;
+  const list = selection.slice(); deselect();
+  for (const p of list) removePart(p);
+};
 const btnSnap = document.getElementById('btnSnap');
 btnSnap.onclick = () => { snap = !snap; btnSnap.textContent = snap ? '스냅 1' : '스냅 off'; btnSnap.classList.toggle('on', snap); };
 
 function serialize() {
   return JSON.stringify({ v: 1, parts: parts.map(p => ({
     x: +p.mesh.position.x.toFixed(3), y: +p.mesh.position.y.toFixed(3), z: +p.mesh.position.z.toFixed(3),
-    w: p.w, h: p.h, d: p.d, color: p.color, rot: +p.rot.toFixed(4), type: p.type
+    w: p.w, h: p.h, d: p.d, color: p.color, rot: +p.rot.toFixed(4), type: p.type, locked: !!p.locked
   })) });
 }
 // 버전 무관 파싱: 예전 형식(배열)도, 새 형식({v,parts})도 모두 지원
@@ -619,7 +688,7 @@ function loadFromData(arr) {
     const color = (typeof o.color === 'number') ? o.color : 0x3498db;
     const rot = +o.rot || 0;
     const type = TYPES.includes(o.type) ? o.type : 'solid';
-    addPart(x, y, z, w, h, d, color, rot, type);
+    addPart(x, y, z, w, h, d, color, rot, type, !!o.locked);
   }
   rebuildColliders();
   return true;
