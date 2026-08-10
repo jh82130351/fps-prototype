@@ -380,6 +380,7 @@ let selected = null;
 let outline = null;
 let dragging = false;
 let orbiting = false;
+let rmbDown = false;
 let draggingAxis = false;
 let scalingAxis = false;
 let scaleDim = null, startHalf = 0;
@@ -458,7 +459,7 @@ canvas.addEventListener('mousedown', (e) => {
       orbiting = true; lastX = e.clientX; lastY = e.clientY;
     }
   } else if (e.button === 2) {
-    orbiting = true; lastX = e.clientX; lastY = e.clientY;
+    orbiting = true; rmbDown = true; lastX = e.clientX; lastY = e.clientY;
   }
 });
 window.addEventListener('mousemove', (e) => {
@@ -506,11 +507,31 @@ window.addEventListener('mousemove', (e) => {
     updateEditCam();
   }
 });
-window.addEventListener('mouseup', () => { dragging = false; orbiting = false; draggingAxis = false; scalingAxis = false; });
+window.addEventListener('mouseup', () => { dragging = false; orbiting = false; draggingAxis = false; scalingAxis = false; rmbDown = false; });
+const groundFocus = new THREE.Vector3();
+const focusObjs = [];
+function raycastFocus(e) {
+  setNDC(e);
+  ray.setFromCamera(ndc, editCam);
+  focusObjs.length = 0;
+  for (const p of parts) focusObjs.push(p.mesh);
+  focusObjs.push(ground);
+  const hits = ray.intersectObjects(focusObjs, false);
+  if (hits.length) return hits[0].point.clone();
+  return ray.ray.at(orbit.radius, new THREE.Vector3());
+}
 canvas.addEventListener('wheel', (e) => {
   if (mode !== 'edit') return;
   e.preventDefault();
+  const cursorZoom = rmbDown || (e.buttons & 2);
+  const oldR = orbit.radius;
   orbit.radius = Math.max(5, Math.min(150, orbit.radius + e.deltaY * 0.03));
+  if (cursorZoom) {
+    // 커서가 향한 지점으로 줌: 궤도 중심을 그 지점 쪽으로 이동
+    const focus = raycastFocus(e);
+    const k = 1 - orbit.radius / oldR;  // 줌인이면 +, 줌아웃이면 -
+    orbit.target.lerp(focus, k);
+  }
   updateEditCam();
 }, { passive: false });
 canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit') e.preventDefault(); });
