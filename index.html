@@ -120,6 +120,25 @@ const crosshair = document.getElementById('crosshair');
 const splash = document.getElementById('splash');
 const waterOverlay = document.getElementById('water');
 const healthEl = document.getElementById('health');
+let audioCtx = null;
+function initAudio() {
+ if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+ if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playHurt() {
+ if (!audioCtx) return;
+ const t = audioCtx.currentTime;
+ const osc = audioCtx.createOscillator();
+ const gain = audioCtx.createGain();
+ osc.type = 'square';
+ osc.frequency.setValueAtTime(320, t);
+ osc.frequency.exponentialRampToValueAtTime(90, t + 0.18);
+ gain.gain.setValueAtTime(0.0001, t);
+ gain.gain.exponentialRampToValueAtTime(0.25, t + 0.01);
+ gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+ osc.connect(gain); gain.connect(audioCtx.destination);
+ osc.start(t); osc.stop(t + 0.22);
+}
 function updateHearts() {
  let s = '';
  for (let i = 0; i < 10; i++) s += '<span style="color:' + (health > i*10 ? '#ff4d5e' : '#4a2b30') + '">\u2665</span>';
@@ -343,7 +362,7 @@ function setMode(m) {
 
 // ---------- Play input ----------
 let locked = false;
-overlay.addEventListener('click', () => { if (mode === 'play') canvas.requestPointerLock(); });
+overlay.addEventListener('click', () => { initAudio(); if (mode === 'play') canvas.requestPointerLock(); });
 document.addEventListener('pointerlockchange', () => {
  locked = document.pointerLockElement === canvas;
  if (mode === 'play') { overlay.style.display = locked ? 'none' : 'flex'; crosshair.style.display = locked ? 'block' : 'none'; }
@@ -741,12 +760,13 @@ function loadFromData(arr) {
  deselect();
  for (const o of arr) {
  if (!o) continue;
+ if (o.locked) continue; // 예전 잠긴 외벽은 불러올 때 제거 (맵 밖으로 나갈 수 있게)
  const x = +o.x || 0, y = +o.y || 0, z = +o.z || 0;
  const w = Math.max(0.2, +o.w || 1), h = Math.max(0.2, +o.h || 1), d = Math.max(0.2, +o.d || 1);
  const color = (typeof o.color === 'number') ? o.color : 0x3498db;
  const rot = +o.rot || 0;
  const type = TYPES.includes(o.type) ? o.type : 'solid';
- addPart(x, y, z, w, h, d, color, rot, type, !!o.locked);
+ addPart(x, y, z, w, h, d, color, rot, type, false);
  }
  rebuildColliders();
  return true;
@@ -883,6 +903,7 @@ function physics(dt) {
  voidTickT -= VOID_TICK;
  health -= VOID_DMG;
  updateHearts();
+ playHurt();
  if (health <= 0) { respawn(); break; }
  }
  } else {
@@ -976,7 +997,7 @@ updateHearts();
 animate();
 
 canvas.focus();
-window.addEventListener('click', () => canvas.focus());
+window.addEventListener('click', () => { canvas.focus(); initAudio(); });
 
 window.addEventListener('resize', () => {
  playCam.aspect = aspect(); playCam.updateProjectionMatrix();
