@@ -25,7 +25,9 @@
  #tools button:hover { background: rgba(38,49,63,0.95); }
  #tools button.on { background: #2d7dd2; border-color: #2d7dd2; color: #fff; }
 
- #hud { position: absolute; top: 12px; left: 12px; z-index: 5; color: #7dd3fc; font-size: 12px;
+ #health { position: absolute; top: 12px; left: 12px; z-index: 6; font-size: 18px;
+ letter-spacing: 2px; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: none; }
+ #hud { position: absolute; top: 40px; left: 12px; z-index: 5; color: #7dd3fc; font-size: 12px;
  font-family: monospace; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px;
  line-height: 1.6; pointer-events: none; white-space: pre; }
 
@@ -74,6 +76,7 @@
 <body>
 <canvas id="app" tabindex="0"></canvas>
 <div id="crosshair"></div>
+<div id="health"></div>
 <div id="water"></div>
 <div id="splash"></div>
 <div id="marquee"></div>
@@ -116,6 +119,12 @@ const hud = document.getElementById('hud');
 const crosshair = document.getElementById('crosshair');
 const splash = document.getElementById('splash');
 const waterOverlay = document.getElementById('water');
+const healthEl = document.getElementById('health');
+function updateHearts() {
+ let s = '';
+ for (let i = 0; i < 10; i++) s += '<span style="color:' + (health > i*10 ? '#ff4d5e' : '#4a2b30') + '">\u2665</span>';
+ healthEl.innerHTML = s + ' <span style="color:#fff;font-size:12px;vertical-align:2px">' + Math.max(0, Math.ceil(health)) + '</span>';
+}
 const modeBadge = document.getElementById('mode');
 const toolbar = document.getElementById('toolbar');
 const propsEl = document.getElementById('props');
@@ -215,11 +224,6 @@ function rebuildColliders() {
 
 function buildDefaultWorld() {
  while (parts.length) removePart(parts[0]);
- const WALL = 96, WH = 5;
- addPart( 0, WH/2, WALL, WALL*2, WH, 2, 0x8a8a8a, 0, 'solid', true);
- addPart( 0, WH/2, -WALL, WALL*2, WH, 2, 0x8a8a8a, 0, 'solid', true);
- addPart( WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a, 0, 'solid', true);
- addPart(-WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a, 0, 'solid', true);
  for (let i = 0; i < 5; i++) { const h = 0.8*(i+1); addPart(-14+i*5, h/2, 20, 4, h, 4, boxMat[i%5]); }
  addPart(20, 1.5, -18, 10, 3, 10, 0x2ecc71);
  addPart(-25, 2, -25, 12, 4, 12, 0x16a085);
@@ -332,6 +336,7 @@ function setMode(m) {
  respawnPoint.set(0, EYE_HEIGHT, 0);
  yawObject.position.copy(respawnPoint);
  vertVel = 0; velocity.set(0,0,0);
+ health = MAX_HP; voidTickT = 0; updateHearts();
  overlay.style.display = 'flex';
  }
 }
@@ -790,6 +795,8 @@ function flash(msg) {
 // ---------- Physics ----------
 const WALK = 6, RUN = 11, GRAVITY = 24, JUMP_SPEED = 8, WATER_FACTOR = 0.45;
 const SWIM_UP = 5, SINK_SPEED = 1.6;
+const MAX_HP = 100, VOID_DMG = 15, VOID_TICK = 0.75; // -140 아래: 15틱(0.05s×15=0.75s)마다 15 데미지
+let health = MAX_HP, voidTickT = 0;
 let vertVel = 0, onGround = true, inWater = false;
 const velocity = new THREE.Vector3();
 const forward = new THREE.Vector3(), right = new THREE.Vector3();
@@ -798,6 +805,7 @@ const clock = new THREE.Clock();
 function respawn() {
  yawObject.position.copy(respawnPoint);
  vertVel = 0; velocity.set(0,0,0);
+ health = MAX_HP; voidTickT = 0; updateHearts();
  splash.style.background = 'rgba(200,0,0,0.5)';
  splash.style.opacity = '1';
  setTimeout(() => { splash.style.opacity = '0'; }, 120);
@@ -840,9 +848,6 @@ function physics(dt) {
  pos.z = c.cz + (lx*sa + lz*ca);
  }
  }
- const lim = groundSize/2 - 1;
- pos.x = Math.max(-lim, Math.min(lim, pos.x));
- pos.z = Math.max(-lim, Math.min(lim, pos.z));
 
  // 수직: 물속이면 수영, 아니면 중력+점프
  if (inWater) {
@@ -855,7 +860,9 @@ function physics(dt) {
  vertVel -= GRAVITY * dt;
  pos.y += vertVel * dt;
  }
- let groundY = EYE_HEIGHT;
+ // 바닥은 맵(그라운드 평면) 범위 안에서만 존재 → 밖은 공허로 낙하
+ const half = groundSize / 2;
+ let groundY = (Math.abs(pos.x) <= half && Math.abs(pos.z) <= half) ? EYE_HEIGHT : -Infinity;
  for (const c of colliders) {
  if (c.type !== 'solid' && c.type !== 'checkpoint') continue;
  const ca = Math.cos(c.a), sa = Math.sin(c.a);
@@ -867,6 +874,20 @@ function physics(dt) {
  }
  }
  if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; } else onGround = false;
+
+ // 공허 낙하: y가 -140 이하로 내려가면 사망 → 부활
+ // 공허: y가 -140 아래면 15틱(0.75초)마다 15 데미지, 0되면 사망→부활
+ if (pos.y <= -140) {
+ voidTickT += dt;
+ while (voidTickT >= VOID_TICK) {
+ voidTickT -= VOID_TICK;
+ health -= VOID_DMG;
+ updateHearts();
+ if (health <= 0) { respawn(); break; }
+ }
+ } else {
+ voidTickT = 0;
+ }
 
  // 트리거 판정 (물/체크포인트/용암)
  let nowInWater = false;
@@ -922,7 +943,7 @@ function animate() {
  if (mode === 'play') {
  gizmo.visible = false;
  scaleGizmo.visible = false;
- physics(dt); renderer.render(scene, playCam); hud.style.display = 'block';
+ physics(dt); renderer.render(scene, playCam); hud.style.display = 'block'; healthEl.style.display = 'block';
  } else {
  if (selected && activeTool === 'move') {
  gizmo.visible = true;
@@ -948,9 +969,10 @@ function animate() {
  } else {
  scaleGizmo.visible = false;
  }
- renderer.render(scene, editCam); hud.style.display = 'none';
+ renderer.render(scene, editCam); hud.style.display = 'none'; healthEl.style.display = 'none';
  }
 }
+updateHearts();
 animate();
 
 canvas.focus();
