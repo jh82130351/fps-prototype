@@ -390,6 +390,9 @@ let rmbDown = false;
 let marqueeActive = false;
 let marqueeX0 = 0, marqueeY0 = 0;
 let groupDragging = false;
+let groupMode = 'xz'; // 'xz'(위에서 봄) | 'y'(옆에서 봄)
+const SIDE_THRESHOLD = 1.1; // phi가 이보다 크면 옆면 시점 → Y 조절
+const groupCentroid = new THREE.Vector3();
 let marqueeSelection = false;
 const groupPlane = new THREE.Plane();
 const groupStartHit = new THREE.Vector3();
@@ -481,8 +484,21 @@ canvas.addEventListener('mousedown', (e) => {
  }
  } else if (e.button === 2) {
  if (selection.length >= 1 && marqueeSelection) { // 박스 선택된 그룹 → 우클릭 드래그로 이동 (Shift 무관)
- let cy = 0; for (const p of selection) cy += p.mesh.position.y; cy /= selection.length;
- groupPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0,1,0), new THREE.Vector3(0, cy, 0));
+ groupCentroid.set(0,0,0);
+ for (const p of selection) groupCentroid.add(p.mesh.position);
+ groupCentroid.multiplyScalar(1 / selection.length);
+ if (orbit.phi > SIDE_THRESHOLD) {
+ // 옆면 시점 → 세로 평면(카메라 향함), Y 조절
+ groupMode = 'y';
+ const n = new THREE.Vector3(editCam.position.x - orbit.target.x, 0, editCam.position.z - orbit.target.z);
+ if (n.lengthSq() < 1e-6) n.set(0, 0, 1);
+ n.normalize();
+ groupPlane.setFromNormalAndCoplanarPoint(n, groupCentroid);
+ } else {
+ // 위에서 봄 → 수평 평면, XZ 조절
+ groupMode = 'xz';
+ groupPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0,1,0), groupCentroid);
+ }
  if (ray.ray.intersectPlane(groupPlane, groupStartHit)) {
  groupStartPos = selection.map(p => p.mesh.position.clone());
  groupDragging = true;
@@ -506,11 +522,18 @@ window.addEventListener('mousemove', (e) => {
  setNDC(e);
  ray.setFromCamera(ndc, editCam);
  if (ray.ray.intersectPlane(groupPlane, hitPoint)) {
+ if (groupMode === 'y') {
+ let dy = hitPoint.y - groupStartHit.y;
+ if (snap) dy = Math.round(dy * 2) / 2;
+ for (let i = 0; i < selection.length; i++)
+ selection[i].mesh.position.y = Math.max(selection[i].h / 2, groupStartPos[i].y + dy);
+ } else {
  let dx = hitPoint.x - groupStartHit.x, dz = hitPoint.z - groupStartHit.z;
  if (snap) { dx = Math.round(dx); dz = Math.round(dz); }
  for (let i = 0; i < selection.length; i++) {
  selection[i].mesh.position.x = groupStartPos[i].x + dx;
  selection[i].mesh.position.z = groupStartPos[i].z + dz;
+ }
  }
  }
  return;
@@ -684,6 +707,7 @@ document.getElementById('btnDup').onclick = () => {
  s.mesh.position.x + off, s.mesh.position.y, s.mesh.position.z + off,
  s.w, s.h, s.d, s.color, s.rot, s.type, s.locked));
  setSelection(copies);
+ marqueeSelection = copies.length > 0; // 복제 그룹도 우클릭 이동 가능
 };
 document.getElementById('btnDel').onclick = () => {
  if (selection.length === 0) return;
