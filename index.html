@@ -8,67 +8,67 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
-  #app { width: 100vw; height: 100vh; display: block; }
+ * { margin: 0; padding: 0; box-sizing: border-box; }
+ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+ #app { width: 100vw; height: 100vh; display: block; }
 
-  #mode { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6;
-    font-size: 13px; font-weight: 600; color: #fff; padding: 5px 14px; border-radius: 999px;
-    background: rgba(0,0,0,0.55); letter-spacing: 0.5px; pointer-events: none; }
-  #mode.edit { background: rgba(52,152,219,0.85); }
-  #mode.play { background: rgba(46,204,113,0.85); }
+ #mode { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6;
+ font-size: 13px; font-weight: 600; color: #fff; padding: 5px 14px; border-radius: 999px;
+ background: rgba(0,0,0,0.55); letter-spacing: 0.5px; pointer-events: none; }
+ #mode.edit { background: rgba(52,152,219,0.85); }
+ #mode.play { background: rgba(46,204,113,0.85); }
 
-  #tools { position: absolute; top: 42px; left: 50%; transform: translateX(-50%); z-index: 7;
-    display: none; gap: 5px; }
-  #tools button { padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
-    border: 1px solid #3a4553; border-radius: 6px; background: rgba(28,37,48,0.92); color: #cdd6e0; }
-  #tools button:hover { background: rgba(38,49,63,0.95); }
-  #tools button.on { background: #2d7dd2; border-color: #2d7dd2; color: #fff; }
+ #tools { position: absolute; top: 42px; left: 50%; transform: translateX(-50%); z-index: 7;
+ display: none; gap: 5px; }
+ #tools button { padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+ border: 1px solid #3a4553; border-radius: 6px; background: rgba(28,37,48,0.92); color: #cdd6e0; }
+ #tools button:hover { background: rgba(38,49,63,0.95); }
+ #tools button.on { background: #2d7dd2; border-color: #2d7dd2; color: #fff; }
 
-  #hud { position: absolute; top: 12px; left: 12px; z-index: 5; color: #7dd3fc; font-size: 12px;
-    font-family: monospace; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px;
-    line-height: 1.6; pointer-events: none; white-space: pre; }
+ #hud { position: absolute; top: 12px; left: 12px; z-index: 5; color: #7dd3fc; font-size: 12px;
+ font-family: monospace; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px;
+ line-height: 1.6; pointer-events: none; white-space: pre; }
 
-  #crosshair { position: absolute; top: 50%; left: 50%; z-index: 5; width: 6px; height: 6px;
-    margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,0.85);
-    pointer-events: none; display: none; }
-  #splash { position: absolute; inset: 0; z-index: 8; pointer-events: none; opacity: 0;
-    transition: opacity 0.15s; }
-  #water { position: absolute; inset: 0; z-index: 4; pointer-events: none; opacity: 0;
-    transition: opacity 0.2s; background: radial-gradient(circle at 50% 45%,
-      rgba(30,120,200,0.22), rgba(12,60,110,0.5)); }
-  #marquee { position: absolute; z-index: 9; pointer-events: none; display: none;
-    border: 1.5px solid #ff8c42; background: rgba(255,140,66,0.15); }
+ #crosshair { position: absolute; top: 50%; left: 50%; z-index: 5; width: 6px; height: 6px;
+ margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,0.85);
+ pointer-events: none; display: none; }
+ #splash { position: absolute; inset: 0; z-index: 8; pointer-events: none; opacity: 0;
+ transition: opacity 0.15s; }
+ #water { position: absolute; inset: 0; z-index: 4; pointer-events: none; opacity: 0;
+ transition: opacity 0.2s; background: radial-gradient(circle at 50% 45%,
+ rgba(30,120,200,0.22), rgba(12,60,110,0.5)); }
+ #marquee { position: absolute; z-index: 9; pointer-events: none; display: none;
+ border: 1.5px solid #ff8c42; background: rgba(255,140,66,0.15); }
 
-  #toolbar { position: absolute; top: 12px; right: 12px; z-index: 7; display: none;
-    flex-direction: column; gap: 6px; width: 210px; }
-  #toolbar .row { display: flex; gap: 6px; }
-  #toolbar button { flex: 1; padding: 7px 8px; font-size: 12px; font-weight: 600; cursor: pointer;
-    border: 1px solid #3a4553; border-radius: 6px; background: #1c2530; color: #cdd6e0; }
-  #toolbar button:hover { background: #26313f; }
-  #toolbar button.on { background: #2d7dd2; border-color: #2d7dd2; color: #fff; }
+ #toolbar { position: absolute; top: 12px; right: 12px; z-index: 7; display: none;
+ flex-direction: column; gap: 6px; width: 210px; }
+ #toolbar .row { display: flex; gap: 6px; }
+ #toolbar button { flex: 1; padding: 7px 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+ border: 1px solid #3a4553; border-radius: 6px; background: #1c2530; color: #cdd6e0; }
+ #toolbar button:hover { background: #26313f; }
+ #toolbar button.on { background: #2d7dd2; border-color: #2d7dd2; color: #fff; }
 
-  #props { position: absolute; bottom: 12px; right: 12px; z-index: 7; display: none;
-    width: 210px; background: rgba(18,24,32,0.94); border: 1px solid #2a3542; border-radius: 8px;
-    padding: 10px; color: #cdd6e0; font-size: 12px; }
-  #props h3 { font-size: 12px; margin-bottom: 8px; color: #7dd3fc; }
-  #props .hint { font-size: 10px; opacity: 0.5; margin-top: 7px; }
-  #props .grid { display: grid; grid-template-columns: 16px 1fr 16px 1fr 16px 1fr; gap: 5px 4px; align-items: center; }
-  #props label { opacity: 0.7; text-align: center; }
-  #props input[type=number] { width: 100%; background: #0f151d; border: 1px solid #2a3542; color: #e6edf3;
-    border-radius: 4px; padding: 3px 4px; font-size: 11px; }
-  #props .row2 { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-  #props .row2 span { opacity: 0.7; width: 34px; }
-  #props .row2 input, #props .row2 select { flex: 1; background: #0f151d; border: 1px solid #2a3542;
-    color: #e6edf3; border-radius: 4px; padding: 3px 4px; font-size: 11px; }
-  #props input[type=color] { flex: none; width: 34px; height: 24px; border: none; background: none; cursor: pointer; padding: 0; }
-  #props .empty { opacity: 0.5; text-align: center; padding: 8px 0; }
+ #props { position: absolute; bottom: 12px; right: 12px; z-index: 7; display: none;
+ width: 210px; background: rgba(18,24,32,0.94); border: 1px solid #2a3542; border-radius: 8px;
+ padding: 10px; color: #cdd6e0; font-size: 12px; }
+ #props h3 { font-size: 12px; margin-bottom: 8px; color: #7dd3fc; }
+ #props .hint { font-size: 10px; opacity: 0.5; margin-top: 7px; }
+ #props .grid { display: grid; grid-template-columns: 16px 1fr 16px 1fr 16px 1fr; gap: 5px 4px; align-items: center; }
+ #props label { opacity: 0.7; text-align: center; }
+ #props input[type=number] { width: 100%; background: #0f151d; border: 1px solid #2a3542; color: #e6edf3;
+ border-radius: 4px; padding: 3px 4px; font-size: 11px; }
+ #props .row2 { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+ #props .row2 span { opacity: 0.7; width: 34px; }
+ #props .row2 input, #props .row2 select { flex: 1; background: #0f151d; border: 1px solid #2a3542;
+ color: #e6edf3; border-radius: 4px; padding: 3px 4px; font-size: 11px; }
+ #props input[type=color] { flex: none; width: 34px; height: 24px; border: none; background: none; cursor: pointer; padding: 0; }
+ #props .empty { opacity: 0.5; text-align: center; padding: 8px 0; }
 
-  #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
-    justify-content: center; background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; z-index: 10; }
-  #overlay h1 { font-size: 22px; font-weight: 600; margin-bottom: 12px; }
-  #overlay p { font-size: 14px; opacity: 0.8; line-height: 1.8; text-align: center; }
-  #overlay kbd { background: #222; border: 1px solid #444; border-radius: 4px; padding: 2px 7px; font-size: 12px; margin: 0 2px; }
+ #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+ justify-content: center; background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; z-index: 10; }
+ #overlay h1 { font-size: 22px; font-weight: 600; margin-bottom: 12px; }
+ #overlay p { font-size: 14px; opacity: 0.8; line-height: 1.8; text-align: center; }
+ #overlay kbd { background: #222; border: 1px solid #444; border-radius: 4px; padding: 2px 7px; font-size: 12px; margin: 0 2px; }
 </style>
 </head>
 <body>
@@ -81,31 +81,31 @@
 <div id="mode" class="play">PLAY</div>
 
 <div id="tools">
-  <button id="tMove" class="on" title="이동 (1)">✥ 이동</button>
-  <button id="tRot" title="회전 (2)">⟳ 회전</button>
-  <button id="tScale" title="크기 (3)">⤢ 크기</button>
+ <button id="tMove" class="on" title="이동 (1)">✥ 이동</button>
+ <button id="tRot" title="회전 (2)">⟳ 회전</button>
+ <button id="tScale" title="크기 (3)">⤢ 크기</button>
 </div>
 
 <div id="toolbar">
-  <div class="row"><button id="btnAdd">＋ 파트</button><button id="btnDup">복제</button></div>
-  <div class="row"><button id="btnDel">삭제</button><button id="btnSnap" class="on">스냅 1</button></div>
-  <div class="row"><button id="btnSave">저장</button><button id="btnLoad">불러오기</button></div>
-  <div class="row"><button id="btnExport">내보내기</button><button id="btnImport">가져오기</button></div>
-  <div class="row"><button id="btnReset">초기화</button></div>
+ <div class="row"><button id="btnAdd">＋ 파트</button><button id="btnDup">복제</button></div>
+ <div class="row"><button id="btnDel">삭제</button><button id="btnSnap" class="on">스냅 1</button></div>
+ <div class="row"><button id="btnSave">저장</button><button id="btnLoad">불러오기</button></div>
+ <div class="row"><button id="btnExport">내보내기</button><button id="btnImport">가져오기</button></div>
+ <div class="row"><button id="btnReset">초기화</button></div>
 </div>
 
 <div id="props">
-  <h3>속성</h3>
-  <div id="propsBody"><div class="empty">파트를 클릭해 선택</div></div>
+ <h3>속성</h3>
+ <div id="propsBody"><div class="empty">파트를 클릭해 선택</div></div>
 </div>
 
 <div id="overlay">
-  <h1>클릭해서 시작</h1>
-  <p>
-    <kbd>Tab</kbd> 편집 / 플레이 전환<br>
-    플레이: <kbd>WASD</kbd> · 마우스 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프<br>
-    편집: 파트 클릭 → 축 화살표 드래그 · 속성의 "종류"로 블록 타입 변경
-  </p>
+ <h1>클릭해서 시작</h1>
+ <p>
+ <kbd>Tab</kbd> 편집 / 플레이 전환<br>
+ 플레이: <kbd>WASD</kbd> · 마우스 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프<br>
+ 편집: 파트 클릭 → 축 화살표 드래그 · 속성의 "종류"로 블록 타입 변경
+ </p>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -121,9 +121,9 @@ const toolbar = document.getElementById('toolbar');
 const propsEl = document.getElementById('props');
 const propsBody = document.getElementById('propsBody');
 const toolBtns = {
-  move: document.getElementById('tMove'),
-  rotate: document.getElementById('tRot'),
-  scale: document.getElementById('tScale'),
+ move: document.getElementById('tMove'),
+ rotate: document.getElementById('tRot'),
+ scale: document.getElementById('tScale'),
 };
 const toolsEl = document.getElementById('tools');
 let activeTool = 'move';
@@ -150,8 +150,8 @@ scene.add(sun);
 
 const groundSize = 200;
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(groundSize, groundSize),
-  new THREE.MeshStandardMaterial({ color: 0x4a7a4a })
+ new THREE.PlaneGeometry(groundSize, groundSize),
+ new THREE.MeshStandardMaterial({ color: 0x4a7a4a })
 );
 ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
 const grid = new THREE.GridHelper(groundSize, 100, 0x336633, 0x3d6b3d);
@@ -164,74 +164,74 @@ const parts = [];
 let colliders = [];
 
 function applyAppearance(p) {
-  const mat = p.mesh.material;
-  if (p.type === 'water') {
-    mat.color.setHex(0x2e8fd8); mat.transparent = true; mat.opacity = 0.5;
-    mat.emissive.setHex(0x0a2a44); mat.emissiveIntensity = 0.3;
-    mat.side = THREE.DoubleSide; mat.depthWrite = false;
-  } else if (p.type === 'checkpoint') {
-    mat.color.setHex(0xffffff); mat.transparent = false; mat.opacity = 1;
-    mat.emissive.setHex(0xfff0a0); mat.emissiveIntensity = 0.9;
-    mat.side = THREE.FrontSide; mat.depthWrite = true;
-  } else if (p.type === 'lava') {
-    mat.color.setHex(0x5a1000); mat.transparent = false; mat.opacity = 1;
-    mat.emissive.setHex(0xff4400); mat.emissiveIntensity = 1.0;
-    mat.side = THREE.FrontSide; mat.depthWrite = true;
-  } else {
-    mat.color.setHex(p.color); mat.transparent = false; mat.opacity = 1;
-    mat.emissive.setHex(0x000000); mat.emissiveIntensity = 0;
-    mat.side = THREE.FrontSide; mat.depthWrite = true;
-  }
-  mat.needsUpdate = true;
+ const mat = p.mesh.material;
+ if (p.type === 'water') {
+ mat.color.setHex(0x2e8fd8); mat.transparent = true; mat.opacity = 0.5;
+ mat.emissive.setHex(0x0a2a44); mat.emissiveIntensity = 0.3;
+ mat.side = THREE.DoubleSide; mat.depthWrite = false;
+ } else if (p.type === 'checkpoint') {
+ mat.color.setHex(0xffffff); mat.transparent = false; mat.opacity = 1;
+ mat.emissive.setHex(0xfff0a0); mat.emissiveIntensity = 0.9;
+ mat.side = THREE.FrontSide; mat.depthWrite = true;
+ } else if (p.type === 'lava') {
+ mat.color.setHex(0x5a1000); mat.transparent = false; mat.opacity = 1;
+ mat.emissive.setHex(0xff4400); mat.emissiveIntensity = 1.0;
+ mat.side = THREE.FrontSide; mat.depthWrite = true;
+ } else {
+ mat.color.setHex(p.color); mat.transparent = false; mat.opacity = 1;
+ mat.emissive.setHex(0x000000); mat.emissiveIntensity = 0;
+ mat.side = THREE.FrontSide; mat.depthWrite = true;
+ }
+ mat.needsUpdate = true;
 }
 
 function addPart(x, y, z, w, h, d, color, rot, type, locked) {
-  rot = rot || 0; type = type || 'solid';
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({ color })
-  );
-  mesh.position.set(x, y, z);
-  mesh.rotation.y = rot;
-  mesh.castShadow = true; mesh.receiveShadow = true;
-  scene.add(mesh);
-  const p = { mesh, w, h, d, color, rot, type, locked: !!locked };
-  applyAppearance(p);
-  parts.push(p);
-  return p;
+ rot = rot || 0; type = type || 'solid';
+ const mesh = new THREE.Mesh(
+ new THREE.BoxGeometry(w, h, d),
+ new THREE.MeshStandardMaterial({ color })
+ );
+ mesh.position.set(x, y, z);
+ mesh.rotation.y = rot;
+ mesh.castShadow = true; mesh.receiveShadow = true;
+ scene.add(mesh);
+ const p = { mesh, w, h, d, color, rot, type, locked: !!locked };
+ applyAppearance(p);
+ parts.push(p);
+ return p;
 }
 function removePart(p) {
-  if (selected === p) deselect();
-  scene.remove(p.mesh);
-  p.mesh.geometry.dispose(); p.mesh.material.dispose();
-  const i = parts.indexOf(p); if (i >= 0) parts.splice(i, 1);
+ if (selected === p) deselect();
+ scene.remove(p.mesh);
+ p.mesh.geometry.dispose(); p.mesh.material.dispose();
+ const i = parts.indexOf(p); if (i >= 0) parts.splice(i, 1);
 }
 function rebuildColliders() {
-  colliders = parts.map(p => {
-    const x = p.mesh.position.x, y = p.mesh.position.y, z = p.mesh.position.z;
-    return { cx:x, cz:z, y0:y-p.h/2, y1:y+p.h/2, hw:p.w/2, hd:p.d/2, a:p.rot, type:p.type };
-  });
+ colliders = parts.map(p => {
+ const x = p.mesh.position.x, y = p.mesh.position.y, z = p.mesh.position.z;
+ return { cx:x, cz:z, y0:y-p.h/2, y1:y+p.h/2, hw:p.w/2, hd:p.d/2, a:p.rot, type:p.type };
+ });
 }
 
 function buildDefaultWorld() {
-  while (parts.length) removePart(parts[0]);
-  const WALL = 96, WH = 5;
-  addPart( 0, WH/2,  WALL, WALL*2, WH, 2, 0x8a8a8a, 0, 'solid', true);
-  addPart( 0, WH/2, -WALL, WALL*2, WH, 2, 0x8a8a8a, 0, 'solid', true);
-  addPart( WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a, 0, 'solid', true);
-  addPart(-WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a, 0, 'solid', true);
-  for (let i = 0; i < 5; i++) { const h = 0.8*(i+1); addPart(-14+i*5, h/2, 20, 4, h, 4, boxMat[i%5]); }
-  addPart(20, 1.5, -18, 10, 3, 10, 0x2ecc71);
-  addPart(-25, 2, -25, 12, 4, 12, 0x16a085);
-  for (let i = 0; i < 9; i++) {
-    const w = 1.5+Math.random()*3, h = 1+Math.random()*4;
-    const a = Math.random()*Math.PI*2, dist = 34+Math.random()*40;
-    addPart(Math.cos(a)*dist, h/2, Math.sin(a)*dist, w, h, w, boxMat[i%5]);
-  }
-  // 특수 블록 데모
-  addPart(0, 0.5, -9, 4, 1, 4, 0xffffff, 0, 'checkpoint');   // 시작 앞 체크포인트
-  addPart(34, 1, 8, 14, 2, 14, 0x2e8fd8, 0, 'water');        // 물웅덩이
-  addPart(-12, 0.6, 36, 12, 1.2, 12, 0x5a1000, 0, 'lava');   // 용암 웅덩이
+ while (parts.length) removePart(parts[0]);
+ const WALL = 96, WH = 5;
+ addPart( 0, WH/2, WALL, WALL*2, WH, 2, 0x8a8a8a, 0, 'solid', true);
+ addPart( 0, WH/2, -WALL, WALL*2, WH, 2, 0x8a8a8a, 0, 'solid', true);
+ addPart( WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a, 0, 'solid', true);
+ addPart(-WALL, WH/2, 0, 2, WH, WALL*2, 0x8a8a8a, 0, 'solid', true);
+ for (let i = 0; i < 5; i++) { const h = 0.8*(i+1); addPart(-14+i*5, h/2, 20, 4, h, 4, boxMat[i%5]); }
+ addPart(20, 1.5, -18, 10, 3, 10, 0x2ecc71);
+ addPart(-25, 2, -25, 12, 4, 12, 0x16a085);
+ for (let i = 0; i < 9; i++) {
+ const w = 1.5+Math.random()*3, h = 1+Math.random()*4;
+ const a = Math.random()*Math.PI*2, dist = 34+Math.random()*40;
+ addPart(Math.cos(a)*dist, h/2, Math.sin(a)*dist, w, h, w, boxMat[i%5]);
+ }
+ // 특수 블록 데모
+ addPart(0, 0.5, -9, 4, 1, 4, 0xffffff, 0, 'checkpoint'); // 시작 앞 체크포인트
+ addPart(34, 1, 8, 14, 2, 14, 0x2e8fd8, 0, 'water'); // 물웅덩이
+ addPart(-12, 0.6, 36, 12, 1.2, 12, 0x5a1000, 0, 'lava'); // 용암 웅덩이
 }
 
 // ---------- Cameras ----------
@@ -248,13 +248,13 @@ scene.add(yawObject);
 const editCam = new THREE.PerspectiveCamera(60, aspect(), 0.1, 2000);
 const orbit = { target: new THREE.Vector3(0, 2, 0), radius: 45, theta: 0.6, phi: 1.0 };
 function updateEditCam() {
-  const { target, radius, theta, phi } = orbit;
-  editCam.position.set(
-    target.x + radius * Math.sin(phi) * Math.sin(theta),
-    target.y + radius * Math.cos(phi),
-    target.z + radius * Math.sin(phi) * Math.cos(theta)
-  );
-  editCam.lookAt(target);
+ const { target, radius, theta, phi } = orbit;
+ editCam.position.set(
+ target.x + radius * Math.sin(phi) * Math.sin(theta),
+ target.y + radius * Math.cos(phi),
+ target.z + radius * Math.sin(phi) * Math.cos(theta)
+ );
+ editCam.lookAt(target);
 }
 updateEditCam();
 
@@ -264,18 +264,18 @@ gizmo.visible = false;
 scene.add(gizmo);
 const gizmoHandles = [];
 function makeArrow(axis, color) {
-  const g = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true });
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 3, 8), mat);
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.7, 12), mat);
-  shaft.position.y = 1.5; tip.position.y = 3.35;
-  shaft.userData.axis = axis; tip.userData.axis = axis;
-  shaft.renderOrder = 999; tip.renderOrder = 999;
-  g.add(shaft); g.add(tip);
-  if (axis === 'x') g.rotation.z = -Math.PI / 2;
-  if (axis === 'z') g.rotation.x = Math.PI / 2;
-  gizmoHandles.push(shaft, tip);
-  return g;
+ const g = new THREE.Group();
+ const mat = new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true });
+ const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 3, 8), mat);
+ const tip = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.7, 12), mat);
+ shaft.position.y = 1.5; tip.position.y = 3.35;
+ shaft.userData.axis = axis; tip.userData.axis = axis;
+ shaft.renderOrder = 999; tip.renderOrder = 999;
+ g.add(shaft); g.add(tip);
+ if (axis === 'x') g.rotation.z = -Math.PI / 2;
+ if (axis === 'z') g.rotation.x = Math.PI / 2;
+ gizmoHandles.push(shaft, tip);
+ return g;
 }
 gizmo.add(makeArrow('x', 0xff4444));
 gizmo.add(makeArrow('y', 0x44dd55));
@@ -285,97 +285,97 @@ gizmo.add(makeArrow('z', 0x4488ff));
 const scaleGizmo = new THREE.Group();
 scaleGizmo.visible = false;
 scene.add(scaleGizmo);
-const scaleArrows = [];        // { group, dim, dir }
+const scaleArrows = []; // { group, dim, dir }
 const scaleHandleMeshes = [];
 function makeScaleArrow(dim, color, orient, dirLocal) {
-  const g = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true });
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.1, 8), mat);
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 10), mat);
-  shaft.position.y = 0.55; tip.position.y = 1.35;
-  shaft.renderOrder = 999; tip.renderOrder = 999;
-  shaft.userData.dim = dim; tip.userData.dim = dim;
-  g.add(shaft); g.add(tip);
-  orient(g);
-  scaleGizmo.add(g);
-  scaleArrows.push({ group: g, dim, dir: dirLocal });
-  scaleHandleMeshes.push(shaft, tip);
-  return g;
+ const g = new THREE.Group();
+ const mat = new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true });
+ const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.1, 8), mat);
+ const tip = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 10), mat);
+ shaft.position.y = 0.55; tip.position.y = 1.35;
+ shaft.renderOrder = 999; tip.renderOrder = 999;
+ shaft.userData.dim = dim; tip.userData.dim = dim;
+ g.add(shaft); g.add(tip);
+ orient(g);
+ scaleGizmo.add(g);
+ scaleArrows.push({ group: g, dim, dir: dirLocal });
+ scaleHandleMeshes.push(shaft, tip);
+ return g;
 }
 makeScaleArrow('w', 0xff4444, g => g.rotation.z = -Math.PI/2, new THREE.Vector3(1,0,0));
-makeScaleArrow('w', 0xff4444, g => g.rotation.z =  Math.PI/2, new THREE.Vector3(-1,0,0));
-makeScaleArrow('h', 0x44dd55, g => {},                        new THREE.Vector3(0,1,0));
-makeScaleArrow('h', 0x44dd55, g => g.rotation.x =  Math.PI,   new THREE.Vector3(0,-1,0));
-makeScaleArrow('d', 0x4488ff, g => g.rotation.x =  Math.PI/2, new THREE.Vector3(0,0,1));
+makeScaleArrow('w', 0xff4444, g => g.rotation.z = Math.PI/2, new THREE.Vector3(-1,0,0));
+makeScaleArrow('h', 0x44dd55, g => {}, new THREE.Vector3(0,1,0));
+makeScaleArrow('h', 0x44dd55, g => g.rotation.x = Math.PI, new THREE.Vector3(0,-1,0));
+makeScaleArrow('d', 0x4488ff, g => g.rotation.x = Math.PI/2, new THREE.Vector3(0,0,1));
 makeScaleArrow('d', 0x4488ff, g => g.rotation.x = -Math.PI/2, new THREE.Vector3(0,0,-1));
 
 // ---------- Mode ----------
 let mode = 'play';
 const respawnPoint = new THREE.Vector3(0, EYE_HEIGHT, 0);
 function setMode(m) {
-  mode = m;
-  const editing = m === 'edit';
-  modeBadge.textContent = editing ? 'EDIT' : 'PLAY';
-  modeBadge.className = editing ? 'edit' : 'play';
-  toolbar.style.display = editing ? 'flex' : 'none';
-  toolsEl.style.display = editing ? 'flex' : 'none';
-  propsEl.style.display = editing ? 'block' : 'none';
-  if (editing) {
-    if (document.pointerLockElement === canvas) document.exitPointerLock();
-    overlay.style.display = 'none';
-    crosshair.style.display = 'none';
-  } else {
-    rebuildColliders();
-    saveWorld();
-    deselect();
-    // 플레이 시작: 스폰 초기화
-    respawnPoint.set(0, EYE_HEIGHT, 0);
-    yawObject.position.copy(respawnPoint);
-    vertVel = 0; velocity.set(0,0,0);
-    overlay.style.display = 'flex';
-  }
+ mode = m;
+ const editing = m === 'edit';
+ modeBadge.textContent = editing ? 'EDIT' : 'PLAY';
+ modeBadge.className = editing ? 'edit' : 'play';
+ toolbar.style.display = editing ? 'flex' : 'none';
+ toolsEl.style.display = editing ? 'flex' : 'none';
+ propsEl.style.display = editing ? 'block' : 'none';
+ if (editing) {
+ if (document.pointerLockElement === canvas) document.exitPointerLock();
+ overlay.style.display = 'none';
+ crosshair.style.display = 'none';
+ } else {
+ rebuildColliders();
+ saveWorld();
+ deselect();
+ // 플레이 시작: 스폰 초기화
+ respawnPoint.set(0, EYE_HEIGHT, 0);
+ yawObject.position.copy(respawnPoint);
+ vertVel = 0; velocity.set(0,0,0);
+ overlay.style.display = 'flex';
+ }
 }
 
 // ---------- Play input ----------
 let locked = false;
 overlay.addEventListener('click', () => { if (mode === 'play') canvas.requestPointerLock(); });
 document.addEventListener('pointerlockchange', () => {
-  locked = document.pointerLockElement === canvas;
-  if (mode === 'play') { overlay.style.display = locked ? 'none' : 'flex'; crosshair.style.display = locked ? 'block' : 'none'; }
+ locked = document.pointerLockElement === canvas;
+ if (mode === 'play') { overlay.style.display = locked ? 'none' : 'flex'; crosshair.style.display = locked ? 'block' : 'none'; }
 });
 
 const keys = {};
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space') e.preventDefault();
-  if (e.code === 'Tab') { e.preventDefault(); setMode(mode === 'play' ? 'edit' : 'play'); return; }
-  if (mode === 'edit') {
-    if (e.code === 'Digit1') { setTool('move'); return; }
-    if (e.code === 'Digit2') { setTool('rotate'); return; }
-    if (e.code === 'Digit3') { setTool('scale'); return; }
-    if (selection.length) {
-      if (e.code === 'Delete') { const list = selection.slice(); deselect(); for (const p of list) removePart(p); return; }
-    }
-    if (selected) {
-      if (e.code === 'KeyQ' || e.code === 'KeyE') {
-        const step = Math.PI / 12;
-        selected.rot += (e.code === 'KeyE' ? step : -step);
-        selected.mesh.rotation.y = selected.rot;
-        refreshOutline(); renderProps();
-        return;
-      }
-    }
-  }
-  keys[e.code] = true;
+ if (e.code === 'Space') e.preventDefault();
+ if (e.code === 'Tab') { e.preventDefault(); setMode(mode === 'play' ? 'edit' : 'play'); return; }
+ if (mode === 'edit') {
+ if (e.code === 'Digit1') { setTool('move'); return; }
+ if (e.code === 'Digit2') { setTool('rotate'); return; }
+ if (e.code === 'Digit3') { setTool('scale'); return; }
+ if (selection.length) {
+ if (e.code === 'Delete') { const list = selection.slice(); deselect(); for (const p of list) removePart(p); return; }
+ }
+ if (selected) {
+ if (e.code === 'KeyQ' || e.code === 'KeyE') {
+ const step = Math.PI / 12;
+ selected.rot += (e.code === 'KeyE' ? step : -step);
+ selected.mesh.rotation.y = selected.rot;
+ refreshOutline(); renderProps();
+ return;
+ }
+ }
+ }
+ keys[e.code] = true;
 });
 window.addEventListener('keyup', (e) => keys[e.code] = false);
 
 const PITCH_LIMIT = Math.PI/2 - 0.05;
 document.addEventListener('mousemove', (e) => {
-  if (mode !== 'play' || !locked) return;
-  const s = 0.0022;
-  yawObject.rotation.y -= e.movementX * s;
-  pitchObject.rotation.x -= e.movementY * s;
-  pitchObject.rotation.x = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitchObject.rotation.x));
+ if (mode !== 'play' || !locked) return;
+ const s = 0.0022;
+ yawObject.rotation.y -= e.movementX * s;
+ pitchObject.rotation.x -= e.movementY * s;
+ pitchObject.rotation.x = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitchObject.rotation.x));
 });
 
 // ---------- Edit input ----------
@@ -390,6 +390,7 @@ let rmbDown = false;
 let marqueeActive = false;
 let marqueeX0 = 0, marqueeY0 = 0;
 let groupDragging = false;
+let marqueeSelection = false;
 const groupPlane = new THREE.Plane();
 const groupStartHit = new THREE.Vector3();
 let groupStartPos = [];
@@ -411,351 +412,355 @@ let sc0 = 0, startComp = 0;
 
 function setNDC(e) { ndc.x = (e.clientX/window.innerWidth)*2-1; ndc.y = -(e.clientY/window.innerHeight)*2+1; }
 function closestAxisParam(r, A, u) {
-  const O = r.origin, v = r.direction;
-  tmpW.copy(A).sub(O);
-  const b = u.dot(v), d = u.dot(tmpW), e = v.dot(tmpW);
-  const denom = 1 - b*b;
-  if (Math.abs(denom) < 1e-6) return 0;
-  return (b*e - d) / denom;
+ const O = r.origin, v = r.direction;
+ tmpW.copy(A).sub(O);
+ const b = u.dot(v), d = u.dot(tmpW), e = v.dot(tmpW);
+ const denom = 1 - b*b;
+ if (Math.abs(denom) < 1e-6) return 0;
+ return (b*e - d) / denom;
 }
 function refreshOutline() {
-  for (const o of outlines) { if (o.parent) o.parent.remove(o); o.geometry.dispose(); o.material.dispose(); }
-  outlines.length = 0;
-  for (const p of selection) {
-    const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(p.w, p.h, p.d));
-    const o = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffee00 }));
-    p.mesh.add(o); outlines.push(o);
-  }
+ for (const o of outlines) { if (o.parent) o.parent.remove(o); o.geometry.dispose(); o.material.dispose(); }
+ outlines.length = 0;
+ for (const p of selection) {
+ const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(p.w, p.h, p.d));
+ const o = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffee00 }));
+ p.mesh.add(o); outlines.push(o);
+ }
 }
 function setSelection(arr) {
-  selection = arr.slice();
-  selected = selection.length === 1 ? selection[0] : null;
-  refreshOutline(); renderProps();
+ selection = arr.slice();
+ selected = selection.length === 1 ? selection[0] : null;
+ marqueeSelection = false;
+ refreshOutline(); renderProps();
 }
 function select(p) { setSelection([p]); }
 function deselect() { setSelection([]); }
 
 canvas.addEventListener('mousedown', (e) => {
-  if (mode !== 'edit') return;
-  setNDC(e);
-  ray.setFromCamera(ndc, editCam);
-  if (e.button === 0) {
-    if (activeTool === 'move' && gizmo.visible) {
-      const gh = ray.intersectObjects(gizmoHandles, false);
-      if (gh.length) {
-        axisName = gh[0].object.userData.axis;
-        axisDir.set(axisName==='x'?1:0, axisName==='y'?1:0, axisName==='z'?1:0);
-        axisOrigin.copy(selected.mesh.position);
-        sc0 = closestAxisParam(ray.ray, axisOrigin, axisDir);
-        startComp = axisName==='x' ? selected.mesh.position.x : axisName==='y' ? selected.mesh.position.y : selected.mesh.position.z;
-        draggingAxis = true;
-        return;
-      }
-    }
-    if (activeTool === 'scale' && scaleGizmo.visible) {
-      const sh = ray.intersectObjects(scaleHandleMeshes, false);
-      if (sh.length) {
-        scaleDim = sh[0].object.userData.dim;
-        const hw = new THREE.Vector3(); sh[0].object.parent.getWorldPosition(hw);
-        scaleAxisDir.copy(hw).sub(selected.mesh.position).normalize();
-        scaleOrigin.copy(selected.mesh.position);
-        sc0 = closestAxisParam(ray.ray, scaleOrigin, scaleAxisDir);
-        startHalf = (scaleDim==='w'?selected.w : scaleDim==='h'?selected.h : selected.d) / 2;
-        scalingAxis = true;
-        return;
-      }
-    }
-    const hits = ray.intersectObjects(parts.filter(p => !p.locked).map(p => p.mesh));
-    if (hits.length) {
-      const p = parts.find(pp => pp.mesh === hits[0].object);
-      select(p);
-      if (activeTool === 'rotate') {
-        dragStart = { mx: e.clientX, my: e.clientY, w: p.w, h: p.h, rot: p.rot };
-        dragging = true;
-      }
-    } else {
-      deselect();
-      orbiting = true; lastX = e.clientX; lastY = e.clientY;
-    }
-  } else if (e.button === 2) {
-    if (e.shiftKey) {   // Left Shift + 우클릭 → 박스 선택(마퀴)
-      marqueeActive = true;
-      marqueeX0 = e.clientX; marqueeY0 = e.clientY;
-      marqueeEl.style.display = 'block';
-      updateMarqueeRect(e.clientX, e.clientY);
-    } else if (selection.length > 1) {   // 여러 개 선택 상태 → 우클릭 드래그로 그룹 이동
-      let cy = 0; for (const p of selection) cy += p.mesh.position.y; cy /= selection.length;
-      groupPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0,1,0), new THREE.Vector3(0, cy, 0));
-      if (ray.ray.intersectPlane(groupPlane, groupStartHit)) {
-        groupStartPos = selection.map(p => p.mesh.position.clone());
-        groupDragging = true;
-      }
-    } else {
-      orbiting = true; rmbDown = true; lastX = e.clientX; lastY = e.clientY;
-    }
-  }
+ if (mode !== 'edit') return;
+ setNDC(e);
+ ray.setFromCamera(ndc, editCam);
+ if (e.button === 0) {
+ if (activeTool === 'move' && gizmo.visible) {
+ const gh = ray.intersectObjects(gizmoHandles, false);
+ if (gh.length) {
+ axisName = gh[0].object.userData.axis;
+ axisDir.set(axisName==='x'?1:0, axisName==='y'?1:0, axisName==='z'?1:0);
+ axisOrigin.copy(selected.mesh.position);
+ sc0 = closestAxisParam(ray.ray, axisOrigin, axisDir);
+ startComp = axisName==='x' ? selected.mesh.position.x : axisName==='y' ? selected.mesh.position.y : selected.mesh.position.z;
+ draggingAxis = true;
+ return;
+ }
+ }
+ if (activeTool === 'scale' && scaleGizmo.visible) {
+ const sh = ray.intersectObjects(scaleHandleMeshes, false);
+ if (sh.length) {
+ scaleDim = sh[0].object.userData.dim;
+ const hw = new THREE.Vector3(); sh[0].object.parent.getWorldPosition(hw);
+ scaleAxisDir.copy(hw).sub(selected.mesh.position).normalize();
+ scaleOrigin.copy(selected.mesh.position);
+ sc0 = closestAxisParam(ray.ray, scaleOrigin, scaleAxisDir);
+ startHalf = (scaleDim==='w'?selected.w : scaleDim==='h'?selected.h : selected.d) / 2;
+ scalingAxis = true;
+ return;
+ }
+ }
+ const hits = ray.intersectObjects(parts.filter(p => !p.locked).map(p => p.mesh));
+ if (hits.length) {
+ const p = parts.find(pp => pp.mesh === hits[0].object);
+ select(p);
+ if (activeTool === 'rotate') {
+ dragStart = { mx: e.clientX, my: e.clientY, w: p.w, h: p.h, rot: p.rot };
+ dragging = true;
+ }
+ } else {
+ deselect();
+ orbiting = true; lastX = e.clientX; lastY = e.clientY;
+ }
+ } else if (e.button === 2) {
+ if (selection.length >= 1 && marqueeSelection) { // 박스 선택된 그룹 → 우클릭 드래그로 이동 (Shift 무관)
+ let cy = 0; for (const p of selection) cy += p.mesh.position.y; cy /= selection.length;
+ groupPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0,1,0), new THREE.Vector3(0, cy, 0));
+ if (ray.ray.intersectPlane(groupPlane, groupStartHit)) {
+ groupStartPos = selection.map(p => p.mesh.position.clone());
+ groupDragging = true;
+ } else {
+ orbiting = true; rmbDown = true; lastX = e.clientX; lastY = e.clientY;
+ }
+ } else if (e.shiftKey) { // 선택 없을 때 Shift + 우클릭 → 박스 선택(마퀴)
+ marqueeActive = true;
+ marqueeX0 = e.clientX; marqueeY0 = e.clientY;
+ marqueeEl.style.display = 'block';
+ updateMarqueeRect(e.clientX, e.clientY);
+ } else {
+ orbiting = true; rmbDown = true; lastX = e.clientX; lastY = e.clientY;
+ }
+ }
 });
 window.addEventListener('mousemove', (e) => {
-  if (mode !== 'edit') return;
-  if (marqueeActive) { updateMarqueeRect(e.clientX, e.clientY); return; }
-  if (groupDragging) {
-    setNDC(e);
-    ray.setFromCamera(ndc, editCam);
-    if (ray.ray.intersectPlane(groupPlane, hitPoint)) {
-      let dx = hitPoint.x - groupStartHit.x, dz = hitPoint.z - groupStartHit.z;
-      if (snap) { dx = Math.round(dx); dz = Math.round(dz); }
-      for (let i = 0; i < selection.length; i++) {
-        selection[i].mesh.position.x = groupStartPos[i].x + dx;
-        selection[i].mesh.position.z = groupStartPos[i].z + dz;
-      }
-    }
-    return;
-  }
-  if (draggingAxis && selected) {
-    setNDC(e);
-    ray.setFromCamera(ndc, editCam);
-    const sc = closestAxisParam(ray.ray, axisOrigin, axisDir);
-    let val = startComp + (sc - sc0);
-    if (snap) val = axisName==='y' ? Math.round(val*2)/2 : Math.round(val);
-    if (axisName === 'x') selected.mesh.position.x = val;
-    else if (axisName === 'y') selected.mesh.position.y = Math.max(selected.h/2, val);
-    else selected.mesh.position.z = val;
-    renderProps();
-    return;
-  }
-  if (scalingAxis && selected) {
-    setNDC(e);
-    ray.setFromCamera(ndc, editCam);
-    const sc = closestAxisParam(ray.ray, scaleOrigin, scaleAxisDir);
-    let newHalf = startHalf + (sc - sc0);
-    if (newHalf < 0.1) newHalf = 0.1;
-    let dim = newHalf * 2;
-    if (snap) { dim = Math.max(0.5, Math.round(dim * 2) / 2); newHalf = dim / 2; }
-    const delta = newHalf - startHalf;   // 잡은 면만 이동, 반대 면 고정
-    if (scaleDim === 'w') selected.w = dim; else if (scaleDim === 'h') selected.h = dim; else selected.d = dim;
-    selected.mesh.geometry.dispose();
-    selected.mesh.geometry = new THREE.BoxGeometry(selected.w, selected.h, selected.d);
-    selected.mesh.position.copy(scaleOrigin).addScaledVector(scaleAxisDir, delta);
-    refreshOutline(); renderProps();
-    return;
-  }
-  if (dragging && selected) {
-    if (activeTool === 'rotate') {
-      let nr = dragStart.rot + (e.clientX - dragStart.mx) * 0.01;
-      if (snap) nr = Math.round(nr / (Math.PI/12)) * (Math.PI/12);
-      selected.rot = nr; selected.mesh.rotation.y = nr;
-      refreshOutline(); renderProps();
-    }
-  } else if (orbiting) {
-    const dx = e.clientX - lastX, dy = e.clientY - lastY;
-    lastX = e.clientX; lastY = e.clientY;
-    orbit.theta -= dx * 0.005;
-    orbit.phi = Math.max(0.15, Math.min(Math.PI/2 + 0.2, orbit.phi - dy * 0.005));
-    updateEditCam();
-  }
+ if (mode !== 'edit') return;
+ if (marqueeActive) { updateMarqueeRect(e.clientX, e.clientY); return; }
+ if (groupDragging) {
+ setNDC(e);
+ ray.setFromCamera(ndc, editCam);
+ if (ray.ray.intersectPlane(groupPlane, hitPoint)) {
+ let dx = hitPoint.x - groupStartHit.x, dz = hitPoint.z - groupStartHit.z;
+ if (snap) { dx = Math.round(dx); dz = Math.round(dz); }
+ for (let i = 0; i < selection.length; i++) {
+ selection[i].mesh.position.x = groupStartPos[i].x + dx;
+ selection[i].mesh.position.z = groupStartPos[i].z + dz;
+ }
+ }
+ return;
+ }
+ if (draggingAxis && selected) {
+ setNDC(e);
+ ray.setFromCamera(ndc, editCam);
+ const sc = closestAxisParam(ray.ray, axisOrigin, axisDir);
+ let val = startComp + (sc - sc0);
+ if (snap) val = axisName==='y' ? Math.round(val*2)/2 : Math.round(val);
+ if (axisName === 'x') selected.mesh.position.x = val;
+ else if (axisName === 'y') selected.mesh.position.y = Math.max(selected.h/2, val);
+ else selected.mesh.position.z = val;
+ renderProps();
+ return;
+ }
+ if (scalingAxis && selected) {
+ setNDC(e);
+ ray.setFromCamera(ndc, editCam);
+ const sc = closestAxisParam(ray.ray, scaleOrigin, scaleAxisDir);
+ let newHalf = startHalf + (sc - sc0);
+ if (newHalf < 0.1) newHalf = 0.1;
+ let dim = newHalf * 2;
+ if (snap) { dim = Math.max(0.5, Math.round(dim * 2) / 2); newHalf = dim / 2; }
+ const delta = newHalf - startHalf; // 잡은 면만 이동, 반대 면 고정
+ if (scaleDim === 'w') selected.w = dim; else if (scaleDim === 'h') selected.h = dim; else selected.d = dim;
+ selected.mesh.geometry.dispose();
+ selected.mesh.geometry = new THREE.BoxGeometry(selected.w, selected.h, selected.d);
+ selected.mesh.position.copy(scaleOrigin).addScaledVector(scaleAxisDir, delta);
+ refreshOutline(); renderProps();
+ return;
+ }
+ if (dragging && selected) {
+ if (activeTool === 'rotate') {
+ let nr = dragStart.rot + (e.clientX - dragStart.mx) * 0.01;
+ if (snap) nr = Math.round(nr / (Math.PI/12)) * (Math.PI/12);
+ selected.rot = nr; selected.mesh.rotation.y = nr;
+ refreshOutline(); renderProps();
+ }
+ } else if (orbiting) {
+ const dx = e.clientX - lastX, dy = e.clientY - lastY;
+ lastX = e.clientX; lastY = e.clientY;
+ orbit.theta -= dx * 0.005;
+ orbit.phi = Math.max(0.15, Math.min(Math.PI/2 + 0.2, orbit.phi - dy * 0.005));
+ updateEditCam();
+ }
 });
 window.addEventListener('mouseup', (e) => {
-  if (marqueeActive) { finishMarquee(e); }
-  dragging = false; orbiting = false; draggingAxis = false; scalingAxis = false; rmbDown = false; groupDragging = false;
+ if (marqueeActive) { finishMarquee(e); }
+ dragging = false; orbiting = false; draggingAxis = false; scalingAxis = false; rmbDown = false; groupDragging = false;
 });
 const groundFocus = new THREE.Vector3();
 const focusObjs = [];
 const marqueeEl = document.getElementById('marquee');
 function updateMarqueeRect(x, y) {
-  const l = Math.min(marqueeX0, x), t = Math.min(marqueeY0, y);
-  const w = Math.abs(x - marqueeX0), h = Math.abs(y - marqueeY0);
-  marqueeEl.style.left = l + 'px'; marqueeEl.style.top = t + 'px';
-  marqueeEl.style.width = w + 'px'; marqueeEl.style.height = h + 'px';
+ const l = Math.min(marqueeX0, x), t = Math.min(marqueeY0, y);
+ const w = Math.abs(x - marqueeX0), h = Math.abs(y - marqueeY0);
+ marqueeEl.style.left = l + 'px'; marqueeEl.style.top = t + 'px';
+ marqueeEl.style.width = w + 'px'; marqueeEl.style.height = h + 'px';
 }
 const _corner = new THREE.Vector3();
 function partFullyInside(p, x0, y0, x1, y1) {
-  p.mesh.updateMatrixWorld();
-  const hw = p.w/2, hh = p.h/2, hd = p.d/2;
-  const W = window.innerWidth, H = window.innerHeight;
-  for (let sx = -1; sx <= 1; sx += 2)
-  for (let sy = -1; sy <= 1; sy += 2)
-  for (let sz = -1; sz <= 1; sz += 2) {
-    _corner.set(sx*hw, sy*hh, sz*hd).applyMatrix4(p.mesh.matrixWorld).project(editCam);
-    if (_corner.z > 1) return false;           // 카메라 뒤
-    const px = (_corner.x * 0.5 + 0.5) * W;
-    const py = (-_corner.y * 0.5 + 0.5) * H;
-    if (px < x0 || px > x1 || py < y0 || py > y1) return false;  // 하나라도 밖이면 제외
-  }
-  return true;
+ p.mesh.updateMatrixWorld();
+ const hw = p.w/2, hh = p.h/2, hd = p.d/2;
+ const W = window.innerWidth, H = window.innerHeight;
+ for (let sx = -1; sx <= 1; sx += 2)
+ for (let sy = -1; sy <= 1; sy += 2)
+ for (let sz = -1; sz <= 1; sz += 2) {
+ _corner.set(sx*hw, sy*hh, sz*hd).applyMatrix4(p.mesh.matrixWorld).project(editCam);
+ if (_corner.z > 1) return false; // 카메라 뒤
+ const px = (_corner.x * 0.5 + 0.5) * W;
+ const py = (-_corner.y * 0.5 + 0.5) * H;
+ if (px < x0 || px > x1 || py < y0 || py > y1) return false; // 하나라도 밖이면 제외
+ }
+ return true;
 }
 function finishMarquee(e) {
-  marqueeEl.style.display = 'none';
-  marqueeActive = false;
-  const x0 = Math.min(marqueeX0, e.clientX), x1 = Math.max(marqueeX0, e.clientX);
-  const y0 = Math.min(marqueeY0, e.clientY), y1 = Math.max(marqueeY0, e.clientY);
-  if (x1 - x0 < 4 && y1 - y0 < 4) { return; }   // 너무 작으면 무시
-  const picked = parts.filter(p => !p.locked && partFullyInside(p, x0, y0, x1, y1));
-  setSelection(picked);
+ marqueeEl.style.display = 'none';
+ marqueeActive = false;
+ const x0 = Math.min(marqueeX0, e.clientX), x1 = Math.max(marqueeX0, e.clientX);
+ const y0 = Math.min(marqueeY0, e.clientY), y1 = Math.max(marqueeY0, e.clientY);
+ if (x1 - x0 < 4 && y1 - y0 < 4) { return; } // 너무 작으면 무시
+ const picked = parts.filter(p => !p.locked && partFullyInside(p, x0, y0, x1, y1));
+ setSelection(picked);
+ marqueeSelection = picked.length > 0;
 }
 function raycastFocus(e) {
-  setNDC(e);
-  ray.setFromCamera(ndc, editCam);
-  focusObjs.length = 0;
-  for (const p of parts) focusObjs.push(p.mesh);
-  focusObjs.push(ground);
-  const hits = ray.intersectObjects(focusObjs, false);
-  if (hits.length) return hits[0].point.clone();
-  return ray.ray.at(orbit.radius, new THREE.Vector3());
+ setNDC(e);
+ ray.setFromCamera(ndc, editCam);
+ focusObjs.length = 0;
+ for (const p of parts) focusObjs.push(p.mesh);
+ focusObjs.push(ground);
+ const hits = ray.intersectObjects(focusObjs, false);
+ if (hits.length) return hits[0].point.clone();
+ return ray.ray.at(orbit.radius, new THREE.Vector3());
 }
 canvas.addEventListener('wheel', (e) => {
-  if (mode !== 'edit') return;
-  e.preventDefault();
-  const cursorZoom = rmbDown || (e.buttons & 2);
-  const oldR = orbit.radius;
-  orbit.radius = Math.max(5, Math.min(150, orbit.radius + e.deltaY * 0.03));
-  if (cursorZoom) {
-    // 커서가 향한 지점으로 줌: 궤도 중심을 그 지점 쪽으로 이동
-    const focus = raycastFocus(e);
-    const k = 1 - orbit.radius / oldR;  // 줌인이면 +, 줌아웃이면 -
-    orbit.target.lerp(focus, k);
-  }
-  updateEditCam();
+ if (mode !== 'edit') return;
+ e.preventDefault();
+ const cursorZoom = rmbDown || (e.buttons & 2);
+ const oldR = orbit.radius;
+ orbit.radius = Math.max(5, Math.min(150, orbit.radius + e.deltaY * 0.03));
+ if (cursorZoom) {
+ // 커서가 향한 지점으로 줌: 궤도 중심을 그 지점 쪽으로 이동
+ const focus = raycastFocus(e);
+ const k = 1 - orbit.radius / oldR; // 줌인이면 +, 줌아웃이면 -
+ orbit.target.lerp(focus, k);
+ }
+ updateEditCam();
 }, { passive: false });
 canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit') e.preventDefault(); });
 
 // ---------- Properties ----------
 function renderProps() {
-  if (!selected) {
-    if (selection.length > 1) propsBody.innerHTML = '<div class="empty">'+selection.length+'개 선택됨 · 복제/삭제 가능</div>';
-    else propsBody.innerHTML = '<div class="empty">파트를 클릭해 선택</div>';
-    return;
-  }
-  const p = selected, m = p.mesh.position;
-  const f = (v) => v.toFixed(2);
-  const deg = Math.round(p.rot * 180 / Math.PI);
-  const typeNames = { solid:'일반', water:'물', checkpoint:'체크포인트', lava:'용암' };
-  let opts = '';
-  TYPES.forEach(t => { opts += '<option value="'+t+'"'+(p.type===t?' selected':'')+'>'+typeNames[t]+'</option>'; });
-  propsBody.innerHTML =
-    '<div class="grid">' +
-    '<label>X</label><input type="number" step="1" id="pX" value="'+f(m.x)+'">' +
-    '<label>Y</label><input type="number" step="1" id="pY" value="'+f(m.y)+'">' +
-    '<label>Z</label><input type="number" step="1" id="pZ" value="'+f(m.z)+'">' +
-    '<label>W</label><input type="number" step="0.5" min="0.2" id="pW" value="'+p.w+'">' +
-    '<label>H</label><input type="number" step="0.5" min="0.2" id="pH" value="'+p.h+'">' +
-    '<label>D</label><input type="number" step="0.5" min="0.2" id="pD" value="'+p.d+'">' +
-    '</div>' +
-    '<div class="row2"><span>회전°</span><input type="number" step="15" id="pR" value="'+deg+'"></div>' +
-    '<div class="row2"><span>종류</span><select id="pType">'+opts+'</select></div>' +
-    '<div class="row2"><span>색</span><input type="color" id="pC" value="#'+p.color.toString(16).padStart(6,'0')+'"></div>' +
-    '<div class="hint">화살표로 이동 · Q/E 회전</div>';
-  const bind = (id, fn) => document.getElementById(id).addEventListener('input', (e) => { fn(parseFloat(e.target.value)); });
-  bind('pX', v => selected.mesh.position.x = v);
-  bind('pY', v => selected.mesh.position.y = v);
-  bind('pZ', v => selected.mesh.position.z = v);
-  const resize = () => {
-    const p = selected;
-    p.mesh.geometry.dispose();
-    p.mesh.geometry = new THREE.BoxGeometry(p.w, p.h, p.d);
-    refreshOutline();
-  };
-  bind('pW', v => { selected.w = Math.max(0.2, v); resize(); });
-  bind('pH', v => { selected.h = Math.max(0.2, v); resize(); });
-  bind('pD', v => { selected.d = Math.max(0.2, v); resize(); });
-  bind('pR', v => { selected.rot = (v || 0) * Math.PI / 180; selected.mesh.rotation.y = selected.rot; refreshOutline(); });
-  document.getElementById('pType').addEventListener('change', (e) => {
-    selected.type = e.target.value; applyAppearance(selected);
-  });
-  document.getElementById('pC').addEventListener('input', (e) => {
-    const c = parseInt(e.target.value.slice(1), 16);
-    selected.color = c; if (selected.type === 'solid') selected.mesh.material.color.setHex(c);
-  });
+ if (!selected) {
+ if (selection.length > 1) propsBody.innerHTML = '<div class="empty">'+selection.length+'개 선택됨 · 복제/삭제 가능</div>';
+ else propsBody.innerHTML = '<div class="empty">파트를 클릭해 선택</div>';
+ return;
+ }
+ const p = selected, m = p.mesh.position;
+ const f = (v) => v.toFixed(2);
+ const deg = Math.round(p.rot * 180 / Math.PI);
+ const typeNames = { solid:'일반', water:'물', checkpoint:'체크포인트', lava:'용암' };
+ let opts = '';
+ TYPES.forEach(t => { opts += '<option value="'+t+'"'+(p.type===t?' selected':'')+'>'+typeNames[t]+'</option>'; });
+ propsBody.innerHTML =
+ '<div class="grid">' +
+ '<label>X</label><input type="number" step="1" id="pX" value="'+f(m.x)+'">' +
+ '<label>Y</label><input type="number" step="1" id="pY" value="'+f(m.y)+'">' +
+ '<label>Z</label><input type="number" step="1" id="pZ" value="'+f(m.z)+'">' +
+ '<label>W</label><input type="number" step="0.5" min="0.2" id="pW" value="'+p.w+'">' +
+ '<label>H</label><input type="number" step="0.5" min="0.2" id="pH" value="'+p.h+'">' +
+ '<label>D</label><input type="number" step="0.5" min="0.2" id="pD" value="'+p.d+'">' +
+ '</div>' +
+ '<div class="row2"><span>회전°</span><input type="number" step="15" id="pR" value="'+deg+'"></div>' +
+ '<div class="row2"><span>종류</span><select id="pType">'+opts+'</select></div>' +
+ '<div class="row2"><span>색</span><input type="color" id="pC" value="#'+p.color.toString(16).padStart(6,'0')+'"></div>' +
+ '<div class="hint">화살표로 이동 · Q/E 회전</div>';
+ const bind = (id, fn) => document.getElementById(id).addEventListener('input', (e) => { fn(parseFloat(e.target.value)); });
+ bind('pX', v => selected.mesh.position.x = v);
+ bind('pY', v => selected.mesh.position.y = v);
+ bind('pZ', v => selected.mesh.position.z = v);
+ const resize = () => {
+ const p = selected;
+ p.mesh.geometry.dispose();
+ p.mesh.geometry = new THREE.BoxGeometry(p.w, p.h, p.d);
+ refreshOutline();
+ };
+ bind('pW', v => { selected.w = Math.max(0.2, v); resize(); });
+ bind('pH', v => { selected.h = Math.max(0.2, v); resize(); });
+ bind('pD', v => { selected.d = Math.max(0.2, v); resize(); });
+ bind('pR', v => { selected.rot = (v || 0) * Math.PI / 180; selected.mesh.rotation.y = selected.rot; refreshOutline(); });
+ document.getElementById('pType').addEventListener('change', (e) => {
+ selected.type = e.target.value; applyAppearance(selected);
+ });
+ document.getElementById('pC').addEventListener('input', (e) => {
+ const c = parseInt(e.target.value.slice(1), 16);
+ selected.color = c; if (selected.type === 'solid') selected.mesh.material.color.setHex(c);
+ });
 }
 
 // ---------- Toolbar ----------
 document.getElementById('btnAdd').onclick = () => {
-  const t = orbit.target;
-  select(addPart(Math.round(t.x), 1, Math.round(t.z), 4, 2, 4, 0x3498db));
+ const t = orbit.target;
+ select(addPart(Math.round(t.x), 1, Math.round(t.z), 4, 2, 4, 0x3498db));
 };
 document.getElementById('btnDup').onclick = () => {
-  if (selection.length === 0) return;
-  const off = snap ? 1 : 0.5;
-  const copies = selection.map(s => addPart(
-    s.mesh.position.x + off, s.mesh.position.y, s.mesh.position.z + off,
-    s.w, s.h, s.d, s.color, s.rot, s.type, s.locked));
-  setSelection(copies);
+ if (selection.length === 0) return;
+ const off = snap ? 1 : 0.5;
+ const copies = selection.map(s => addPart(
+ s.mesh.position.x + off, s.mesh.position.y, s.mesh.position.z + off,
+ s.w, s.h, s.d, s.color, s.rot, s.type, s.locked));
+ setSelection(copies);
 };
 document.getElementById('btnDel').onclick = () => {
-  if (selection.length === 0) return;
-  const list = selection.slice(); deselect();
-  for (const p of list) removePart(p);
+ if (selection.length === 0) return;
+ const list = selection.slice(); deselect();
+ for (const p of list) removePart(p);
 };
 const btnSnap = document.getElementById('btnSnap');
 btnSnap.onclick = () => { snap = !snap; btnSnap.textContent = snap ? '스냅 1' : '스냅 off'; btnSnap.classList.toggle('on', snap); };
 
 function serialize() {
-  return JSON.stringify({ v: 1, parts: parts.map(p => ({
-    x: +p.mesh.position.x.toFixed(3), y: +p.mesh.position.y.toFixed(3), z: +p.mesh.position.z.toFixed(3),
-    w: p.w, h: p.h, d: p.d, color: p.color, rot: +p.rot.toFixed(4), type: p.type, locked: !!p.locked
-  })) });
+ return JSON.stringify({ v: 1, parts: parts.map(p => ({
+ x: +p.mesh.position.x.toFixed(3), y: +p.mesh.position.y.toFixed(3), z: +p.mesh.position.z.toFixed(3),
+ w: p.w, h: p.h, d: p.d, color: p.color, rot: +p.rot.toFixed(4), type: p.type, locked: !!p.locked
+ })) });
 }
 // 버전 무관 파싱: 예전 형식(배열)도, 새 형식({v,parts})도 모두 지원
 function worldFromJSON(str) {
-  const data = JSON.parse(str);
-  if (Array.isArray(data)) return data;
-  if (data && Array.isArray(data.parts)) return data.parts;
-  return null;
+ const data = JSON.parse(str);
+ if (Array.isArray(data)) return data;
+ if (data && Array.isArray(data.parts)) return data.parts;
+ return null;
 }
 function loadFromData(arr) {
-  if (!Array.isArray(arr)) return false;
-  while (parts.length) removePart(parts[0]);
-  deselect();
-  for (const o of arr) {
-    if (!o) continue;
-    const x = +o.x || 0, y = +o.y || 0, z = +o.z || 0;
-    const w = Math.max(0.2, +o.w || 1), h = Math.max(0.2, +o.h || 1), d = Math.max(0.2, +o.d || 1);
-    const color = (typeof o.color === 'number') ? o.color : 0x3498db;
-    const rot = +o.rot || 0;
-    const type = TYPES.includes(o.type) ? o.type : 'solid';
-    addPart(x, y, z, w, h, d, color, rot, type, !!o.locked);
-  }
-  rebuildColliders();
-  return true;
+ if (!Array.isArray(arr)) return false;
+ while (parts.length) removePart(parts[0]);
+ deselect();
+ for (const o of arr) {
+ if (!o) continue;
+ const x = +o.x || 0, y = +o.y || 0, z = +o.z || 0;
+ const w = Math.max(0.2, +o.w || 1), h = Math.max(0.2, +o.h || 1), d = Math.max(0.2, +o.d || 1);
+ const color = (typeof o.color === 'number') ? o.color : 0x3498db;
+ const rot = +o.rot || 0;
+ const type = TYPES.includes(o.type) ? o.type : 'solid';
+ addPart(x, y, z, w, h, d, color, rot, type, !!o.locked);
+ }
+ rebuildColliders();
+ return true;
 }
 function saveWorld() { try { localStorage.setItem('fpsWorld', serialize()); return true; } catch (e) { return false; } }
 
 document.getElementById('btnSave').onclick = () => { flash(saveWorld() ? '저장됨' : '저장 불가(미리보기)'); };
 document.getElementById('btnLoad').onclick = () => {
-  try {
-    const s = localStorage.getItem('fpsWorld');
-    const arr = s ? worldFromJSON(s) : null;
-    if (arr && loadFromData(arr)) flash('불러옴'); else flash('저장본 없음');
-  } catch (e) { flash('불러오기 실패'); }
+ try {
+ const s = localStorage.getItem('fpsWorld');
+ const arr = s ? worldFromJSON(s) : null;
+ if (arr && loadFromData(arr)) flash('불러옴'); else flash('저장본 없음');
+ } catch (e) { flash('불러오기 실패'); }
 };
 document.getElementById('btnExport').onclick = () => {
-  const blob = new Blob([serialize()], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = 'world.json'; a.click();
+ const blob = new Blob([serialize()], { type: 'application/json' });
+ const a = document.createElement('a');
+ a.href = URL.createObjectURL(blob); a.download = 'world.json'; a.click();
 };
 document.getElementById('btnImport').onclick = () => {
-  const inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = 'application/json,.json';
-  inp.onchange = () => {
-    const file = inp.files[0]; if (!file) return;
-    const r = new FileReader();
-    r.onload = () => {
-      try {
-        const arr = worldFromJSON(r.result);
-        if (arr && loadFromData(arr)) { saveWorld(); flash('가져옴'); }
-        else flash('파일 형식 오류');
-      } catch (e) { flash('파일 오류'); }
-    };
-    r.readAsText(file);
-  };
-  inp.click();
+ const inp = document.createElement('input');
+ inp.type = 'file'; inp.accept = 'application/json,.json';
+ inp.onchange = () => {
+ const file = inp.files[0]; if (!file) return;
+ const r = new FileReader();
+ r.onload = () => {
+ try {
+ const arr = worldFromJSON(r.result);
+ if (arr && loadFromData(arr)) { saveWorld(); flash('가져옴'); }
+ else flash('파일 형식 오류');
+ } catch (e) { flash('파일 오류'); }
+ };
+ r.readAsText(file);
+ };
+ inp.click();
 };
 document.getElementById('btnReset').onclick = () => { buildDefaultWorld(); rebuildColliders(); saveWorld(); deselect(); flash('초기화'); };
 
 let flashTimer = null;
 function flash(msg) {
-  modeBadge.textContent = msg;
-  clearTimeout(flashTimer);
-  flashTimer = setTimeout(() => { modeBadge.textContent = mode === 'edit' ? 'EDIT' : 'PLAY'; }, 900);
+ modeBadge.textContent = msg;
+ clearTimeout(flashTimer);
+ flashTimer = setTimeout(() => { modeBadge.textContent = mode === 'edit' ? 'EDIT' : 'PLAY'; }, 900);
 }
 
 // ---------- Physics ----------
@@ -767,160 +772,160 @@ const forward = new THREE.Vector3(), right = new THREE.Vector3();
 const clock = new THREE.Clock();
 
 function respawn() {
-  yawObject.position.copy(respawnPoint);
-  vertVel = 0; velocity.set(0,0,0);
-  splash.style.background = 'rgba(200,0,0,0.5)';
-  splash.style.opacity = '1';
-  setTimeout(() => { splash.style.opacity = '0'; }, 120);
+ yawObject.position.copy(respawnPoint);
+ vertVel = 0; velocity.set(0,0,0);
+ splash.style.background = 'rgba(200,0,0,0.5)';
+ splash.style.opacity = '1';
+ setTimeout(() => { splash.style.opacity = '0'; }, 120);
 }
 
 function physics(dt) {
-  const shift = keys['ShiftLeft'] || keys['ShiftRight'];
-  const speed = inWater ? (shift ? WALK : WALK * WATER_FACTOR) : (shift ? RUN : WALK);
-  const y = yawObject.rotation.y;
-  forward.set(-Math.sin(y), 0, -Math.cos(y));
-  right.set(Math.cos(y), 0, -Math.sin(y));
+ const shift = keys['ShiftLeft'] || keys['ShiftRight'];
+ const speed = inWater ? (shift ? WALK : WALK * WATER_FACTOR) : (shift ? RUN : WALK);
+ const y = yawObject.rotation.y;
+ forward.set(-Math.sin(y), 0, -Math.cos(y));
+ right.set(Math.cos(y), 0, -Math.sin(y));
 
-  const move = new THREE.Vector3();
-  if (keys['KeyW']) move.add(forward);
-  if (keys['KeyS']) move.sub(forward);
-  if (keys['KeyD']) move.add(right);
-  if (keys['KeyA']) move.sub(right);
-  if (move.lengthSq() > 0) move.normalize().multiplyScalar(speed);
+ const move = new THREE.Vector3();
+ if (keys['KeyW']) move.add(forward);
+ if (keys['KeyS']) move.sub(forward);
+ if (keys['KeyD']) move.add(right);
+ if (keys['KeyA']) move.sub(right);
+ if (move.lengthSq() > 0) move.normalize().multiplyScalar(speed);
 
-  velocity.lerp(move, 1 - Math.pow(0.001, dt));
-  yawObject.position.addScaledVector(velocity, dt);
+ velocity.lerp(move, 1 - Math.pow(0.001, dt));
+ yawObject.position.addScaledVector(velocity, dt);
 
-  const pos = yawObject.position, R = 0.4, H = EYE_HEIGHT;
+ const pos = yawObject.position, R = 0.4, H = EYE_HEIGHT;
 
-  // 수평 충돌 (solid + checkpoint만 막힘)
-  for (const c of colliders) {
-    if (c.type !== 'solid' && c.type !== 'checkpoint') continue;
-    const feetY = pos.y - H, headY = pos.y;
-    if (feetY >= c.y1 - 0.05 || headY <= c.y0) continue;
-    const ca = Math.cos(c.a), sa = Math.sin(c.a);
-    const dx = pos.x - c.cx, dz = pos.z - c.cz;
-    let lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
-    const bx = c.hw + R, bz = c.hd + R;
-    if (lx > -bx && lx < bx && lz > -bz && lz < bz) {
-      const pL = lx+bx, pR = bx-lx, pD = lz+bz, pU = bz-lz;
-      const m = Math.min(pL, pR, pD, pU);
-      if (m === pL) lx = -bx; else if (m === pR) lx = bx;
-      else if (m === pD) lz = -bz; else lz = bz;
-      pos.x = c.cx + (lx*ca - lz*sa);
-      pos.z = c.cz + (lx*sa + lz*ca);
-    }
-  }
-  const lim = groundSize/2 - 1;
-  pos.x = Math.max(-lim, Math.min(lim, pos.x));
-  pos.z = Math.max(-lim, Math.min(lim, pos.z));
+ // 수평 충돌 (solid + checkpoint만 막힘)
+ for (const c of colliders) {
+ if (c.type !== 'solid' && c.type !== 'checkpoint') continue;
+ const feetY = pos.y - H, headY = pos.y;
+ if (feetY >= c.y1 - 0.05 || headY <= c.y0) continue;
+ const ca = Math.cos(c.a), sa = Math.sin(c.a);
+ const dx = pos.x - c.cx, dz = pos.z - c.cz;
+ let lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
+ const bx = c.hw + R, bz = c.hd + R;
+ if (lx > -bx && lx < bx && lz > -bz && lz < bz) {
+ const pL = lx+bx, pR = bx-lx, pD = lz+bz, pU = bz-lz;
+ const m = Math.min(pL, pR, pD, pU);
+ if (m === pL) lx = -bx; else if (m === pR) lx = bx;
+ else if (m === pD) lz = -bz; else lz = bz;
+ pos.x = c.cx + (lx*ca - lz*sa);
+ pos.z = c.cz + (lx*sa + lz*ca);
+ }
+ }
+ const lim = groundSize/2 - 1;
+ pos.x = Math.max(-lim, Math.min(lim, pos.x));
+ pos.z = Math.max(-lim, Math.min(lim, pos.z));
 
-  // 수직: 물속이면 수영, 아니면 중력+점프
-  if (inWater) {
-    if (keys['Space']) vertVel = SWIM_UP;        // 위로 떠오름
-    else if (shift) vertVel = 0;                 // 유지 (안 가라앉음)
-    else vertVel = -SINK_SPEED;                  // 천천히 가라앉음
-    pos.y += vertVel * dt;
-  } else {
-    if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
-    vertVel -= GRAVITY * dt;
-    pos.y += vertVel * dt;
-  }
-  let groundY = EYE_HEIGHT;
-  for (const c of colliders) {
-    if (c.type !== 'solid' && c.type !== 'checkpoint') continue;
-    const ca = Math.cos(c.a), sa = Math.sin(c.a);
-    const dx = pos.x - c.cx, dz = pos.z - c.cz;
-    const lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
-    if (lx > -(c.hw+R) && lx < (c.hw+R) && lz > -(c.hd+R) && lz < (c.hd+R)) {
-      const top = c.y1 + EYE_HEIGHT;
-      if (vertVel <= 0 && pos.y <= top + 0.1 && top > groundY) groundY = top;
-    }
-  }
-  if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; } else onGround = false;
+ // 수직: 물속이면 수영, 아니면 중력+점프
+ if (inWater) {
+ if (keys['Space']) vertVel = SWIM_UP; // 위로 떠오름
+ else if (shift) vertVel = 0; // 유지 (안 가라앉음)
+ else vertVel = -SINK_SPEED; // 천천히 가라앉음
+ pos.y += vertVel * dt;
+ } else {
+ if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
+ vertVel -= GRAVITY * dt;
+ pos.y += vertVel * dt;
+ }
+ let groundY = EYE_HEIGHT;
+ for (const c of colliders) {
+ if (c.type !== 'solid' && c.type !== 'checkpoint') continue;
+ const ca = Math.cos(c.a), sa = Math.sin(c.a);
+ const dx = pos.x - c.cx, dz = pos.z - c.cz;
+ const lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
+ if (lx > -(c.hw+R) && lx < (c.hw+R) && lz > -(c.hd+R) && lz < (c.hd+R)) {
+ const top = c.y1 + EYE_HEIGHT;
+ if (vertVel <= 0 && pos.y <= top + 0.1 && top > groundY) groundY = top;
+ }
+ }
+ if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; } else onGround = false;
 
-  // 트리거 판정 (물/체크포인트/용암)
-  let nowInWater = false;
-  const feetY = pos.y - H, headY = pos.y;
-  for (const c of colliders) {
-    const ca = Math.cos(c.a), sa = Math.sin(c.a);
-    const dx = pos.x - c.cx, dz = pos.z - c.cz;
-    const lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
-    const inside = lx > -(c.hw+R) && lx < (c.hw+R) && lz > -(c.hd+R) && lz < (c.hd+R);
-    if (!inside) continue;
-    const yOverlap = feetY < c.y1 && headY > c.y0;
-    if (c.type === 'water' && yOverlap) nowInWater = true;
-    else if (c.type === 'lava' && yOverlap) { respawn(); return; }
-    else if (c.type === 'checkpoint' && feetY <= c.y1 + 0.2 && headY > c.y0) {
-      respawnPoint.set(c.cx, c.y1 + EYE_HEIGHT, c.cz);
-    }
-  }
-  inWater = nowInWater;
+ // 트리거 판정 (물/체크포인트/용암)
+ let nowInWater = false;
+ const feetY = pos.y - H, headY = pos.y;
+ for (const c of colliders) {
+ const ca = Math.cos(c.a), sa = Math.sin(c.a);
+ const dx = pos.x - c.cx, dz = pos.z - c.cz;
+ const lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
+ const inside = lx > -(c.hw+R) && lx < (c.hw+R) && lz > -(c.hd+R) && lz < (c.hd+R);
+ if (!inside) continue;
+ const yOverlap = feetY < c.y1 && headY > c.y0;
+ if (c.type === 'water' && yOverlap) nowInWater = true;
+ else if (c.type === 'lava' && yOverlap) { respawn(); return; }
+ else if (c.type === 'checkpoint' && feetY <= c.y1 + 0.2 && headY > c.y0) {
+ respawnPoint.set(c.cx, c.y1 + EYE_HEIGHT, c.cz);
+ }
+ }
+ inWater = nowInWater;
 
-  const p = pos;
-  hud.textContent = 'x:'+p.x.toFixed(1)+'  z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
-    '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'');
+ const p = pos;
+ hud.textContent = 'x:'+p.x.toFixed(1)+' z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
+ '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'');
 }
 
 // ---------- Loop ----------
 // 시작 시 저장본 자동 불러오기 (없으면 기본 월드)
 (function initWorld() {
-  let loaded = false;
-  try {
-    const s = localStorage.getItem('fpsWorld');
-    if (s) { const arr = worldFromJSON(s); if (arr && arr.length) loaded = loadFromData(arr); }
-  } catch (e) {}
-  if (!loaded) buildDefaultWorld();
-  rebuildColliders();
+ let loaded = false;
+ try {
+ const s = localStorage.getItem('fpsWorld');
+ if (s) { const arr = worldFromJSON(s); if (arr && arr.length) loaded = loadFromData(arr); }
+ } catch (e) {}
+ if (!loaded) buildDefaultWorld();
+ rebuildColliders();
 })();
 
 let autoSaveT = 0;
 let glowT = 0;
 function updateGlow(dt) {
-  glowT += dt;
-  for (const p of parts) {
-    if (p.type === 'checkpoint') p.mesh.material.emissiveIntensity = 0.6 + 0.4 * Math.sin(glowT * 3);
-    else if (p.type === 'lava') p.mesh.material.emissiveIntensity = 0.85 + 0.25 * Math.sin(glowT * 5);
-  }
+ glowT += dt;
+ for (const p of parts) {
+ if (p.type === 'checkpoint') p.mesh.material.emissiveIntensity = 0.6 + 0.4 * Math.sin(glowT * 3);
+ else if (p.type === 'lava') p.mesh.material.emissiveIntensity = 0.85 + 0.25 * Math.sin(glowT * 5);
+ }
 }
 
 function animate() {
-  requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05);
-  updateGlow(dt);
-  waterOverlay.style.opacity = (mode === 'play' && inWater) ? '1' : '0';
-  if (mode === 'edit') { autoSaveT += dt; if (autoSaveT > 3) { autoSaveT = 0; saveWorld(); } }
-  if (mode === 'play') {
-    gizmo.visible = false;
-    scaleGizmo.visible = false;
-    physics(dt); renderer.render(scene, playCam); hud.style.display = 'block';
-  } else {
-    if (selected && activeTool === 'move') {
-      gizmo.visible = true;
-      gizmo.position.copy(selected.mesh.position);
-      const dist = editCam.position.distanceTo(gizmo.position);
-      gizmo.scale.setScalar(Math.max(0.5, dist / 32));
-    } else {
-      gizmo.visible = false;
-    }
-    if (selected && activeTool === 'scale') {
-      scaleGizmo.visible = true;
-      scaleGizmo.position.copy(selected.mesh.position);
-      scaleGizmo.rotation.y = selected.rot;
-      const dist = editCam.position.distanceTo(scaleGizmo.position);
-      const s = Math.max(0.5, dist / 45);
-      const pad = 0.3 * s;
-      const hw = selected.w/2, hh = selected.h/2, hd = selected.d/2;
-      for (const a of scaleArrows) {
-        const off = (a.dim==='w'?hw : a.dim==='h'?hh : hd) + pad;
-        a.group.position.set(a.dir.x*off, a.dir.y*off, a.dir.z*off);
-        a.group.scale.setScalar(s);
-      }
-    } else {
-      scaleGizmo.visible = false;
-    }
-    renderer.render(scene, editCam); hud.style.display = 'none';
-  }
+ requestAnimationFrame(animate);
+ const dt = Math.min(clock.getDelta(), 0.05);
+ updateGlow(dt);
+ waterOverlay.style.opacity = (mode === 'play' && inWater) ? '1' : '0';
+ if (mode === 'edit') { autoSaveT += dt; if (autoSaveT > 3) { autoSaveT = 0; saveWorld(); } }
+ if (mode === 'play') {
+ gizmo.visible = false;
+ scaleGizmo.visible = false;
+ physics(dt); renderer.render(scene, playCam); hud.style.display = 'block';
+ } else {
+ if (selected && activeTool === 'move') {
+ gizmo.visible = true;
+ gizmo.position.copy(selected.mesh.position);
+ const dist = editCam.position.distanceTo(gizmo.position);
+ gizmo.scale.setScalar(Math.max(0.5, dist / 32));
+ } else {
+ gizmo.visible = false;
+ }
+ if (selected && activeTool === 'scale') {
+ scaleGizmo.visible = true;
+ scaleGizmo.position.copy(selected.mesh.position);
+ scaleGizmo.rotation.y = selected.rot;
+ const dist = editCam.position.distanceTo(scaleGizmo.position);
+ const s = Math.max(0.5, dist / 45);
+ const pad = 0.3 * s;
+ const hw = selected.w/2, hh = selected.h/2, hd = selected.d/2;
+ for (const a of scaleArrows) {
+ const off = (a.dim==='w'?hw : a.dim==='h'?hh : hd) + pad;
+ a.group.position.set(a.dir.x*off, a.dir.y*off, a.dir.z*off);
+ a.group.scale.setScalar(s);
+ }
+ } else {
+ scaleGizmo.visible = false;
+ }
+ renderer.render(scene, editCam); hud.style.display = 'none';
+ }
 }
 animate();
 
@@ -928,9 +933,9 @@ canvas.focus();
 window.addEventListener('click', () => canvas.focus());
 
 window.addEventListener('resize', () => {
-  playCam.aspect = aspect(); playCam.updateProjectionMatrix();
-  editCam.aspect = aspect(); editCam.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+ playCam.aspect = aspect(); playCam.updateProjectionMatrix();
+ editCam.aspect = aspect(); editCam.updateProjectionMatrix();
+ renderer.setSize(window.innerWidth, window.innerHeight);
 });
 </script>
 </body>
