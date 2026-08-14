@@ -436,6 +436,9 @@ function texDrawCanvas() {
  if (!cv) return;
  const size = getTexSize();
  texCanvas.width = size; texCanvas.height = size;
+ const DISPLAY_PX = 320; // 항상 320x320 CSS 픽셀로 확대 표시 (해상도 무관)
+ texCanvas.style.width = DISPLAY_PX + 'px';
+ texCanvas.style.height = DISPLAY_PX + 'px';
  texCtx.clearRect(0,0,size,size);
  texCtx.imageSmoothingEnabled = false;
  texCtx.drawImage(cv, 0, 0, size, size);
