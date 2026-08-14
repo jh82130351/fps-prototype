@@ -552,10 +552,11 @@ function texRenderTextureList() {
   del.onclick = (e) => { e.stopPropagation(); texDeleteTexture(t.id); };
   item.appendChild(del);
   item.onclick = () => texActivateTexture(t.id);
-  item.addEventListener('mousedown', (e) => {
+  item.addEventListener('pointerdown', (e) => {
   if (e.button !== 2 || !e.shiftKey) return; // Shift + 우클릭만 드래그 시작
   e.preventDefault();
   texDragTextureId = t.id;
+  try { item.setPointerCapture(e.pointerId); } catch (err) {}
   });
   item.addEventListener('contextmenu', (e) => e.preventDefault());
   listEl.appendChild(item);
@@ -1188,6 +1189,7 @@ canvas.addEventListener('wheel', (e) => {
  updateEditCam();
 }, { passive: false });
 canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit') e.preventDefault(); });
+window.addEventListener('contextmenu', (e) => { if (texDragTextureId !== null) e.preventDefault(); });
 
 // ---------- Properties ----------
 function renderProps() {
@@ -1605,7 +1607,7 @@ window.addEventListener('resize', () => {
 });
 
 // 텍스처 목록 우클릭 드래그 → 블록 특정 면에 적용
-window.addEventListener('mouseup', (e) => {
+window.addEventListener('pointerup', (e) => {
  if (texDragTextureId === null) return;
  const tid = texDragTextureId; texDragTextureId = null;
  if (mode !== 'edit') return;
