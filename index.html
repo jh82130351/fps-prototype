@@ -334,6 +334,7 @@ const TEX_RES_OPTIONS = [16, 32, 64, 128];
 let texTextures = [];
 let texActiveId = null;
 let texSeq = 1;
+let texDragTextureId = null;
 function getTexCanvas() { return texFaceCanvases[texActiveFace]; }
 // 활성 텍스처의 해상도
 function getTexSize() {
@@ -402,11 +403,15 @@ function texBuildFaces() {
  return c;
 }
 
+const texSharedTextureCache = new WeakMap();
 function texCanvasTexture(cv) {
- const t = new THREE.CanvasTexture(cv);
+ let t = texSharedTextureCache.get(cv);
+ if (t) return t;
+ t = new THREE.CanvasTexture(cv);
  t.magFilter = THREE.NearestFilter;
  t.minFilter = THREE.NearestFilter;
  t.colorSpace = THREE.SRGBColorSpace;
+ texSharedTextureCache.set(cv, t);
  return t;
 }
 
@@ -545,6 +550,12 @@ function texRenderTextureList() {
   del.onclick = (e) => { e.stopPropagation(); texDeleteTexture(t.id); };
   item.appendChild(del);
   item.onclick = () => texActivateTexture(t.id);
+  item.addEventListener('mousedown', (e) => {
+  if (e.button !== 2) return;
+  e.preventDefault();
+  texDragTextureId = t.id;
+  });
+  item.addEventListener('contextmenu', (e) => e.preventDefault());
   listEl.appendChild(item);
  }
 }
@@ -610,6 +621,8 @@ function texPaintAt(e) {
  }
  texDrawCanvas();
  texRefreshPreview();
+ const shared = texSharedTextureCache.get(cv);
+ if (shared) shared.needsUpdate = true;
 }
 function hexToRgb(hex) {
  const n = parseInt(hex.slice(1), 16);
@@ -620,6 +633,8 @@ function texClearBtnHandler() {
  const size = getTexSize();
  const cctx = cv.getContext('2d'); cctx.clearRect(0,0,size,size);
  texDrawCanvas(); texRefreshPreview();
+ const shared = texSharedTextureCache.get(cv);
+ if (shared) shared.needsUpdate = true;
 }
 
 // 3D 미리보기 마우스 회전
@@ -1582,6 +1597,35 @@ window.addEventListener('resize', () => {
  playCam.aspect = aspect(); playCam.updateProjectionMatrix();
  editCam.aspect = aspect(); editCam.updateProjectionMatrix();
  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// 텍스처 목록 우클릭 드래그 → 블록 특정 면에 적용
+window.addEventListener('mouseup', (e) => {
+ if (texDragTextureId === null) return;
+ const tid = texDragTextureId; texDragTextureId = null;
+ if (mode !== 'edit') return;
+ setNDC(e);
+ ray.setFromCamera(ndc, editCam);
+ const hits = ray.intersectObjects(parts.filter(p => !p.locked).map(p => p.mesh));
+ if (!hits.length) return;
+ const hitMesh = hits[0].object;
+ const p = parts.find(pp => pp.mesh === hitMesh);
+ const faceIdx = hits[0].face.materialIndex; // 0~5, DISPLAY_FACES 순서와 동일
+ const faceName = DISPLAY_FACES[faceIdx];
+ const t = texTextures.find(x => x.id === tid);
+ if (!p || !t || !t.canvases[faceName]) return;
+ if (!Array.isArray(p.mesh.material)) {
+  const base = p.mesh.material;
+  p.mesh.material = DISPLAY_FACES.map(() => base.clone());
+ }
+ const mat = p.mesh.material[faceIdx];
+ mat.map = texCanvasTexture(t.canvases[faceName]);
+ mat.color.setHex(0xffffff);
+ mat.needsUpdate = true;
+ if (!p.textureFaces) p.textureFaces = {};
+ p.textureFaces[faceName] = mat.map; // Texture 객체로 저장 (캔버스 아님)
+ p.isSpecial = true;
+ flash(FACE_NAMES[faceName] + ' 면에 텍스처 적용됨');
 });
 </script>
 </body>
