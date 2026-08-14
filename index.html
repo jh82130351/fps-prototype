@@ -663,8 +663,8 @@ texApplyBtn.onclick = () => {
  p.textureFaces = { _list: texTextures.map(t => ({
   size: t.size, canvases: t.canvases
  })) };
- // 매터리얼을 첫 텍스처의 면별 텍스처 배열로 교체
- const main = texTextures[0] || texTextures[texTextures.length-1];
+ // 매터리얼을 현재 선택(활성)된 텍스처의 면별 텍스처 배열로 교체
+ const main = texTextures.find(t => t.id === texActiveId) || texTextures[0] || texTextures[texTextures.length-1];
  if (!main) { flash('텍스처 없음'); return; }
  const mats = DISPLAY_FACES.map(f => new THREE.MeshStandardMaterial({
    color: 0xffffff, map: texCanvasTexture(main.canvases[f])
