@@ -553,7 +553,7 @@ function texRenderTextureList() {
   item.appendChild(del);
   item.onclick = () => texActivateTexture(t.id);
   item.addEventListener('pointerdown', (e) => {
-  if (e.button !== 2 || !e.shiftKey) return; // Shift + 우클릭만 드래그 시작
+  if (e.button !== 2 || !e.altKey) return; // Alt + 우클릭만 드래그 시작
   e.preventDefault();
   texDragTextureId = t.id;
   try { item.setPointerCapture(e.pointerId); } catch (err) {}
