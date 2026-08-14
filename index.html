@@ -86,6 +86,30 @@
  #texTools button { flex: 1; padding: 6px 4px; font-size: 11px; background: #1c2530; border: 1px solid #3a4553;
  border-radius: 6px; color: #cdd6e0; cursor: pointer; }
  #texTools button.on { background: #2d7dd2; border-color: #2d7dd2; color: #fff; }
+ #texListRow { display: flex; align-items: stretch; gap: 6px; }
+ #texListContainer { flex: 1; min-width: 0; }
+ .texListHead { font-size: 10px; opacity: 0.65; margin-bottom: 4px; }
+ #texList { display: flex; flex-wrap: wrap; gap: 4px; max-height: 52px; overflow-y: auto; }
+ #texList .texItem { display: flex; align-items: center; gap: 4px; padding: 3px 6px; font-size: 11px;
+  background: #1c2530; border: 1px solid #3a4553; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+ #texList .texItem.on { background: #2d7dd2; border-color: #2d7dd2; color: #fff; }
+ #texList .texItem canvas { width: 18px; height: 18px; image-rendering: pixelated; background: #0a0f16; border: 1px solid #2a3542; border-radius: 2px; }
+ #texList .texItem .texDel { color: #8b98a5; font-size: 12px; line-height: 1; margin-left: 2px; }
+ #texList .texItem .texDel:hover { color: #ff4d5e; }
+ #texNewBtn { flex: none; width: 32px; font-size: 18px; font-weight: 700; background: #1c2530;
+  border: 1px solid #3a4553; border-radius: 6px; color: #7dd3fc; cursor: pointer; }
+ #texNewBtn:hover { background: #26313f; }
+ #texResOverlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  background: rgba(8,12,18,0.82); border-radius: 10px; z-index: 3; }
+ #texResOverlay.show { display: flex; }
+ .texResBox { background: #141c26; border: 1px solid #3a4553; border-radius: 10px; padding: 16px; text-align: center; }
+ .texResTitle { font-size: 13px; color: #7dd3fc; margin-bottom: 12px; font-weight: 600; }
+ .texResBtns { display: flex; gap: 8px; margin-bottom: 12px; }
+ .texResBtns button { padding: 10px 14px; font-size: 12px; font-weight: 600; background: #1c2530;
+  border: 1px solid #3a4553; border-radius: 8px; color: #e6edf3; cursor: pointer; }
+ .texResBtns button:hover { background: #2d7dd2; border-color: #2d7dd2; }
+ .texResBox .texResCancel { padding: 6px 16px; font-size: 11px; background: #2a3542; border: 1px solid #3a4553;
+  border-radius: 6px; color: #cdd6e0; cursor: pointer; }
 
  #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
  justify-content: center; background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; z-index: 10; }
@@ -121,13 +145,32 @@
 
 <div id="texturePanel">
  <h3><span>텍스처 편집</span><span class="closeX" id="texClose" title="닫기">✕</span></h3>
+ <div id="texListRow">
+  <div id="texListContainer">
+   <div class="texListHead">텍스처 목록</div>
+   <div id="texList"></div>
+  </div>
+  <button id="texNewBtn" title="새 텍스처 추가">＋</button>
+ </div>
+ <div id="texResOverlay">
+  <div class="texResBox">
+   <div class="texResTitle">새 텍스처 해상도</div>
+   <div class="texResBtns">
+    <button data-res="16">16×16</button>
+    <button data-res="32">32×32</button>
+    <button data-res="64">64×64</button>
+    <button data-res="128">128×128</button>
+   </div>
+   <button id="texResCancel">취소</button>
+  </div>
+ </div>
  <div id="tex3dWrap"><canvas id="texture3d"></canvas></div>
  <div id="texFaces">
   <button data-face="up">위(Up)</button><button data-face="down">아래(Down)</button><button data-face="right">오른쪽</button>
   <button data-face="left">왼쪽</button><button data-face="front">앞</button><button data-face="back">뒤</button>
  </div>
  <div id="texCanvasWrap">
-  <canvas id="texCanvas" width="64" height="64"></canvas>
+  <canvas id="texCanvas" width="16" height="16"></canvas>
  </div>
  <div id="texTools">
   <button id="texToolPen" class="on">✨ 펜</button>
@@ -284,10 +327,46 @@ let texActiveFace = 'front';
 let texSelectedPart = null;
 let texDrawing = false;
 let texTool = 'pen';
-const TEX_SIZE = 64;
 const DISPLAY_FACES = ['right','left','top','bottom','front','back'];
-// 각 면의 텍스처 캔버스 (선택 블록의 텍스처)
+const FACE_NAMES = { right:'오른쪽', left:'왼쪽', top:'위', bottom:'아래', front:'앞', back:'뒤' };
+const TEX_RES_OPTIONS = [16, 32, 64, 128];
+// 텍스처 목록: 각 아이템 { id, size, canvases:{면:canvas} }
+let texTextures = [];
+let texActiveId = null;
+let texSeq = 1;
+function getTexCanvas() { return texFaceCanvases[texActiveFace]; }
+// 활성 텍스처의 해상도
+function getTexSize() {
+ const t = texTextures.find(x => x.id === texActiveId);
+ return t ? t.size : 16;
+}
+// 각 면의 텍스처 캔버스 (활성 텍스처)
 let texFaceCanvases = {};
+
+function hexToRgb(hex) {
+ const n = parseInt(hex.slice(1), 16);
+ return [n>>16 & 255, n>>8 & 255, n & 255];
+}
+function floodFill(ctx, x, y, target, fill) {
+ const size = getTexSize();
+ const img = ctx.getImageData(0, 0, size, size);
+ const d = img.data;
+ const idx = (y*size + x) * 4;
+ const match = (i) => d[i]===target[0] && d[i+1]===target[1] && d[i+2]===target[2];
+ if (match(idx) && !(fill[0]===target[0] && fill[1]===target[1] && fill[2]===target[2])) {
+  const stack = [[x,y]]; const visited = new Set();
+  while (stack.length) {
+   const [cx,cy] = stack.pop();
+   const k = cy*size + cx; if (visited.has(k)) continue; visited.add(k);
+   const i = k*4;
+   if (!match(i)) continue;
+   d[i]=fill[0]; d[i+1]=fill[1]; d[i+2]=fill[2]; d[i+3]=255;
+   if (cx>0) stack.push([cx-1,cy]); if (cx<size-1) stack.push([cx+1,cy]);
+   if (cy>0) stack.push([cx,cy-1]); if (cy<size-1) stack.push([cx,cy+1]);
+  }
+  ctx.putImageData(img, 0, 0);
+ }
+}
 
 // 3D 미리보기용 씬/렌더러/카메라
 const texScene = new THREE.Scene();
@@ -305,16 +384,20 @@ texScene.add(...texLights);
 let texPreviewMesh = null;
 let texPreviewRotY = 0, texPreviewRotX = -0.2, texPreviewDragging = false, texPrevX = 0, texPrevY = 0;
 
+function makeFaceCanvas(size, colorHex) {
+ const cv = document.createElement('canvas');
+ cv.width = size; cv.height = size;
+ const ctx = cv.getContext('2d');
+ if (colorHex) { ctx.fillStyle = colorHex; ctx.fillRect(0, 0, size, size); }
+ return cv;
+}
 function texBuildFaces() {
+ const size = getTexSize();
  const c = {};
  for (const f of DISPLAY_FACES) {
-  const cv = document.createElement('canvas');
-  cv.width = TEX_SIZE; cv.height = TEX_SIZE;
-  const ctx = cv.getContext('2d');
   // 기본: 블록 색상 단색
-  ctx.fillStyle = '#' + (texSelectedPart ? texSelectedPart.color.toString(16).padStart(6,'0') : '3498db');
-  ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-  c[f] = cv;
+  const col = '#' + (texSelectedPart ? texSelectedPart.color.toString(16).padStart(6,'0') : '3498db');
+  c[f] = makeFaceCanvas(size, col);
  }
  return c;
 }
@@ -351,9 +434,11 @@ function texDrawCanvas() {
  const f = texActiveFace;
  const cv = texFaceCanvases[f];
  if (!cv) return;
- // 캔버스 복사본 렌더
- texCtx.clearRect(0,0,TEX_SIZE,TEX_SIZE);
- texCtx.drawImage(cv, 0, 0);
+ const size = getTexSize();
+ texCanvas.width = size; texCanvas.height = size;
+ texCtx.clearRect(0,0,size,size);
+ texCtx.imageSmoothingEnabled = false;
+ texCtx.drawImage(cv, 0, 0, size, size);
 }
 
 function texApplyFaceBtn() {
@@ -362,24 +447,115 @@ function texApplyFaceBtn() {
  texDrawCanvas();
 }
 
-function texSelectPart(p) {
- texSelectedPart = p;
- // 기존 텍스처 있으면 로드, 없으면 단색 생성
- const loaded = p.textureFaces ? p.textureFaces : null;
- if (loaded && loaded._canvases) {
-  texFaceCanvases = loaded._canvases;
- } else {
-  const base = {};
-  const col = '#' + p.color.toString(16).padStart(6,'0');
-  for (const f of DISPLAY_FACES) {
-   const cv = document.createElement('canvas'); cv.width=TEX_SIZE; cv.height=TEX_SIZE;
-   const cctx = cv.getContext('2d'); cctx.fillStyle = col; cctx.fillRect(0,0,TEX_SIZE,TEX_SIZE);
-   base[f] = cv;
+async function loadPartTexturesIntoList(p) {
+ // 파트에 저장된 텍스처 세트 있으면 목록으로 변환, 없으면 기본 16×16 1개 생성
+ texTextures = [];
+ const loaded = p.textureFaces && p.textureFaces._list;
+ const defaultCol = '#' + p.color.toString(16).padStart(6,'0');
+ if (loaded && loaded.length) {
+  for (const t of loaded) {
+   const size = t.size || 16;
+   const canvases = {};
+   if (t.faces && typeof t.faces === 'object') {
+    // 저장/불러오기에서 온 형식: { size, faces: {면: dataURL} } → 비동기 로딩
+    for (const f of DISPLAY_FACES) {
+     canvases[f] = t.faces[f] ? await loadDataURLToCanvas(t.faces[f], size) : makeFaceCanvas(size, defaultCol);
+    }
+   } else {
+    // 편집 중 적용에서 온 형식: { size, canvases: {면: canvas} }
+    for (const f of DISPLAY_FACES) {
+     canvases[f] = (t.canvases && t.canvases[f]) ? t.canvases[f] : makeFaceCanvas(size, defaultCol);
+    }
+   }
+   texTextures.push({ id: texSeq++, size, canvases });
   }
-  texFaceCanvases = base;
+ } else {
+  // 기본: 16×16 단색 텍스처 1개 (기하존 디폴트)
+  const canvases = {};
+  for (const f of DISPLAY_FACES) canvases[f] = makeFaceCanvas(16, defaultCol);
+  texTextures.push({ id: texSeq++, size: 16, canvases });
  }
+ texActiveId = texTextures[texTextures.length - 1].id;
+ texActivateTexture(texActiveId);
+}
+
+async function texSelectPart(p) {
+ texSelectedPart = p;
+ await loadPartTexturesIntoList(p);
  texRefreshPreview();
  texApplyFaceBtn();
+ texRenderTextureList();
+}
+
+function texActivateTexture(id) {
+ const t = texTextures.find(x => x.id === id);
+ if (!t) return;
+ texActiveId = id;
+ texFaceCanvases = t.canvases;
+ texDrawCanvas();
+ texRefreshPreview();
+ texRenderTextureList();
+}
+
+function createNewTexture(size) {
+ if (!texSelectedPart) return;
+ const canvases = {};
+ const col = '#' + texSelectedPart.color.toString(16).padStart(6,'0');
+ for (const f of DISPLAY_FACES) canvases[f] = makeFaceCanvas(size, col);
+ const t = { id: texSeq++, size, canvases };
+ texTextures.push(t);
+ texActivateTexture(t.id);
+ texResOverlayShow(false);
+}
+
+// 해상도 선택 팝업 표시/숨김
+const texResOverlay = document.getElementById('texResOverlay');
+function texResOverlayShow(show) {
+ texResOverlay.classList.toggle('show', !!show);
+}
+
+// 텍스처 목록 렌더링 (미리보기 썸네일 + 이름)
+function texRenderTextureList() {
+ const listEl = document.getElementById('texList');
+ if (!listEl) return;
+ listEl.innerHTML = '';
+ for (const t of texTextures) {
+  const item = document.createElement('div');
+  item.className = 'texItem' + (t.id === texActiveId ? ' on' : '');
+  item.style.cursor = 'pointer';
+  // 썸네일 (앞면)
+  const thumb = document.createElement('canvas');
+  thumb.width = t.size; thumb.height = t.size;
+  const tctx = thumb.getContext('2d');
+  const front = t.canvases && t.canvases['front'];
+  if (front) { tctx.imageSmoothingEnabled = false; tctx.drawImage(front, 0, 0, t.size, t.size); }
+  item.appendChild(thumb);
+  // 이름: texture.png {N}×{N}px
+  const name = document.createElement('span');
+  name.textContent = `texture.png ${t.size}×${t.size}px`;
+  name.style.flex = '1'; name.style.overflow = 'hidden'; name.style.textOverflow = 'ellipsis'; name.style.whiteSpace = 'nowrap';
+  item.appendChild(name);
+  // 삭제 버튼
+  const del = document.createElement('span');
+  del.className = 'texDel'; del.textContent = '✕'; del.title = '삭제';
+  del.style.cursor = 'pointer';
+  del.onclick = (e) => { e.stopPropagation(); texDeleteTexture(t.id); };
+  item.appendChild(del);
+  item.onclick = () => texActivateTexture(t.id);
+  listEl.appendChild(item);
+ }
+}
+
+function texDeleteTexture(id) {
+ if (texTextures.length <= 1) { flash('최소 1개의 텍스처 필요'); return; }
+ const i = texTextures.findIndex(x => x.id === id);
+ if (i < 0) return;
+ texTextures.splice(i, 1);
+ if (texActiveId === id) {
+  const next = texTextures[Math.min(i, texTextures.length - 1)];
+  texActiveId = next.id; texFaceCanvases = next.canvases; texDrawCanvas(); texRefreshPreview();
+ }
+ texRenderTextureList();
 }
 
 function texOpen() {
@@ -404,10 +580,11 @@ function setTexPanelSize() {
 // 픽셀 그리기 로직
 function texGetPixel(e) {
  const r = texCanvas.getBoundingClientRect();
- const sx = TEX_SIZE / r.width;
+ const size = getTexSize();
+ const sx = size / r.width;
  const px = Math.floor((e.clientX - r.left) * sx);
  const py = Math.floor((e.clientY - r.top) * sx);
- return { x: Math.max(0, Math.min(TEX_SIZE-1, px)), y: Math.max(0, Math.min(TEX_SIZE-1, py)) };
+ return { x: Math.max(0, Math.min(size-1, px)), y: Math.max(0, Math.min(size-1, py)) };
 }
 
 texCanvas.addEventListener('mousedown', (e) => { texDrawing = true; texPaintAt(e); e.preventDefault(); });
@@ -435,24 +612,11 @@ function hexToRgb(hex) {
  const n = parseInt(hex.slice(1), 16);
  return [n>>16 & 255, n>>8 & 255, n & 255];
 }
-function floodFill(ctx, x, y, target, fill) {
- const img = ctx.getImageData(0, 0, TEX_SIZE, TEX_SIZE);
- const d = img.data;
- const idx = (y*TEX_SIZE + x) * 4;
- const match = (i) => d[i]===target[0] && d[i+1]===target[1] && d[i+2]===target[2];
- if (match(idx) && !(fill[0]===target[0] && fill[1]===target[1] && fill[2]===target[2])) {
-  const stack = [[x,y]]; const visited = new Set();
-  while (stack.length) {
-   const [cx,cy] = stack.pop();
-   const k = cy*TEX_SIZE + cx; if (visited.has(k)) continue; visited.add(k);
-   const i = k*4;
-   if (!match(i)) continue;
-   d[i]=fill[0]; d[i+1]=fill[1]; d[i+2]=fill[2]; d[i+3]=255;
-   if (cx>0) stack.push([cx-1,cy]); if (cx<TEX_SIZE-1) stack.push([cx+1,cy]);
-   if (cy>0) stack.push([cx,cy-1]); if (cy<TEX_SIZE-1) stack.push([cx,cy+1]);
-  }
-  ctx.putImageData(img, 0, 0);
- }
+function texClearBtnHandler() {
+ const cv = texFaceCanvases[texActiveFace]; if (!cv) return;
+ const size = getTexSize();
+ const cctx = cv.getContext('2d'); cctx.clearRect(0,0,size,size);
+ texDrawCanvas(); texRefreshPreview();
 }
 
 // 3D 미리보기 마우스 회전
@@ -469,6 +633,14 @@ window.addEventListener('mouseup', () => { texRotDragging = false; });
 
 // 면 버튼
 [...document.querySelectorAll('#texFaces button')].forEach(b => b.onclick = () => { texActiveFace = b.dataset.face; texApplyFaceBtn(); });
+// 새 텍스처 추가(+) 버튼 → 해상도 선택 팝업
+const texNewBtn = document.getElementById('texNewBtn');
+if (texNewBtn) texNewBtn.onclick = () => { texResOverlayShow(true); };
+// 취소 버튼
+const texResCancel = document.getElementById('texResCancel');
+if (texResCancel) texResCancel.onclick = () => { texResOverlayShow(false); };
+// 해상도 선택 버튼 (16/32/64/128)
+[...document.querySelectorAll('.texResBtns button[data-res]')].forEach(b => b.onclick = () => { createNewTexture(parseInt(b.dataset.res, 10)); });
 // 툴 버튼
 const texToolBtns = { pen:'texToolPen', fill:'texToolFill', erase:'texToolErase' };
 for (const k in texToolBtns) {
@@ -479,26 +651,25 @@ for (const k in texToolBtns) {
 }
 const texColorInput = document.getElementById('texColor');
 const texClearBtn = document.getElementById('texClear');
-texClearBtn.onclick = () => {
- const cv = texFaceCanvases[texActiveFace]; if (!cv) return;
- const cctx = cv.getContext('2d'); cctx.clearRect(0,0,TEX_SIZE,TEX_SIZE);
- texDrawCanvas(); texRefreshPreview();
-};
+texClearBtn.onclick = texClearBtnHandler;
 const texApplyBtn = document.getElementById('texApplyToPart');
 texApplyBtn.onclick = () => {
  if (!texSelectedPart) return;
  const p = texSelectedPart;
- p.textureFaces = p.textureFaces || {};
- // 현재 편집 중인 캔버스를 파트에 적용 (textureFaces에 Cairo 캔버스 저장)
- p.textureFaces._canvases = texFaceCanvases;
- // 매터리얼을 면별 텍스처 배열로 교체
+ // 현재 목록(여러 텍스처)을 파트에 적용 — 첫 텍스처를 메인으로 사용
+ p.textureFaces = { _list: texTextures.map(t => ({
+  size: t.size, canvases: t.canvases
+ })) };
+ // 매터리얼을 첫 텍스처의 면별 텍스처 배열로 교체
+ const main = texTextures[0] || texTextures[texTextures.length-1];
+ if (!main) { flash('텍스처 없음'); return; }
  const mats = DISPLAY_FACES.map(f => new THREE.MeshStandardMaterial({
-   color: 0xffffff, map: texCanvasTexture(texFaceCanvases[f])
+   color: 0xffffff, map: texCanvasTexture(main.canvases[f])
  }));
  p.mesh.material = mats;
  p._isSpecialTexture = true;
  applyAppearance(p);
- p.mesh.geometry = new THREE.BoxGeometry(p.w, p.h, p.d); // 면별 material 재적용을 위해 재설정
+ p.mesh.geometry = new THREE.BoxGeometry(p.w, p.h, p.d);
  refreshOutline();
  flash('텍스처 적용됨');
 };
@@ -534,7 +705,14 @@ function addPart(x, y, z, w, h, d, color, rot, type, locked, textureCanvases) {
  mesh.castShadow = true; mesh.receiveShadow = true;
  scene.add(mesh);
  const p = { mesh, w, h, d, color, rot, type, locked: !!locked };
- if (textureCanvases) { p.textureFaces = { _canvases: textureCanvases }; p._isSpecialTexture = true; }
+ if (textureCanvases) {
+  p.textureFaces = { _canvases: textureCanvases };
+  // 전체 텍스처 목록(해상도 포함)이 전달되면 함께 보관 → 편집기에서 복원 가능
+  if (textureCanvases._list && Array.isArray(textureCanvases._list)) {
+   p.textureFaces._list = textureCanvases._list;
+  }
+  p._isSpecialTexture = true;
+ }
  applyAppearance(p);
  parts.push(p);
  return p;
@@ -1069,14 +1247,20 @@ const btnSnap = document.getElementById('btnSnap');
 btnSnap.onclick = () => { snap = !snap; btnSnap.textContent = snap ? '스냅 1' : '스냅 off'; btnSnap.classList.toggle('on', snap); };
 
 function serialize() {
- return JSON.stringify({ v: 2, parts: parts.map(p => {
+ return JSON.stringify({ v: 3, parts: parts.map(p => {
   let texData = null;
-  if (p.textureFaces && p.textureFaces._canvases) {
-   texData = {};
-   for (const f of DISPLAY_FACES) {
-    const cv = p.textureFaces._canvases[f];
-    if (cv) texData[f] = cv.toDataURL('image/png');
-   }
+  if (p.textureFaces && Array.isArray(p.textureFaces._list) && p.textureFaces._list.length) {
+   texData = { list: p.textureFaces._list.map(t => ({
+    size: t.size || 16,
+    faces: (() => {
+     const o = {};
+     for (const f of DISPLAY_FACES) {
+      const cv = t.canvases[f];
+      if (cv) o[f] = cv.toDataURL('image/png');
+     }
+     return o;
+    })()
+   })) };
   }
   return {
    x: +p.mesh.position.x.toFixed(3), y: +p.mesh.position.y.toFixed(3), z: +p.mesh.position.z.toFixed(3),
@@ -1092,25 +1276,57 @@ function worldFromJSON(str) {
  if (data && Array.isArray(data.parts)) return data.parts;
  return null;
 }
+function loadDataURLToCanvas(dataURL, size) {
+ const cv = document.createElement('canvas'); cv.width = size; cv.height = size;
+ const ctx = cv.getContext('2d');
+ return new Promise((res) => {
+  const u = new Image();
+  u.onload = () => { ctx.drawImage(u, 0, 0, size, size); res(cv); };
+  u.onerror = () => res(cv);
+  u.src = dataURL;
+ });
+}
+async function loadTextureList(tex) {
+ // tex: { size, faces: {면: dataURL} } 또는 기존 { _canvases } 형태
+ if (!tex) return null;
+ const size = tex.size || 16;
+ const c = {};
+ if (tex.faces && typeof tex.faces === 'object') {
+  for (const f of DISPLAY_FACES) {
+   if (tex.faces[f]) c[f] = await loadDataURLToCanvas(tex.faces[f], size);
+   else c[f] = makeFaceCanvas(size, null);
+  }
+  return { size, canvases: c };
+ }
+ return null;
+}
+// 저장된 텍스처 데이터 → per-face 캔버스 객체 변환 (addPart에 전달용)
 function loadTextureCanvases(tex) {
  if (!tex) return null;
- const c = {};
- let any = false;
- for (const f of DISPLAY_FACES) {
-  if (tex[f]) {
-   try {
-    const img = new Image();
-    img.src = tex[f];
-    const cv = document.createElement('canvas'); cv.width = TEX_SIZE; cv.height = TEX_SIZE;
-    const ctx = cv.getContext('2d');
-    const u = new Image();
-    u.onload = () => { ctx.drawImage(u, 0, 0, TEX_SIZE, TEX_SIZE); };
-    u.src = tex[f];
-    c[f] = cv; any = true;
-   } catch (e) {}
+ // 새 형식: { list: [{ size, faces: {면: dataURL} }] } — 첫 텍스처를 메인으로
+ if (tex.list && Array.isArray(tex.list) && tex.list.length) {
+  const first = tex.list[0];
+  const size = first.size || 16;
+  const c = {};
+  if (first.faces && typeof first.faces === 'object') {
+   // 동기적으로 빈 캔버스 먼저 만들고, 이미지 로딩은 비동기 처리
+   for (const f of DISPLAY_FACES) c[f] = makeFaceCanvas(size, null);
+   for (const f of DISPLAY_FACES) {
+    if (first.faces[f]) {
+     const img = new Image();
+     img.onload = () => { const ctx = c[f].getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.drawImage(img, 0, 0, size, size); };
+     img.src = first.faces[f];
+    }
+   }
+   // 해상도 + 전체 목록 정보를 캔버스에 기록해 loadPartTexturesIntoList가 복원 가능하게
+   c._size = size;
+   c._list = tex.list.map(t => ({ size: t.size || 16, faces: t.faces || {} }));
+   return c;
   }
  }
- return any ? c : null;
+ // 구 형식: { _canvases: {면: canvas} }
+ if (tex._canvases && typeof tex._canvases === 'object') return tex._canvases;
+ return null;
 }
 function loadFromData(arr) {
  if (!Array.isArray(arr)) return false;
