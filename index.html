@@ -1456,6 +1456,7 @@ const WALK = 6, RUN = 11, GRAVITY = 24, JUMP_SPEED = 8, WATER_FACTOR = 0.45;
 const SWIM_UP = 5, SINK_SPEED = 1.6;
 const MAX_HP = 100, VOID_DMG = 15, VOID_TICK = 0.75; // -140 아래: 15틱(0.05s×15=0.75s)마다 15 데미지
 let health = MAX_HP, voidTickT = 0;
+let healTickT = 0;
 let lastCheckpointKey = null;
 let vertVel = 0, onGround = true, inWater = false;
 const velocity = new THREE.Vector3();
@@ -1570,10 +1571,20 @@ function physics(dt) {
  respawnPoint.set(c.cx, c.y1 + EYE_HEIGHT, c.cz);
  if (cpKey !== lastCheckpointKey) { // 새 체크포인트 도달 시에만
  lastCheckpointKey = cpKey;
- health = MAX_HP; updateHearts(); // 체력 회복
- flash('✓ 체크포인트 저장 · 체력 회복');
+ flash('✓ 체크포인트 저장');
  }
  }
+ }
+ // 체크포인트 위에 있으면 10틱(0.5초)마다 5 회복 (하트 반 칸)
+ if (onCheckpoint && health < MAX_HP) {
+ healTickT += dt;
+ while (healTickT >= 0.5) {
+ healTickT -= 0.5;
+ health = Math.min(MAX_HP, health + 5);
+ updateHearts();
+ }
+ } else {
+ healTickT = 0;
  }
  inWater = nowInWater;
 
