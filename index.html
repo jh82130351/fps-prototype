@@ -583,10 +583,10 @@ function texDeleteTexture(id) {
 
 function texOpen() {
  if (mode !== 'edit') return;
- if (!selected) { flash('블록을 먼저 선택하세요'); return; }
  texPanel.style.display = 'flex';
  setTexPanelSize();
- texSelectPart(selected);
+ if (selected) texSelectPart(selected); // 블록이 선택돼 있으면 그 블록 기준으로, 아니면 그냥 목록만
+ texRenderTextureList();
 }
 function texClose() { texPanel.style.display = 'none'; texScene.clear(); texPreviewMesh = null; }
 function texTogglePanel() {
@@ -985,7 +985,7 @@ function setSelection(arr) {
  // 텍스처 패널이 열려 있으면 새 선택에 맞게 갱신
  if (texPanel.style.display === 'flex') {
   if (selected) texSelectPart(selected);
-  else texClose();
+  else { texRenderTextureList(); /* 선택 블록의 기본 텍스처 미리보기는 비우기 */ }
  }
 }
 function select(p) { setSelection([p]); }
