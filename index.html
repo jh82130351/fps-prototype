@@ -224,6 +224,7 @@ const crosshair = document.getElementById('crosshair');
 const splash = document.getElementById('splash');
 const waterOverlay = document.getElementById('water');
 const healthEl = document.getElementById('health');
+const touchControls = document.getElementById('touchControls');
 let audioCtx = null;
 function initAudio() {
  if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
@@ -1731,6 +1732,7 @@ function updateGlow(dt) {
 
 function animate() {
  requestAnimationFrame(animate);
+ touchControls.style.display = (isTouch && mode === 'play') ? 'block' : 'none';
  const dt = Math.min(clock.getDelta(), 0.05);
  updateGlow(dt);
  waterOverlay.style.opacity = (mode === 'play' && inWater) ? '1' : '0';
