@@ -877,6 +877,7 @@ function setMode(m) {
  yawObject.position.copy(respawnPoint);
  vertVel = 0; velocity.set(0,0,0);
  health = MAX_HP; voidTickT = 0; updateHearts();
+ lastCheckpointKey = null;
  overlay.style.display = 'flex';
  }
 }
@@ -1455,6 +1456,7 @@ const WALK = 6, RUN = 11, GRAVITY = 24, JUMP_SPEED = 8, WATER_FACTOR = 0.45;
 const SWIM_UP = 5, SINK_SPEED = 1.6;
 const MAX_HP = 100, VOID_DMG = 15, VOID_TICK = 0.75; // -140 아래: 15틱(0.05s×15=0.75s)마다 15 데미지
 let health = MAX_HP, voidTickT = 0;
+let lastCheckpointKey = null;
 let vertVel = 0, onGround = true, inWater = false;
 const velocity = new THREE.Vector3();
 const forward = new THREE.Vector3(), right = new THREE.Vector3();
@@ -1464,6 +1466,7 @@ function respawn() {
  yawObject.position.copy(respawnPoint);
  vertVel = 0; velocity.set(0,0,0);
  health = MAX_HP; voidTickT = 0; updateHearts();
+ lastCheckpointKey = null;
  splash.style.background = 'rgba(200,0,0,0.5)';
  splash.style.opacity = '1';
  setTimeout(() => { splash.style.opacity = '0'; }, 120);
@@ -1561,7 +1564,13 @@ function physics(dt) {
  if (c.type === 'water' && yOverlap) nowInWater = true;
  else if (c.type === 'lava' && yOverlap) { respawn(); return; }
  else if (c.type === 'checkpoint' && feetY <= c.y1 + 0.2 && headY > c.y0) {
+ const cpKey = c.cx.toFixed(2) + ',' + c.cz.toFixed(2) + ',' + c.y1.toFixed(2);
  respawnPoint.set(c.cx, c.y1 + EYE_HEIGHT, c.cz);
+ if (cpKey !== lastCheckpointKey) { // 새 체크포인트 도달 시에만
+ lastCheckpointKey = cpKey;
+ health = MAX_HP; updateHearts(); // 체력 회복
+ flash('✓ 체크포인트 저장 · 체력 회복');
+ }
  }
  }
  inWater = nowInWater;
