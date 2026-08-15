@@ -337,6 +337,7 @@ let texTextures = [];
 let texActiveId = null;
 let texSeq = 1;
 let texDragTextureId = null;
+let texDragStartX = 0, texDragStartY = 0, texDragMoved = false;
 function getTexCanvas() { return texFaceCanvases[texActiveFace]; }
 // 활성 텍스처의 해상도
 function getTexSize() {
@@ -552,13 +553,12 @@ function texRenderTextureList() {
   del.onclick = (e) => { e.stopPropagation(); texDeleteTexture(t.id); };
   item.appendChild(del);
   item.onclick = () => texActivateTexture(t.id);
-  item.draggable = true;
-  item.addEventListener('dragstart', (e) => {
+  item.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return; // 좌클릭만
   texDragTextureId = t.id;
-  e.dataTransfer.effectAllowed = 'copy';
-  e.dataTransfer.setData('text/plain', String(t.id)); // 일부 브라우저는 데이터 없으면 드래그 취소함
+  texDragStartX = e.clientX; texDragStartY = e.clientY;
+  texDragMoved = false;
   });
-  item.addEventListener('dragend', () => { texDragTextureId = null; });
   listEl.appendChild(item);
  }
 }
@@ -1129,6 +1129,12 @@ window.addEventListener('mouseup', (e) => {
  if (marqueeActive) { finishMarquee(e); }
  dragging = false; orbiting = false; draggingAxis = false; scalingAxis = false; rmbDown = false; groupDragging = false;
 });
+// 텍스처 목록 좌클릭 드래그 이동/커서 피드백
+window.addEventListener('mousemove', (e) => {
+ if (texDragTextureId === null) return;
+ const dx = e.clientX - texDragStartX, dy = e.clientY - texDragStartY;
+ if (!texDragMoved && Math.hypot(dx, dy) > 5) { texDragMoved = true; document.body.style.cursor = 'grabbing'; }
+});
 const groundFocus = new THREE.Vector3();
 const focusObjs = [];
 const marqueeEl = document.getElementById('marquee');
@@ -1632,12 +1638,13 @@ window.addEventListener('resize', () => {
  renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// 텍스처 목록 HTML5 좌클릭 드래그 → 블록 특정 면에 적용
-canvas.addEventListener('dragover', (e) => { if (texDragTextureId !== null) e.preventDefault(); });
-canvas.addEventListener('drop', (e) => {
+// 텍스처 목록 좌클릭 드래그 → 블록 특정 면에 적용
+window.addEventListener('mouseup', (e) => {
  if (texDragTextureId === null) return;
- e.preventDefault();
- const tid = texDragTextureId; texDragTextureId = null;
+ const wasMoved = texDragMoved;
+ const tid = texDragTextureId; texDragTextureId = null; texDragMoved = false;
+ document.body.style.cursor = '';
+ if (!wasMoved) return; // 그냥 클릭(이동 없음)이면 적용 시도하지 않음 — 목록 클릭 선택과 구분
  if (mode !== 'edit') { flash('편집 모드 아님'); return; }
  setNDC(e);
  ray.setFromCamera(ndc, editCam);
