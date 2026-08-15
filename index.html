@@ -115,9 +115,17 @@
 
  #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
  justify-content: center; background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; z-index: 10; }
- #overlay h1 { font-size: 22px; font-weight: 600; margin-bottom: 12px; }
  #overlay p { font-size: 14px; opacity: 0.8; line-height: 1.8; text-align: center; }
  #overlay kbd { background: #222; border: 1px solid #444; border-radius: 4px; padding: 2px 7px; font-size: 12px; margin: 0 2px; }
+ #menu { display:flex; flex-direction:column; align-items:center; gap:12px; }
+ #startBtn { padding:14px 48px; font-size:18px; font-weight:700; cursor:pointer; border:none;
+  border-radius:10px; background:#2ecc71; color:#fff; }
+ #startBtn:hover { background:#27ae60; }
+ #nickInput { width:220px; padding:10px 14px; font-size:15px; text-align:center; border-radius:8px;
+  border:1px solid #3a4553; background:#0f151d; color:#e6edf3; outline:none; }
+ #comingSoon { width:220px; padding:10px 14px; font-size:14px; text-align:center; border-radius:8px;
+  border:1px dashed #3a4553; background:rgba(255,255,255,0.04); color:#8b98a5; cursor:not-allowed; }
+ #overlayHelp { margin-top:20px; }
 
  #touchControls { position:absolute; inset:0; z-index:7; pointer-events:none; }
  #joystick { position:absolute; left:24px; bottom:24px; width:120px; height:120px; border-radius:50%;
@@ -209,11 +217,13 @@
 </div>
 
 <div id="overlay">
- <h1 id="overlayTitle">클릭해서 시작</h1>
- <p>
- <kbd>Tab</kbd> 편집 / 플레이 전환<br>
- 플레이: <kbd>WASD</kbd> · 마우스 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프<br>
- 편집: 파트 클릭 → 축 화살표 드래그 · 속성의 "종류"로 블록 타입 변경
+ <div id="menu">
+  <button id="startBtn">시작하기</button>
+  <input id="nickInput" type="text" maxlength="16" placeholder="닉네임" autocomplete="off">
+  <div id="comingSoon">준비중</div>
+ </div>
+ <p id="overlayHelp">
+  <kbd>Tab</kbd> 편집 / 플레이 전환 · <kbd>WASD</kbd> 이동 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프
  </p>
 </div>
 
@@ -227,6 +237,28 @@ const splash = document.getElementById('splash');
 const waterOverlay = document.getElementById('water');
 const healthEl = document.getElementById('health');
 const touchControls = document.getElementById('touchControls');
+const nickInput = document.getElementById('nickInput');
+const startBtn = document.getElementById('startBtn');
+let playerNick = localStorage.getItem('fpsNick') || '플레이어';
+if (nickInput) nickInput.value = playerNick;
+function saveNick() {
+ const v = (nickInput && nickInput.value.trim()) || '';
+ playerNick = v.slice(0, 16);
+ if (playerNick) { try { localStorage.setItem('fpsNick', playerNick); } catch (e) {} }
+}
+if (startBtn) startBtn.addEventListener('click', (e) => {
+ e.stopPropagation();
+ saveNick();
+ initAudio();
+ if (mode !== 'play') return;
+ if (isTouch) {
+  overlay.style.display = 'none';
+  crosshair.style.display = 'block';
+  locked = false;
+ } else {
+  canvas.requestPointerLock();
+ }
+});
 let audioCtx = null;
 function initAudio() {
  if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
@@ -916,26 +948,14 @@ function setMode(m) {
  vertVel = 0; velocity.set(0,0,0);
  health = MAX_HP; voidTickT = 0; updateHearts();
  lastCheckpointKey = null;
- const overlayTitle = document.getElementById('overlayTitle');
- if (overlayTitle) overlayTitle.textContent = isTouch ? '화면을 터치해 시작' : '클릭해서 시작';
+ if (document.getElementById('overlayTitle')) document.getElementById('overlayTitle').textContent =
+   isTouch ? '화면을 터치해 시작' : '클릭해서 시작';
  overlay.style.display = 'flex';
  }
 }
 
 // ---------- Play input ----------
 let locked = false;
-overlay.addEventListener('click', () => {
- initAudio();
- if (mode !== 'play') return;
- if (isTouch) {
-  // 모바일: 포인터락 없이 오버레이만 숨기고 플레이 시작
-  overlay.style.display = 'none';
-  crosshair.style.display = 'block';
-  locked = false;
- } else {
-  canvas.requestPointerLock();
- }
-});
 document.addEventListener('pointerlockchange', () => {
  locked = document.pointerLockElement === canvas;
  if (mode === 'play') { overlay.style.display = locked ? 'none' : 'flex'; crosshair.style.display = locked ? 'block' : 'none'; }
@@ -1710,8 +1730,8 @@ function physics(dt) {
  inWater = nowInWater;
 
  const p = pos;
- hud.textContent = 'x:'+p.x.toFixed(1)+' z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
- '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'')+(onCheckpoint?' · ✓체크포인트':'');
+ hud.textContent = (playerNick ? playerNick + '\n' : '') +
+  'x:'+p.x.toFixed(1)+' z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
 }
 
 // ---------- Loop ----------
