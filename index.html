@@ -944,6 +944,7 @@ const keys = {};
 // ---------- Mobile touch input ----------
 const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 let touchMove = { x: 0, y: 0 }; // 조이스틱 방향 (-1~1)
+let touchRun = false;
 let touchLookId = null, touchLookLastX = 0, touchLookLastY = 0;
 
 const joyEl = document.getElementById('joystick');
@@ -955,6 +956,7 @@ function joyUpdate(t) {
  let dx = t.clientX - cx, dy = t.clientY - cy;
  const max = r.width / 2; // 60px
  const len = Math.hypot(dx, dy);
+ touchRun = len > max * 0.98; // 원 경계 밖까지 밀면 달리기
  if (len > max) { dx = dx / len * max; dy = dy / len * max; }
  touchMove.x = dx / max;
  touchMove.y = dy / max;
@@ -963,6 +965,7 @@ function joyUpdate(t) {
 }
 function joyReset() {
  touchMove.x = 0; touchMove.y = 0;
+ touchRun = false;
  joyKnob.style.left = '35px'; joyKnob.style.top = '35px';
 }
 joyEl.addEventListener('touchstart', (e) => { e.preventDefault(); joyUpdate(e.touches[0]); }, { passive: false });
@@ -1583,7 +1586,7 @@ function respawn() {
 }
 
 function physics(dt) {
- const shift = keys['ShiftLeft'] || keys['ShiftRight'];
+ const shift = keys['ShiftLeft'] || keys['ShiftRight'] || touchRun;
  const speed = inWater ? (shift ? WALK : WALK * WATER_FACTOR) : (shift ? RUN : WALK);
  const y = yawObject.rotation.y;
  forward.set(-Math.sin(y), 0, -Math.cos(y));
