@@ -91,9 +91,11 @@
  .texListHead { font-size: 10px; opacity: 0.65; margin-bottom: 4px; }
  #texList { display: flex; flex-wrap: wrap; gap: 4px; max-height: 52px; overflow-y: auto; }
  #texList .texItem { display: flex; align-items: center; gap: 4px; padding: 3px 6px; font-size: 11px;
-  background: #1c2530; border: 1px solid #3a4553; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+  background: #1c2530; border: 1px solid #3a4553; border-radius: 6px; cursor: pointer; white-space: nowrap;
+  user-select: none; -webkit-user-drag: none; }
  #texList .texItem.on { background: #2d7dd2; border-color: #2d7dd2; color: #fff; }
- #texList .texItem canvas { width: 18px; height: 18px; image-rendering: pixelated; background: #0a0f16; border: 1px solid #2a3542; border-radius: 2px; }
+ #texList .texItem canvas { width: 18px; height: 18px; image-rendering: pixelated; background: #0a0f16; border: 1px solid #2a3542; border-radius: 2px;
+  -webkit-user-drag: none; pointer-events: none; }
  #texList .texItem .texDel { color: #8b98a5; font-size: 12px; line-height: 1; margin-left: 2px; }
  #texList .texItem .texDel:hover { color: #ff4d5e; }
  #texNewBtn { flex: none; width: 32px; font-size: 18px; font-weight: 700; background: #1c2530;
@@ -575,11 +577,13 @@ function texRenderTextureList() {
   item.onclick = () => texActivateTexture(t.id);
   item.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return; // 좌클릭만
+  e.preventDefault(); // 내부 캔버스의 네이티브 이미지 드래그 차단 (이게 mousemove를 삼켜서 드래그가 안 됐음)
   texDragTextureId = t.id;
   texDbg('mousedown 시작 id=' + t.id);
   texDragStartX = e.clientX; texDragStartY = e.clientY;
   texDragMoved = false;
   });
+  item.setAttribute('draggable', 'false');
   listEl.appendChild(item);
  }
 }
