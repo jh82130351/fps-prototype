@@ -1553,6 +1553,7 @@ function physics(dt) {
 
  // 트리거 판정 (물/체크포인트/용암)
  let nowInWater = false;
+ let onCheckpoint = false;
  const feetY = pos.y - H, headY = pos.y;
  for (const c of colliders) {
  const ca = Math.cos(c.a), sa = Math.sin(c.a);
@@ -1564,6 +1565,7 @@ function physics(dt) {
  if (c.type === 'water' && yOverlap) nowInWater = true;
  else if (c.type === 'lava' && yOverlap) { respawn(); return; }
  else if (c.type === 'checkpoint' && feetY <= c.y1 + 0.2 && headY > c.y0) {
+ onCheckpoint = true;
  const cpKey = c.cx.toFixed(2) + ',' + c.cz.toFixed(2) + ',' + c.y1.toFixed(2);
  respawnPoint.set(c.cx, c.y1 + EYE_HEIGHT, c.cz);
  if (cpKey !== lastCheckpointKey) { // 새 체크포인트 도달 시에만
@@ -1577,7 +1579,7 @@ function physics(dt) {
 
  const p = pos;
  hud.textContent = 'x:'+p.x.toFixed(1)+' z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
- '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'');
+ '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'')+(onCheckpoint?' · ✓체크포인트':'');
 }
 
 // ---------- Loop ----------
