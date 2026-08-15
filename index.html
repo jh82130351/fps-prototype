@@ -122,6 +122,8 @@
  #touchControls { position:absolute; inset:0; z-index:7; pointer-events:none; }
  #joystick { position:absolute; left:24px; bottom:24px; width:120px; height:120px; border-radius:50%;
   background:rgba(255,255,255,0.12); border:2px solid rgba(255,255,255,0.3); pointer-events:auto; touch-action:none; }
+ #joystick.run { background:rgba(46,204,113,0.28); border-color:#2ecc71; }
+ #joystick.run #joyKnob { background:rgba(46,204,113,0.85); }
  #joyKnob { position:absolute; left:35px; top:35px; width:50px; height:50px; border-radius:50%;
   background:rgba(255,255,255,0.5); }
  #btnJump { position:absolute; right:24px; bottom:40px; width:88px; height:88px; border-radius:50%;
@@ -957,6 +959,7 @@ function joyUpdate(t) {
  const max = r.width / 2; // 60px
  const len = Math.hypot(dx, dy);
  touchRun = len > max * 0.98; // 원 경계 밖까지 밀면 달리기
+ joyEl.classList.toggle('run', touchRun);
  if (len > max) { dx = dx / len * max; dy = dy / len * max; }
  touchMove.x = dx / max;
  touchMove.y = dy / max;
@@ -966,6 +969,7 @@ function joyUpdate(t) {
 function joyReset() {
  touchMove.x = 0; touchMove.y = 0;
  touchRun = false;
+ joyEl.classList.remove('run');
  joyKnob.style.left = '35px'; joyKnob.style.top = '35px';
 }
 joyEl.addEventListener('touchstart', (e) => { e.preventDefault(); joyUpdate(e.touches[0]); }, { passive: false });
