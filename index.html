@@ -407,6 +407,11 @@ function texBuildFaces() {
 }
 
 const texSharedTextureCache = new WeakMap();
+function texDbg(msg) {
+ const el = document.getElementById('texDbg');
+ if (el) el.textContent = 'texDbg: ' + msg;
+ console.log('[texDbg]', msg);
+}
 function texCanvasTexture(cv) {
  let t = texSharedTextureCache.get(cv);
  if (t) return t;
@@ -556,6 +561,7 @@ function texRenderTextureList() {
   item.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return; // 좌클릭만
   texDragTextureId = t.id;
+  texDbg('mousedown 시작 id=' + t.id);
   texDragStartX = e.clientX; texDragStartY = e.clientY;
   texDragMoved = false;
   });
@@ -1133,7 +1139,7 @@ window.addEventListener('mouseup', (e) => {
 window.addEventListener('mousemove', (e) => {
  if (texDragTextureId === null) return;
  const dx = e.clientX - texDragStartX, dy = e.clientY - texDragStartY;
- if (!texDragMoved && Math.hypot(dx, dy) > 5) { texDragMoved = true; document.body.style.cursor = 'grabbing'; }
+ if (!texDragMoved && Math.hypot(dx, dy) > 5) { texDragMoved = true; document.body.style.cursor = 'grabbing'; texDbg('드래그 이동 감지됨(grabbing)'); }
 });
 const groundFocus = new THREE.Vector3();
 const focusObjs = [];
@@ -1640,6 +1646,7 @@ window.addEventListener('resize', () => {
 
 // 텍스처 목록 좌클릭 드래그 → 블록 특정 면에 적용
 window.addEventListener('mouseup', (e) => {
+ if (texDragTextureId !== null) texDbg('mouseup 발생, moved=' + texDragMoved + ' mode=' + mode);
  if (texDragTextureId === null) return;
  const wasMoved = texDragMoved;
  const tid = texDragTextureId; texDragTextureId = null; texDragMoved = false;
@@ -1649,6 +1656,7 @@ window.addEventListener('mouseup', (e) => {
  setNDC(e);
  ray.setFromCamera(ndc, editCam);
  const hits = ray.intersectObjects(parts.filter(p => !p.locked).map(p => p.mesh), false);
+ texDbg('레이캐스트 hits=' + hits.length);
  if (!hits.length) { flash('블록 위에서 놓아야 함'); return; }
  const hitMesh = hits[0].object;
  const p = parts.find(pp => pp.mesh === hitMesh);
@@ -1669,8 +1677,10 @@ window.addEventListener('mouseup', (e) => {
  if (!p.faceOverrides) p.faceOverrides = {};
  p.faceOverrides[faceName] = { size: t.size, canvas: t.canvases[faceName] }; // 저장용 구조
  p.isSpecial = true;
+ texDbg('적용 성공 face=' + faceName + ' part=' + (p ? 'ok' : 'null'));
  flash(FACE_NAMES[faceName] + ' 면에 텍스처 적용됨');
 });
 </script>
+<div id="texDbg" style="position:absolute;right:12px;bottom:12px;z-index:9999;background:rgba(0,0,0,0.8);color:#0f0;font:12px monospace;padding:8px 10px;border-radius:6px;max-width:320px;white-space:pre-wrap;pointer-events:none;">texDbg: 대기</div>
 </body>
 </html>
