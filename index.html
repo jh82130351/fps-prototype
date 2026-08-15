@@ -250,14 +250,10 @@ if (startBtn) startBtn.addEventListener('click', (e) => {
  e.stopPropagation();
  saveNick();
  initAudio();
- if (mode !== 'play') return;
- if (isTouch) {
-  overlay.style.display = 'none';
-  crosshair.style.display = 'block';
-  locked = false;
- } else {
-  canvas.requestPointerLock();
- }
+ started = true;
+ overlay.style.display = 'none'; // 잠금 성공 여부와 무관하게 시작
+ crosshair.style.display = 'block';
+ if (!isTouch) { try { canvas.requestPointerLock(); } catch (err) {} }
 });
 let audioCtx = null;
 function initAudio() {
@@ -948,17 +944,24 @@ function setMode(m) {
  vertVel = 0; velocity.set(0,0,0);
  health = MAX_HP; voidTickT = 0; updateHearts();
  lastCheckpointKey = null;
- if (document.getElementById('overlayTitle')) document.getElementById('overlayTitle').textContent =
-   isTouch ? '화면을 터치해 시작' : '클릭해서 시작';
- overlay.style.display = 'flex';
+ // 이미 시작한 세션이면 오버레이 없이 바로 플레이. 최초 1회만 오버레이 표시.
+ if (started) {
+  overlay.style.display = 'none';
+  crosshair.style.display = 'block';
+ } else if (document.getElementById('overlayTitle')) {
+  document.getElementById('overlayTitle').textContent =
+    isTouch ? '화면을 터치해 시작' : '클릭해서 시작';
+  overlay.style.display = 'flex';
  }
-}
+ }
 
 // ---------- Play input ----------
 let locked = false;
+let started = false;
 document.addEventListener('pointerlockchange', () => {
  locked = document.pointerLockElement === canvas;
- if (mode === 'play') { overlay.style.display = locked ? 'none' : 'flex'; crosshair.style.display = locked ? 'block' : 'none'; }
+ // 시작 후에는 오버레이를 다시 띄우지 않음. 데스크톱에서 잠금이 풀리면 크로스헤어만 숨김.
+ if (mode === 'play' && started) crosshair.style.display = (locked || isTouch) ? 'block' : 'none';
 });
 
 const keys = {};
@@ -1127,6 +1130,9 @@ function setSelection(arr) {
 function select(p) { setSelection([p]); }
 function deselect() { setSelection([]); }
 
+canvas.addEventListener('click', () => {
+ if (started && !isTouch && mode === 'play' && !locked) { try { canvas.requestPointerLock(); } catch (err) {} }
+});
 canvas.addEventListener('mousedown', (e) => {
  if (mode !== 'edit') return;
  setNDC(e);
