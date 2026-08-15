@@ -118,6 +118,15 @@
  #overlay h1 { font-size: 22px; font-weight: 600; margin-bottom: 12px; }
  #overlay p { font-size: 14px; opacity: 0.8; line-height: 1.8; text-align: center; }
  #overlay kbd { background: #222; border: 1px solid #444; border-radius: 4px; padding: 2px 7px; font-size: 12px; margin: 0 2px; }
+
+ #touchControls { position:absolute; inset:0; z-index:7; pointer-events:none; }
+ #joystick { position:absolute; left:24px; bottom:24px; width:120px; height:120px; border-radius:50%;
+  background:rgba(255,255,255,0.12); border:2px solid rgba(255,255,255,0.3); pointer-events:auto; touch-action:none; }
+ #joyKnob { position:absolute; left:35px; top:35px; width:50px; height:50px; border-radius:50%;
+  background:rgba(255,255,255,0.5); }
+ #btnJump { position:absolute; right:24px; bottom:40px; width:88px; height:88px; border-radius:50%;
+  background:rgba(255,255,255,0.18); border:2px solid rgba(255,255,255,0.35); color:#fff; font-size:15px;
+  font-weight:600; pointer-events:auto; touch-action:none; }
 </style>
 </head>
 <body>
@@ -129,6 +138,11 @@
 <div id="marquee"></div>
 <div id="hud"></div>
 <div id="mode" class="play">PLAY</div>
+
+<div id="touchControls" style="display:none;">
+ <div id="joystick"><div id="joyKnob"></div></div>
+ <button id="btnJump">점프</button>
+</div>
 
 <div id="tools">
  <button id="tMove" class="on" title="이동 (1)">✥ 이동</button>
@@ -193,7 +207,7 @@
 </div>
 
 <div id="overlay">
- <h1>클릭해서 시작</h1>
+ <h1 id="overlayTitle">클릭해서 시작</h1>
  <p>
  <kbd>Tab</kbd> 편집 / 플레이 전환<br>
  플레이: <kbd>WASD</kbd> · 마우스 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프<br>
@@ -883,6 +897,8 @@ function setMode(m) {
  toolbar.style.display = editing ? 'flex' : 'none';
  toolsEl.style.display = editing ? 'flex' : 'none';
  propsEl.style.display = editing ? 'block' : 'none';
+ const touchControls = document.getElementById('touchControls');
+ touchControls.style.display = (editing || !isTouch) ? 'none' : 'block';
  if (editing) {
  if (document.pointerLockElement === canvas) document.exitPointerLock();
  overlay.style.display = 'none';
@@ -897,19 +913,92 @@ function setMode(m) {
  vertVel = 0; velocity.set(0,0,0);
  health = MAX_HP; voidTickT = 0; updateHearts();
  lastCheckpointKey = null;
+ const overlayTitle = document.getElementById('overlayTitle');
+ if (overlayTitle) overlayTitle.textContent = isTouch ? '화면을 터치해 시작' : '클릭해서 시작';
  overlay.style.display = 'flex';
  }
 }
 
 // ---------- Play input ----------
 let locked = false;
-overlay.addEventListener('click', () => { initAudio(); if (mode === 'play') canvas.requestPointerLock(); });
+overlay.addEventListener('click', () => {
+ initAudio();
+ if (mode !== 'play') return;
+ if (isTouch) {
+  // 모바일: 포인터락 없이 오버레이만 숨기고 플레이 시작
+  overlay.style.display = 'none';
+  crosshair.style.display = 'block';
+  locked = false;
+ } else {
+  canvas.requestPointerLock();
+ }
+});
 document.addEventListener('pointerlockchange', () => {
  locked = document.pointerLockElement === canvas;
  if (mode === 'play') { overlay.style.display = locked ? 'none' : 'flex'; crosshair.style.display = locked ? 'block' : 'none'; }
 });
 
 const keys = {};
+
+// ---------- Mobile touch input ----------
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+let touchMove = { x: 0, y: 0 }; // 조이스틱 방향 (-1~1)
+let touchLookId = null, touchLookLastX = 0, touchLookLastY = 0;
+
+const joyEl = document.getElementById('joystick');
+const joyKnob = document.getElementById('joyKnob');
+const btnJump = document.getElementById('btnJump');
+function joyUpdate(t) {
+ const r = joyEl.getBoundingClientRect();
+ const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+ let dx = t.clientX - cx, dy = t.clientY - cy;
+ const max = r.width / 2; // 60px
+ const len = Math.hypot(dx, dy);
+ if (len > max) { dx = dx / len * max; dy = dy / len * max; }
+ touchMove.x = dx / max;
+ touchMove.y = dy / max;
+ joyKnob.style.left = (35 + (dx / max) * 25) + 'px';
+ joyKnob.style.top = (35 + (dy / max) * 25) + 'px';
+}
+function joyReset() {
+ touchMove.x = 0; touchMove.y = 0;
+ joyKnob.style.left = '35px'; joyKnob.style.top = '35px';
+}
+joyEl.addEventListener('touchstart', (e) => { e.preventDefault(); joyUpdate(e.touches[0]); }, { passive: false });
+joyEl.addEventListener('touchmove', (e) => { e.preventDefault(); joyUpdate(e.touches[0]); }, { passive: false });
+joyEl.addEventListener('touchend', (e) => { e.preventDefault(); joyReset(); }, { passive: false });
+
+btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); keys['Space'] = true; }, { passive: false });
+btnJump.addEventListener('touchend', (e) => { e.preventDefault(); keys['Space'] = false; }, { passive: false });
+
+// 시점 회전: 오른쪽 반화면에서 시작한 터치 (조이스틱/점프 제외)
+document.addEventListener('touchstart', (e) => {
+ if (!isTouch || mode !== 'play') return;
+ for (const t of e.changedTouches) {
+  if (t.clientX > window.innerWidth / 2 && touchLookId === null) {
+   if (joyEl.contains(t.target) || btnJump.contains(t.target)) continue;
+   touchLookId = t.identifier;
+   touchLookLastX = t.clientX; touchLookLastY = t.clientY;
+  }
+ }
+}, { passive: true });
+document.addEventListener('touchmove', (e) => {
+ if (touchLookId === null || mode !== 'play') return;
+ for (const t of e.changedTouches) {
+  if (t.identifier === touchLookId) {
+   e.preventDefault();
+   const dx = t.clientX - touchLookLastX, dy = t.clientY - touchLookLastY;
+   yawObject.rotation.y -= dx * 0.005;
+   pitchObject.rotation.x = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitchObject.rotation.x - dy * 0.005));
+   touchLookLastX = t.clientX; touchLookLastY = t.clientY;
+  }
+ }
+}, { passive: false });
+document.addEventListener('touchend', (e) => {
+ for (const t of e.changedTouches) {
+  if (t.identifier === touchLookId) touchLookId = null;
+ }
+});
 window.addEventListener('keydown', (e) => {
  if (e.code === 'Space') e.preventDefault();
  if (e.code === 'Tab') { e.preventDefault(); setMode(mode === 'play' ? 'edit' : 'play'); return; }
@@ -1504,7 +1593,12 @@ function physics(dt) {
  if (keys['KeyS']) move.sub(forward);
  if (keys['KeyD']) move.add(right);
  if (keys['KeyA']) move.sub(right);
- if (move.lengthSq() > 0) move.normalize().multiplyScalar(speed);
+ if (isTouch && (touchMove.x || touchMove.y)) {
+  move.addScaledVector(forward, -touchMove.y);
+  move.addScaledVector(right, touchMove.x);
+ }
+ const mag = Math.min(1, move.length());
+ if (move.lengthSq() > 0) move.normalize().multiplyScalar(speed * mag);
 
  velocity.lerp(move, 1 - Math.pow(0.001, dt));
  yawObject.position.addScaledVector(velocity, dt);
