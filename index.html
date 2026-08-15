@@ -483,13 +483,13 @@ async function loadPartTexturesIntoList(p) {
      canvases[f] = (t.canvases && t.canvases[f]) ? t.canvases[f] : makeFaceCanvas(size, defaultCol);
     }
    }
-   texTextures.push({ id: texSeq++, size, canvases });
+   texTextures.push({ id: texSeq++, size, canvases, fromPart: true });
   }
  } else {
   // 기본: 16×16 단색 텍스처 1개 (기하존 디폴트)
   const canvases = {};
   for (const f of DISPLAY_FACES) canvases[f] = makeFaceCanvas(16, defaultCol);
-  texTextures.push({ id: texSeq++, size: 16, canvases });
+  texTextures.push({ id: texSeq++, size: 16, canvases, fromPart: true });
  }
  texActiveId = texTextures[texTextures.length - 1].id;
  texActivateTexture(texActiveId);
@@ -500,6 +500,18 @@ async function texSelectPart(p) {
  await loadPartTexturesIntoList(p);
  texRefreshPreview();
  texApplyFaceBtn();
+ texRenderTextureList();
+}
+
+function texDeselectPart() {
+ texSelectedPart = null;
+ // 블록에서 불러온(파트 소속) 텍스처를 목록에서 제거하고, 사용자가 새로 만든 텍스처만 남긴다
+ texTextures = texTextures.filter(t => !t.fromPart);
+ if (!texTextures.some(t => t.id === texActiveId)) {
+  texActiveId = texTextures.length ? texTextures[0].id : null;
+  if (texActiveId) texFaceCanvases = texTextures.find(t => t.id === texActiveId).canvases;
+ }
+ texRefreshPreview();
  texRenderTextureList();
 }
 
@@ -985,7 +997,7 @@ function setSelection(arr) {
  // 텍스처 패널이 열려 있으면 새 선택에 맞게 갱신
  if (texPanel.style.display === 'flex') {
   if (selected) texSelectPart(selected);
-  else { texRenderTextureList(); /* 선택 블록의 기본 텍스처 미리보기는 비우기 */ }
+  else texDeselectPart();
  }
 }
 function select(p) { setSelection([p]); }
