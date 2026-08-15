@@ -552,13 +552,13 @@ function texRenderTextureList() {
   del.onclick = (e) => { e.stopPropagation(); texDeleteTexture(t.id); };
   item.appendChild(del);
   item.onclick = () => texActivateTexture(t.id);
-  item.addEventListener('pointerdown', (e) => {
-  if (e.button !== 2 || !e.altKey) return; // Alt + 우클릭만 드래그 시작
-  e.preventDefault();
+  item.draggable = true;
+  item.addEventListener('dragstart', (e) => {
   texDragTextureId = t.id;
-  try { item.setPointerCapture(e.pointerId); } catch (err) {}
+  e.dataTransfer.effectAllowed = 'copy';
+  e.dataTransfer.setData('text/plain', String(t.id)); // 일부 브라우저는 데이터 없으면 드래그 취소함
   });
-  item.addEventListener('contextmenu', (e) => e.preventDefault());
+  item.addEventListener('dragend', () => { texDragTextureId = null; });
   listEl.appendChild(item);
  }
 }
@@ -1189,7 +1189,6 @@ canvas.addEventListener('wheel', (e) => {
  updateEditCam();
 }, { passive: false });
 canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit') e.preventDefault(); });
-window.addEventListener('contextmenu', (e) => { if (texDragTextureId !== null) e.preventDefault(); });
 
 // ---------- Properties ----------
 function renderProps() {
@@ -1290,7 +1289,10 @@ function serialize() {
   return {
    x: +p.mesh.position.x.toFixed(3), y: +p.mesh.position.y.toFixed(3), z: +p.mesh.position.z.toFixed(3),
    w: p.w, h: p.h, d: p.d, color: p.color, rot: +p.rot.toFixed(4), type: p.type, locked: !!p.locked,
-   texture: texData
+   texture: texData,
+   faceOverrides: p.faceOverrides ? Object.fromEntries(
+    Object.entries(p.faceOverrides).map(([f, o]) => [f, { size: o.size, data: o.canvas.toDataURL('image/png') }])
+   ) : null,
   };
  }) });
 }
@@ -1366,7 +1368,31 @@ function loadFromData(arr) {
  const rot = +o.rot || 0;
  const type = TYPES.includes(o.type) ? o.type : 'solid';
  const tcv = loadTextureCanvases(o.texture);
- addPart(x, y, z, w, h, d, color, rot, type, false, tcv);
+ const newPart = addPart(x, y, z, w, h, d, color, rot, type, false, tcv);
+ // 드래그로 면별 적용된 텍스처(faceOverrides) 복원 — 비동기 이미지 로드 후 머티리얼에 적용
+ if (o.faceOverrides) {
+  if (!Array.isArray(newPart.mesh.material)) {
+   const base = newPart.mesh.material;
+   newPart.mesh.material = DISPLAY_FACES.map(() => base.clone());
+  }
+  newPart.faceOverrides = {};
+  newPart.isSpecial = true;
+  for (const [f, ov] of Object.entries(o.faceOverrides)) {
+   const img = new Image();
+   img.onload = () => {
+    const cv = document.createElement('canvas');
+    cv.width = ov.size; cv.height = ov.size;
+    cv.getContext('2d').drawImage(img, 0, 0);
+    newPart.faceOverrides[f] = { size: ov.size, canvas: cv };
+    const idx = DISPLAY_FACES.indexOf(f);
+    const mat = newPart.mesh.material[idx];
+    mat.map = texCanvasTexture(cv);
+    mat.color.setHex(0xffffff);
+    mat.needsUpdate = true;
+   };
+   img.src = ov.data;
+  }
+ }
  }
  rebuildColliders();
  return true;
@@ -1606,9 +1632,11 @@ window.addEventListener('resize', () => {
  renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// 텍스처 목록 우클릭 드래그 → 블록 특정 면에 적용
-window.addEventListener('pointerup', (e) => {
+// 텍스처 목록 HTML5 좌클릭 드래그 → 블록 특정 면에 적용
+canvas.addEventListener('dragover', (e) => { if (texDragTextureId !== null) e.preventDefault(); });
+canvas.addEventListener('drop', (e) => {
  if (texDragTextureId === null) return;
+ e.preventDefault();
  const tid = texDragTextureId; texDragTextureId = null;
  if (mode !== 'edit') { flash('편집 모드 아님'); return; }
  setNDC(e);
@@ -1631,8 +1659,8 @@ window.addEventListener('pointerup', (e) => {
  mat.map = texCanvasTexture(t.canvases[faceName]);
  mat.color.setHex(0xffffff);
  mat.needsUpdate = true;
- if (!p.textureFaces) p.textureFaces = {};
- p.textureFaces[faceName] = mat.map; // Texture 객체로 저장 (캔버스 아님)
+ if (!p.faceOverrides) p.faceOverrides = {};
+ p.faceOverrides[faceName] = { size: t.size, canvas: t.canvases[faceName] }; // 저장용 구조
  p.isSpecial = true;
  flash(FACE_NAMES[faceName] + ' 면에 텍스처 적용됨');
 });
