@@ -465,7 +465,8 @@ function texApplyFaceBtn() {
 
 async function loadPartTexturesIntoList(p) {
  // 파트에 저장된 텍스처 세트 있으면 목록으로 변환, 없으면 기본 16×16 1개 생성
- texTextures = [];
+ // 사용자가 만든 텍스처(fromPart 아님)는 보존하고, 이 블록의 텍스처만 새로 얹는다
+ texTextures = texTextures.filter(t => !t.fromPart);
  const loaded = p.textureFaces && p.textureFaces._list;
  const defaultCol = '#' + p.color.toString(16).padStart(6,'0');
  if (loaded && loaded.length) {
@@ -491,8 +492,10 @@ async function loadPartTexturesIntoList(p) {
   for (const f of DISPLAY_FACES) canvases[f] = makeFaceCanvas(16, defaultCol);
   texTextures.push({ id: texSeq++, size: 16, canvases, fromPart: true });
  }
- texActiveId = texTextures[texTextures.length - 1].id;
- texActivateTexture(texActiveId);
+ if (texTextures.length) {
+  texActiveId = texTextures[texTextures.length - 1].id;
+  texActivateTexture(texActiveId);
+ }
 }
 
 async function texSelectPart(p) {
