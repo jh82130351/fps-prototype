@@ -2316,25 +2316,39 @@ function setupConn(conn) {
   if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode + '/count').set(mpConns.length + 1);
  });
 }
-function removeRemote(id) {
- if (remotePlayers[id]) { scene.remove(remotePlayers[id].fig); delete remotePlayers[id]; }
+function removeRemote(peerId) {
+ // conn.peer(또는 d.id)로 직접 저장된 항목 제거
+ if (remotePlayers[peerId]) { scene.remove(remotePlayers[peerId].fig); delete remotePlayers[peerId]; }
+ // 매칭 보강: 같은 플레이어를 다른 key로 저장했을 수도 있으니 해당 fig 제거 후 삭제
+ for (const id in remotePlayers) {
+  if (id === peerId) continue; // 위에서 이미 처리
+  if (remotePlayers[id].connPeer === peerId) { scene.remove(remotePlayers[id].fig); delete remotePlayers[id]; }
+ }
 }
-function handleMpData(id, msg) {
+function handleMpData(fromConnPeer, msg) {
  let d; try { d = JSON.parse(msg); } catch(e){ return; }
- if (d && d.t === 'pos') {
-  if (!remotePlayers[id]) {
-   const fig = makeCharacter(); const tag=makeNameTag(d.nick); fig.add(tag); scene.add(fig); remotePlayers[id] = { fig, nick: d.nick, tag };
-  }
-  const rp = remotePlayers[id];
-  rp.fig.position.set(d.x, d.y - 1.7, d.z);
-  rp.fig.rotation.y = d.ry;
+ if (!d || d.t !== 'pos') return;
+ const pid = d.id || fromConnPeer; // 실제 발신 플레이어 id
+ const myId = (peer && peer.id) ? peer.id : 'me';
+ if (pid === myId) return; // 내 데이터는 무시(에코 방지)
+ if (!remotePlayers[pid]) {
+  const fig = makeCharacter(); const tag = makeNameTag(d.nick); fig.add(tag); scene.add(fig);
+  remotePlayers[pid] = { fig, nick: d.nick, tag };
+ }
+ const rp = remotePlayers[pid];
+ rp.fig.position.set(d.x, d.y - 1.7, d.z);
+ rp.fig.rotation.y = d.ry;
+ // 호스트면: 받은 위치를 "보낸 연결"을 제외한 다른 참가자에게 중계
+ if (isHost) {
+  mpConns.forEach(c => { if (c.open && c.peer !== fromConnPeer) { try { c.send(msg); } catch(e){} } });
  }
 }
 function mpSend() {
  if (mpActive && mpConns.length) {
-  const s = { t:'pos', x:yawObject.position.x, y:yawObject.position.y, z:yawObject.position.z, ry:yawObject.rotation.y, nick:playerNick };
-  const str = JSON.stringify(s);
-  mpConns.forEach(c => { if (c.open) c.send(str); });
+ const myId = (peer && peer.id) ? peer.id : 'me';
+ const s = { t:'pos', id: myId, x:yawObject.position.x, y:yawObject.position.y, z:yawObject.position.z, ry:yawObject.rotation.y, nick:playerNick };
+ const str = JSON.stringify(s);
+ mpConns.forEach(c => { if (c.open) c.send(str); });
  }
 }
 function startHost(attempt) {
