@@ -230,7 +230,7 @@
  <div id="menu">
   <button id="startBtn">시작하기</button>
   <input id="nickInput" type="text" maxlength="16" placeholder="닉네임" autocomplete="off">
-  <div id="comingSoon">준비중</div>
+  <div id="comingSoon">🎨 커스텀 · 준비중</div>
  </div>
  <p id="overlayHelp">
   <kbd>Tab</kbd> 편집 / 플레이 전환 · <kbd>WASD</kbd> 이동 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프
@@ -250,11 +250,16 @@ const touchControls = document.getElementById('touchControls');
 const nickInput = document.getElementById('nickInput');
 const startBtn = document.getElementById('startBtn');
 let playerNick = localStorage.getItem('fpsNick') || '플레이어';
-if (nickInput) nickInput.value = playerNick;
+if (nickInput) {
+ nickInput.value = playerNick;
+ ['pointerdown','touchstart','mousedown','click'].forEach(ev =>
+  nickInput.addEventListener(ev, (e) => e.stopPropagation()));
+ nickInput.addEventListener('input', saveNick);
+}
 function saveNick() {
  const v = (nickInput && nickInput.value.trim()) || '';
- playerNick = v.slice(0, 16);
- if (playerNick) { try { localStorage.setItem('fpsNick', playerNick); } catch (e) {} }
+ playerNick = v.slice(0, 16) || '플레이어';
+ try { localStorage.setItem('fpsNick', playerNick); } catch (e) {}
 }
 if (startBtn) startBtn.addEventListener('click', (e) => {
  e.stopPropagation();
