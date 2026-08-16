@@ -2147,6 +2147,12 @@ function renderCustom() {
 }
 
 // ---------- P2P 멀티플레이어 1단계 : 연결 + 위치 동기화 ----------
+function makeRoomCode() {
+ const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0,O,1,I 제외
+ let s = '';
+ for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+ return s;
+}
 function makeCharacter() {
  const g = new THREE.Group();
  const skin=0xe8b88a, shirt=0x3498db, pants=0x2c3e50;
@@ -2194,13 +2200,26 @@ function mpSend() {
 if (mpHost) mpHost.addEventListener('click', (e) => {
  e.stopPropagation();
  if (peer) { try { peer.destroy(); } catch(_){} peer = null; mpConns = []; }
- peer = new Peer();
- peer.on('open', (id) => { isHost = true; mpActive = true; mpLog('방 코드: ' + id); });
+ const room = makeRoomCode();
+ peer = new Peer(room);
+ peer.on('open', (id) => { isHost = true; mpActive = true; mpLog('방 코드: ' + id + ' (친구에게 공유)'); });
+ peer.on('error', (err) => {
+  if (err.type === 'unavailable-id') { // 코드 충돌 시 재시도
+   mpLog('코드 충돌, 다시 생성 중...');
+   try { peer.destroy(); } catch(e){}
+   const room2 = makeRoomCode();
+   peer = new Peer(room2);
+   peer.on('open', (id2) => { isHost = true; mpActive = true; mpLog('방 코드: ' + id2 + ' (친구에게 공유)'); });
+   peer.on('connection', (conn) => setupConn(conn));
+  } else {
+   mpLog('오류: ' + err.type);
+  }
+ });
  peer.on('connection', (conn) => setupConn(conn));
 });
 if (mpJoin) mpJoin.addEventListener('click', (e) => {
  e.stopPropagation();
- const code = (mpCodeInput && mpCodeInput.value.trim()) || '';
+ const code = (mpCodeInput && mpCodeInput.value.trim().toUpperCase()) || '';
  if (!code) { mpLog('방 코드를 입력하세요'); return; }
  if (peer) { try { peer.destroy(); } catch(_){} peer = null; mpConns = []; }
  peer = new Peer();
