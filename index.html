@@ -2173,7 +2173,7 @@ function mpLog(m){ if (mpStatus) mpStatus.textContent = m; }
 function setupConn(conn) {
  mpConns.push(conn);
  conn.on('data', (msg) => handleMpData(conn.peer, msg));
- conn.on('open', () => mpLog('연결됨: ' + conn.peer));
+ conn.on('open', () => mpLog('상대 접속됨: ' + conn.peer));
  conn.on('close', () => removeRemote(conn.peer));
 }
 function removeRemote(id) {
@@ -2222,11 +2222,18 @@ if (mpJoin) mpJoin.addEventListener('click', (e) => {
  const code = (mpCodeInput && mpCodeInput.value.trim().toUpperCase()) || '';
  if (!code) { mpLog('방 코드를 입력하세요'); return; }
  if (peer) { try { peer.destroy(); } catch(_){} peer = null; mpConns = []; }
+ mpLog('서버 연결 중...');
  peer = new Peer();
  peer.on('open', () => {
-  const conn = peer.connect(code);
+  mpLog('방 ' + code + ' 에 연결 시도 중...');
+  const conn = peer.connect(code, { reliable: true });
+  conn.on('open', () => { mpActive = true; isHost = false; mpLog('상대와 연결 성공!'); });
+  conn.on('error', (err) => mpLog('연결 오류: ' + (err.type || err)));
   setupConn(conn);
-  mpActive = true; isHost = false;
+ });
+ peer.on('error', (err) => {
+  if (err.type === 'peer-unavailable') mpLog('방을 찾을 수 없음 (코드 확인)');
+  else mpLog('오류: ' + err.type);
  });
 });
 if (mpBtn) mpBtn.addEventListener('click', (e) => { e.stopPropagation(); mpPanel.style.display = 'flex'; });
