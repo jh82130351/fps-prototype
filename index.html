@@ -303,8 +303,10 @@ window.addEventListener('error', function(ev){
  if (el) el.textContent = '❌ 에러: ' + (ev.message || ev.error) + ' @' + (ev.lineno || '?');
 });
 window.addEventListener('unhandledrejection', function(ev){
+ var m = (ev.reason && ev.reason.message) ? ev.reason.message : String(ev.reason);
+ if (m && m.indexOf('pointer lock') !== -1) return; // 무해한 포인터잠금 실패 무시
  var el = document.getElementById('texDbg');
- if (el) el.textContent = '❌ 비동기에러: ' + (ev.reason && ev.reason.message ? ev.reason.message : ev.reason);
+ if (el) el.textContent = '❌ 비동기에러: ' + m;
 });
 window.addEventListener('load', function(){
  var el = document.getElementById('texDbg');
@@ -341,7 +343,7 @@ if (startBtn) startBtn.addEventListener('click', (e) => {
  started = true;
  overlay.style.display = 'none'; // 잠금 성공 여부와 무관하게 시작
  crosshair.style.display = 'block';
- if (!isTouch) { try { canvas.requestPointerLock(); } catch (err) {} }
+ if (!isTouch) { try { const pr = canvas.requestPointerLock(); if (pr && pr.catch) pr.catch(()=>{}); } catch (err) {} }
 });
 let audioCtx = null;
 function initAudio() {
@@ -1252,7 +1254,7 @@ function select(p) { setSelection([p]); }
 function deselect() { setSelection([]); }
 
 canvas.addEventListener('click', () => {
- if (started && !isTouch && mode === 'play' && !locked) { try { canvas.requestPointerLock(); } catch (err) {} }
+ if (started && !isTouch && mode === 'play' && !locked) { try { const pr = canvas.requestPointerLock(); if (pr && pr.catch) pr.catch(()=>{}); } catch (err) {} }
 });
 canvas.addEventListener('mousedown', (e) => {
  if (mode !== 'edit') return;
@@ -1930,7 +1932,7 @@ function enterMultiplayerGame() {
  if (overlay) overlay.style.display = 'none';
  started = true;
  crosshair.style.display = 'block';
- if (!isTouch) { try { canvas.requestPointerLock(); } catch (e) {} }
+ if (!isTouch) { try { const pr = canvas.requestPointerLock(); if (pr && pr.catch) pr.catch(()=>{}); } catch (e) {} }
 }
 
 // 멀티 종료 시 싱글 월드 복원
