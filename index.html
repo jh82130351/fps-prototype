@@ -926,13 +926,35 @@ function buildDefaultWorld() {
 // 멀티 전용 아레나 월드 빌더 (싱글과 완전 분리, 항상 동일한 고정 배치)
 function buildArenaWorld() {
  while (parts.length) removePart(parts[0]);
- // 평평한 넓은 바닥 + 중앙 스폰대 + 장애물 몇 개 (모두 고정값 = 모두 동일)
- addPart(0, 0.5, 0, 20, 1, 20, 0x3d5a80); // 중앙 스폰 플랫폼
- addPart(18, 1, 0, 6, 2, 6, 0x98c1d9);
- addPart(-18, 1, 0, 6, 2, 6, 0x98c1d9);
- addPart(0, 1, 18, 6, 2, 6, 0xe0fbfc);
- addPart(0, 1, -18, 6, 2, 6, 0xe0fbfc);
- addPart(0, 0.5, 0, 4, 1, 4, 0xffffff, 0, 'checkpoint'); // 중앙 체크포인트
+ // 중앙 스폰대
+ addPart(0, 0.5, 0, 14, 1, 14, 0x3d5a80);
+ addPart(0, 0.5, 0, 3, 1, 3, 0xffffff, 0, 'checkpoint'); // 시작 체크포인트
+
+ // 타워형 점프맵: 반경 8 원을 돌며 나선형으로 위로. 높이차 1.2씩(점프 가능).
+ const colors = [0xe74c3c, 0xf39c12, 0xf1c40f, 0x2ecc71, 0x1abc9c, 0x3498db, 0x9b59b6];
+ const steps = 24; // 플랫폼 개수
+ const radius = 8; // 나선 반경
+ const rise = 1.2; // 계단 높이차(점프로 오를 수 있는 값)
+ const baseY = 2; // 첫 발판 높이
+ for (let i = 0; i < steps; i++) {
+  const ang = i * 0.9; // 나선 회전
+  const y = baseY + i * rise;
+  const x = Math.cos(ang) * radius;
+  const z = Math.sin(ang) * radius;
+  const size = i < 4 ? 3.0 : 2.2; // 아래쪽은 넓게, 위로 갈수록 좁게(난이도↑)
+  addPart(x, y, z, size, 0.6, size, colors[i % colors.length]);
+ }
+
+ // 정상 플랫폼 + 완주 체크포인트
+ const topY = baseY + steps * rise;
+ const topAng = steps * 0.9;
+ const tx = Math.cos(topAng) * radius, tz = Math.sin(topAng) * radius;
+ addPart(tx, topY, tz, 5, 1, 5, 0xffd700); // 금색 정상
+ addPart(tx, topY + 0.5, tz, 3, 0.4, 3, 0xffffff, 0, 'checkpoint'); // 완주 체크포인트
+
+ // (선택) 물 낙하 완충: 아주 낮은 곳에 넓은 물웅덩이 — 떨어져도 데미지 없이 재시작 느낌
+ addPart(0, -1, 0, 40, 0.5, 40, 0x2e8fd8, 0, 'water');
+
  rebuildColliders();
 }
 
