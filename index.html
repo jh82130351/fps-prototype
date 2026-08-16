@@ -137,13 +137,13 @@
  #btnJump { position:absolute; right:24px; bottom:40px; width:88px; height:88px; border-radius:50%;
   background:rgba(255,255,255,0.18); border:2px solid rgba(255,255,255,0.35); color:#fff; font-size:15px;
   font-weight:600; pointer-events:auto; touch-action:none; }
- /* 모바일 전용: 모드 전환 버튼 (touchControls 밖, 점프 버튼 위) */
- #modeToggleButton { position:absolute; right:24px; bottom:140px; z-index:8; display:none;
-  pointer-events:auto; touch-action:none;
-  padding:10px 18px; border-radius:24px; border:2px solid rgba(255,255,255,0.35);
-  color:#fff; font-size:15px; font-weight:700; cursor:pointer; }
- #modeToggleButton.m { background:#2ecc71; }        /* PLAY 상태 → "편집모드" */
- #modeToggleButton.m.editing { background:#3498db; } /* EDIT 상태 → "플레이로" */
+ /* 모바일 전용: 모드 전환 버튼 (touchControls 밖, 상태에 따라 위치 변경) */
+ #modeToggleButton { position:absolute; z-index:8; display:none; padding:10px 16px;
+  border:none; border-radius:8px; color:#fff; font-size:14px; font-weight:700; pointer-events:auto;
+  right:24px; bottom:140px; left:auto; top:auto; transform:none; } /* 기본(플레이): 점프 버튼 위 */
+ #modeToggleButton.editing { right:auto; bottom:auto; left:50%; top:40px; transform:translateX(-50%); } /* 편집: 상단 배지 아래 중앙 */
+ #modeToggleButton.m { background:#2ecc71; } /* 편집모드로 가는 버튼 */
+ #modeToggleButton.editing { background:#3498db; } /* 플레이로 가는 버튼 */
 </style>
 </head>
 <body>
@@ -971,9 +971,10 @@ function setMode(m) {
  }
  // 모드 전환 버튼 상태 갱신 (터치 전용)
  if (modeToggleBtn) {
-  const toEdit = mode === 'play';
-  modeToggleBtn.textContent = toEdit ? '편집모드' : '플레이로';
-  modeToggleBtn.className = toEdit ? 'm' : 'm editing';
+  const inPlay = mode === 'play';
+  modeToggleBtn.textContent = inPlay ? '편집모드' : '플레이로'; // 누르면 갈 모드
+  modeToggleBtn.classList.toggle('editing', !inPlay); // 편집 중이면 상단으로
+  modeToggleBtn.style.display = isTouch ? 'block' : 'none';
  }
 }
 
