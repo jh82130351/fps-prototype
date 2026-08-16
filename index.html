@@ -2082,10 +2082,17 @@ function initCustomScene() {
 }
 if (customBtn) customBtn.addEventListener('click', (e) => {
  e.stopPropagation();
- customPanel.style.display = 'flex';
- customOpen = true;
- initCustomScene();
+ texDbg('커스텀 클릭됨 · panel=' + (customPanel ? 'ok' : 'null'));
+ try {
+  customPanel.style.display = 'flex';
+  customOpen = true;
+  initCustomScene();
+  texDbg('커스텀 패널 열림 성공');
+ } catch (err) {
+  texDbg('커스텀 에러: ' + err.message);
+ }
 });
+if (customBtn) customBtn.addEventListener('pointerdown', () => texDbg('커스텀 pointerdown 감지'));
 if (customClose) customClose.addEventListener('click', (e) => {
  e.stopPropagation();
  customPanel.style.display = 'none';
