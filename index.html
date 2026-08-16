@@ -173,6 +173,8 @@
 </style>
 </head>
 <body>
+<div id="mpBar" style="position:fixed;top:0;left:0;right:0;z-index:99998;background:#111;color:#0f0;
+ font:bold 14px monospace;padding:6px 10px;text-align:center;display:none;"></div>
 <canvas id="app" tabindex="0"></canvas>
 <div id="crosshair"></div>
 <div id="health"></div>
@@ -2237,10 +2239,11 @@ const mpJoin = document.getElementById('mpJoin');
 const mpCodeInput = document.getElementById('mpCodeInput');
 const mpStatus = document.getElementById('mpStatus');
 const mpClose = document.getElementById('mpClose');
-function mpLog(m){ if (mpStatus) mpStatus.textContent = m; }
+function mpBarShow(m){ const b=document.getElementById('mpBar'); if(b){ b.style.display='block'; b.textContent='[MP] '+m; } }
+function mpLog(m){ if (mpStatus) mpStatus.textContent = m; mpBarShow(m); }
 function setupConn(conn) {
  mpConns.push(conn);
- conn.on('data', (msg) => handleMpData(conn.peer, msg));
+ conn.on('data', (msg) => { if (!conn._got) { conn._got = true; mpBarShow('상대 데이터 수신 시작 ✅'); } handleMpData(conn.peer, msg); });
  conn.on('open', () => { mpLog('상대 접속됨: ' + conn.peer); enterMultiplayerGame();
   if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode + '/count').set(mpConns.length + 1);
  });
@@ -2281,6 +2284,8 @@ function startHost(attempt) {
   mpLog('✅ 방 열림 · 코드: ' + id + ' (이 코드를 공유)');
   if (fbdb) fbdb.ref('rooms/' + id).set({ code: id, count: 1, created: Date.now() });
  });
+ peer.on('disconnected', () => mpBarShow('브로커 연결 끊김(재연결 시도)'));
+ peer.on('close', () => mpBarShow('peer 닫힘'));
  peer.on('connection', (conn) => {
   if (fbdb && myRoomCode) fbdb.ref('rooms/' + myRoomCode + '/count').set(mpConns.length + 2);
   setupConn(conn);
