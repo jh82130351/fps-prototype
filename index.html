@@ -1776,7 +1776,7 @@ function loadFromData(arr) {
 function saveWorld() { try { localStorage.setItem('fpsWorld', serialize()); return true; } catch (e) { return false; } }
 // 페이지 이탈·백그라운드 전환 시 자동 저장 (모바일 대응)
 window.addEventListener('pagehide', () => { saveWorld(); if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode).remove(); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { saveWorld(); if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode).remove(); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { saveWorld(); } });
 
 document.getElementById('btnSave').onclick = () => { flash(saveWorld() ? '저장됨' : '저장 불가(미리보기)'); };
 document.getElementById('btnLoad').onclick = () => {
