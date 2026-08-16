@@ -173,8 +173,6 @@
 </style>
 </head>
 <body>
-<div id="mpBar" style="position:fixed;top:0;left:0;right:0;z-index:99998;background:#111;color:#0f0;
- font:bold 14px monospace;padding:6px 10px;text-align:center;display:none;"></div>
 <canvas id="app" tabindex="0"></canvas>
 <div id="crosshair"></div>
 <div id="health"></div>
@@ -292,27 +290,17 @@
  <button id="roomAdminClose">닫기</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js" onerror="document.title='CDN실패-THREE'"></script>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" onerror="document.title='CDN실패-PEERJS'"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" onerror="document.title='CDN실패-FIREBASE1'"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js" onerror="document.title='CDN실패-FIREBASE2'"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
-document.title = 'MAIN-시작';
-window.addEventListener('error', function(ev){
- var el = document.getElementById('texDbg');
- if (el) el.textContent = '❌ 에러: ' + (ev.message || ev.error) + ' @' + (ev.lineno || '?');
-});
-window.addEventListener('unhandledrejection', function(ev){
- var m = (ev.reason && ev.reason.message) ? ev.reason.message : String(ev.reason);
- if (m && m.indexOf('pointer lock') !== -1) return; // 무해한 포인터잠금 실패 무시
- var el = document.getElementById('texDbg');
- if (el) el.textContent = '❌ 비동기에러: ' + m;
-});
+window.addEventListener('error', function(ev){ console.error('[err]', ev.message, '@' + ev.lineno); });
+window.addEventListener('unhandledrejection', function(ev){ var m=(ev.reason&&ev.reason.message)?ev.reason.message:String(ev.reason); if(m&&m.indexOf('pointer lock')!==-1)return; console.error('[reject]', m); });
 window.addEventListener('load', function(){
- var el = document.getElementById('texDbg');
- if (typeof THREE === 'undefined') { if (el) el.textContent = '❌ THREE 로드 실패 (CDN 차단?)'; return; }
- if (typeof Peer === 'undefined' && el) el.textContent = '⚠️ PeerJS 로드 실패';
- if (typeof firebase === 'undefined' && el) el.textContent = '⚠️ Firebase 로드 실패';
+ if (typeof THREE === 'undefined') { console.error('[load] THREE 로드 실패 (CDN 차단?)'); return; }
+ if (typeof Peer === 'undefined') console.error('[load] PeerJS 로드 실패');
+ if (typeof firebase === 'undefined') console.error('[load] Firebase 로드 실패');
 });
 const canvas = document.getElementById('app');
 const overlay = document.getElementById('overlay');
@@ -545,9 +533,7 @@ function texBuildFaces() {
 
 const texSharedTextureCache = new WeakMap();
 function texDbg(msg) {
- const el = document.getElementById('texDbg');
- if (el) el.textContent = 'texDbg: ' + msg;
- console.log('[texDbg]', msg);
+ console.log('[dbg]', msg);
 }
 function texCanvasTexture(cv) {
  let t = texSharedTextureCache.get(cv);
@@ -2110,7 +2096,6 @@ function physics(dt) {
  } catch (e) {}
  if (!loaded) buildDefaultWorld();
  rebuildColliders();
- document.title = 'MAIN-월드완성';
 })();
 
 let autoSaveT = 0;
@@ -2309,8 +2294,8 @@ const mpJoin = document.getElementById('mpJoin');
 const mpCodeInput = document.getElementById('mpCodeInput');
 const mpStatus = document.getElementById('mpStatus');
 const mpClose = document.getElementById('mpClose');
-function mpBarShow(m){ const b=document.getElementById('mpBar'); if(b){ b.style.display='block'; b.textContent='[MP] '+m; } }
-function mpLog(m){ if (mpStatus) mpStatus.textContent = m; mpBarShow(m); }
+function mpBarShow(m){}
+function mpLog(m){ if (mpStatus) mpStatus.textContent = m; }
 if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM + '/count').on('value', s => {
  const n = s.val(); const el = document.getElementById('mpMainInfo');
  if (el) el.textContent = (n ? ('현재 ' + n + '명 접속 중') : '비어있음 (첫 접속 시 호스트가 됩니다)');
@@ -2512,6 +2497,5 @@ function watchRooms() {
 }
 if (mpRooms) { ['pointerdown','touchstart','mousedown','click'].forEach(ev => mpRooms.addEventListener(ev, (e) => e.stopPropagation())); }
 </script>
-<div id="texDbg" style="position:absolute;right:12px;bottom:12px;z-index:9999;background:rgba(0,0,0,0.8);color:#0f0;font:12px monospace;padding:8px 10px;border-radius:6px;max-width:320px;white-space:pre-wrap;pointer-events:none;">texDbg: 대기</div>
 </body>
 </html>
