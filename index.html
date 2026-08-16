@@ -274,6 +274,8 @@
 
 <div id="mpPanel" style="display:none;">
  <h2 style="color:#fff">멀티플레이</h2>
+ <button id="mpMain" style="background:#e67e22;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-weight:700;cursor:pointer">🌐 메인 서버 접속</button>
+ <div id="mpMainInfo" style="color:#7dd3fc;font-size:12px;min-height:16px"></div>
  <button id="mpHost">방 만들기</button>
  <div style="display:flex;gap:6px">
   <input id="mpCodeInput" placeholder="방 코드" autocomplete="off">
@@ -1873,6 +1875,8 @@ const firebaseConfig = {
 let fbdb = null;
 try { firebase.initializeApp(firebaseConfig); fbdb = firebase.database(); } catch (e) { console.log('firebase init 실패', e); }
 let myRoomCode = null;
+const MAIN_ROOM = 'MAIN01'; // 메인 서버 고정 방 코드(PeerJS ID)
+let mpRole = null; // 'host' | 'client' | null
 
 // 공통 PeerJS 옵션 (호스트/참가 모두 같은 브로커 0.peerjs.com 사용)
 const PEER_OPTS = {
@@ -2241,9 +2245,12 @@ const mpStatus = document.getElementById('mpStatus');
 const mpClose = document.getElementById('mpClose');
 function mpBarShow(m){ const b=document.getElementById('mpBar'); if(b){ b.style.display='block'; b.textContent='[MP] '+m; } }
 function mpLog(m){ if (mpStatus) mpStatus.textContent = m; mpBarShow(m); }
+if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM + '/count').on('value', s => {
+ const n = s.val(); const el = document.getElementById('mpMainInfo');
+ if (el) el.textContent = (n ? ('현재 ' + n + '명 접속 중') : '비어있음 (첫 접속 시 호스트가 됩니다)');
+});
 function setupConn(conn) {
- mpConns.push(conn);
- conn.on('data', (msg) => { if (!conn._got) { conn._got = true; mpBarShow('상대 데이터 수신 시작 ✅'); } handleMpData(conn.peer, msg); });
+ mpConns.push(conn); conn.on('data', (msg) => { if (!conn._got) { conn._got = true; mpBarShow('상대 데이터 수신 시작 ✅'); } handleMpData(conn.peer, msg); });
  conn.on('open', () => { mpLog('상대 접속됨: ' + conn.peer); enterMultiplayerGame();
   if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode + '/count').set(mpConns.length + 1);
  });
@@ -2297,6 +2304,64 @@ function startHost(attempt) {
  });
 }
 if (mpHost) mpHost.addEventListener('click', (e) => { e.stopPropagation(); startHost(0); });
+
+const mpMain = document.getElementById('mpMain');
+if (mpMain) mpMain.addEventListener('click', (e) => {
+ e.stopPropagation();
+ if (!fbdb) { mpLog('DB 연결 안 됨'); return; }
+ mpLog('메인 서버 확인 중...');
+ // 호스트 존재 여부 확인
+ fbdb.ref('rooms/' + MAIN_ROOM).get().then(snap => {
+  const room = snap.val();
+  if (room && room.host) {
+   joinMain(); // 이미 호스트 있음 → 참가
+  } else {
+   hostMain(); // 아무도 없음 → 내가 호스트
+  }
+ }).catch(() => hostMain());
+});
+
+function hostMain() {
+ mpLog('메인 서버 호스트로 시작...');
+ if (peer) { try { peer.destroy(); } catch(_){} }
+ mpConns = [];
+ peer = new Peer(MAIN_ROOM, PEER_OPTS); // 고정 코드로 호스트
+ peer.on('open', (id) => {
+  isHost = true; mpRole = 'host'; mpActive = true; myRoomCode = MAIN_ROOM;
+  mpLog('✅ 메인 서버 호스트 · 접속 대기 중');
+  if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM).set({ code: MAIN_ROOM, host: id, count: 1, created: Date.now() });
+  enterMultiplayerGame();
+ });
+ peer.on('connection', (conn) => {
+  setupConn(conn);
+  if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM + '/count').set(mpConns.length + 1);
+ });
+ peer.on('error', (err) => {
+  if (err.type === 'unavailable-id') { mpLog('이미 호스트 있음 → 참가'); joinMain(); } // 경쟁 상황: 남이 먼저 호스트됨
+  else mpLog('호스트 오류: ' + err.type);
+ });
+ // 호스트 나갈 때 방 정리(다음 사람이 승계하도록)
+ window.addEventListener('pagehide', () => { if (mpRole === 'host' && fbdb) fbdb.ref('rooms/' + MAIN_ROOM).remove(); });
+}
+
+function joinMain() {
+ mpLog('메인 서버 참가 중...');
+ if (peer) { try { peer.destroy(); } catch(_){} }
+ mpConns = [];
+ peer = new Peer(undefined, PEER_OPTS);
+ peer.on('open', () => {
+  const conn = peer.connect(MAIN_ROOM, { reliable: true });
+  let opened = false;
+  conn.on('open', () => { opened = true; mpActive = true; isHost = false; mpRole = 'client'; mpLog('✅ 메인 서버 접속 성공'); enterMultiplayerGame(); });
+  conn.on('error', (err) => mpLog('연결 오류: ' + (err.type || err)));
+  setupConn(conn);
+  setTimeout(() => { if (!opened && !mpActive) { mpLog('호스트 응답 없음 → 내가 호스트로 전환'); hostMain(); } }, 4000); // 호스트가 방금 나갔으면 승계
+ });
+ peer.on('error', (err) => {
+  if (err.type === 'peer-unavailable') { mpLog('호스트 없음 → 내가 호스트로'); hostMain(); } // 자동 승계
+  else mpLog('오류: ' + err.type);
+ });
+}
 if (mpJoin) mpJoin.addEventListener('click', (e) => {
  e.stopPropagation();
  const code = (mpCodeInput && mpCodeInput.value.trim().toUpperCase()) || '';
