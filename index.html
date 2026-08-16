@@ -1794,8 +1794,8 @@ function loadFromData(arr) {
 }
 function saveWorld() { try { localStorage.setItem('fpsWorld', serialize()); return true; } catch (e) { return false; } }
 // 페이지 이탈·백그라운드 전환 시 자동 저장 (모바일 대응)
-window.addEventListener('pagehide', () => { saveWorld(); if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode).remove(); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { saveWorld(); } });
+window.addEventListener('pagehide', () => { if (!mpActive) saveWorld(); if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode).remove(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { if (!mpActive) saveWorld(); } });
 
 document.getElementById('btnSave').onclick = () => { flash(saveWorld() ? '저장됨' : '저장 불가(미리보기)'); };
 document.getElementById('btnLoad').onclick = () => {
@@ -1875,6 +1875,7 @@ const firebaseConfig = {
 let fbdb = null;
 try { firebase.initializeApp(firebaseConfig); fbdb = firebase.database(); } catch (e) { console.log('firebase init 실패', e); }
 let myRoomCode = null;
+let mpBackupWorld = null; // 멀티 진입 시 싱글 월드 백업
 const MAIN_ROOM = 'MAIN01'; // 메인 서버 고정 방 코드(PeerJS ID)
 let mpRole = null; // 'host' | 'client' | null
 
@@ -1886,13 +1887,17 @@ const PEER_OPTS = {
  config: {
   iceServers: [
    { urls: 'stun:stun.l.google.com:19302' },
-   { urls: 'stun:global.stun.twilio.com:3478' }
+   { urls: 'stun:global.stun.twilio.com:3478' },
+   { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+   { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
   ]
  }
 };
 
 // 멀티플레이 연결 성공 시 플레이 진입 공통 함수
 function enterMultiplayerGame() {
+ if (!mpBackupWorld) mpBackupWorld = serialize();
  if (mpPanel) mpPanel.style.display = 'none';
  if (overlay) overlay.style.display = 'none';
  started = true;
@@ -2075,7 +2080,7 @@ function animate() {
  const dt = Math.min(clock.getDelta(), 0.05);
  updateGlow(dt);
  waterOverlay.style.opacity = (mode === 'play' && inWater) ? '1' : '0';
- if (mode === 'edit') { autoSaveT += dt; if (autoSaveT > 3) { autoSaveT = 0; saveWorld(); } }
+ if (mode === 'edit' && !mpActive) { autoSaveT += dt; if (autoSaveT > 3) { autoSaveT = 0; saveWorld(); } }
  if (mode === 'play') {
  gizmo.visible = false;
  scaleGizmo.visible = false;
@@ -2236,6 +2241,17 @@ function makeCharacter() {
  add(0.35,1.1,0.35,pants,-0.25,0.35,0); add(0.35,1.1,0.35,pants,0.25,0.35,0);
  return g;
 }
+function makeNameTag(text) {
+ const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+ const ctx = cv.getContext('2d');
+ ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0,0,256,64);
+ ctx.fillStyle = '#fff'; ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+ ctx.fillText(text || '플레이어', 128, 32);
+ const tex = new THREE.CanvasTexture(cv);
+ const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+ spr.scale.set(2, 0.5, 1); spr.position.set(0, 3.0, 0); // 머리 위
+ return spr;
+}
 const mpBtn = document.getElementById('mpBtn');
 const mpPanel = document.getElementById('mpPanel');
 const mpHost = document.getElementById('mpHost');
@@ -2265,7 +2281,7 @@ function handleMpData(id, msg) {
  let d; try { d = JSON.parse(msg); } catch(e){ return; }
  if (d && d.t === 'pos') {
   if (!remotePlayers[id]) {
-   const fig = makeCharacter(); scene.add(fig); remotePlayers[id] = { fig, nick: d.nick };
+   const fig = makeCharacter(); const tag=makeNameTag(d.nick); fig.add(tag); scene.add(fig); remotePlayers[id] = { fig, nick: d.nick, tag };
   }
   const rp = remotePlayers[id];
   rp.fig.position.set(d.x, d.y - 1.7, d.z);
@@ -2355,7 +2371,7 @@ function joinMain() {
   conn.on('open', () => { opened = true; mpActive = true; isHost = false; mpRole = 'client'; mpLog('✅ 메인 서버 접속 성공'); enterMultiplayerGame(); });
   conn.on('error', (err) => mpLog('연결 오류: ' + (err.type || err)));
   setupConn(conn);
-  setTimeout(() => { if (!opened && !mpActive) { mpLog('호스트 응답 없음 → 내가 호스트로 전환'); hostMain(); } }, 4000); // 호스트가 방금 나갔으면 승계
+  setTimeout(() => { if (opened || mpActive) return; mpLog('연결 지연 · 네트워크(NAT) 문제일 수 있음, 같은 와이파이 권장'); if (!opened && !mpActive) { mpLog('호스트 응답 없음 → 내가 호스트로 전환'); hostMain(); } }, 4000); // 호스트가 방금 나갔으면 승계
  });
  peer.on('error', (err) => {
   if (err.type === 'peer-unavailable') { mpLog('호스트 없음 → 내가 호스트로'); hostMain(); } // 자동 승계
