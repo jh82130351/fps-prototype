@@ -131,6 +131,19 @@
  #customCanvas { width:280px; height:340px; background:#1a2230; border-radius:12px; }
  #customClose { padding:10px 28px; font-size:15px; font-weight:700; border:none; border-radius:8px;
   background:#2ecc71; color:#fff; cursor:pointer; }
+ #mpBtn { width:220px; padding:14px 14px; font-size:15px; text-align:center; border-radius:10px;
+  border:none; background:#2c8fc9; color:#fff; cursor:pointer; font-weight:700; margin-top:8px; }
+ #mpBtn:hover { background:#2477ab; }
+ #mpPanel { position:absolute; inset:0; z-index:11; display:none; flex-direction:column;
+  align-items:center; justify-content:center; gap:12px; background:rgba(10,15,22,0.92); }
+ #mpHost { padding:12px 30px; font-size:15px; font-weight:700; border:none; border-radius:8px;
+  background:#2ecc71; color:#fff; cursor:pointer; }
+ #mpCodeInput { width:160px; padding:10px 14px; font-size:15px; text-align:center; border-radius:8px;
+  border:1px solid #3a4553; background:#0f151d; color:#e6edf3; outline:none; }
+ #mpJoin { padding:10px 22px; font-size:15px; font-weight:700; border:none; border-radius:8px;
+  background:#9b59b6; color:#fff; cursor:pointer; }
+ #mpClose { padding:10px 28px; font-size:15px; font-weight:700; border:none; border-radius:8px;
+  background:#2ecc71; color:#fff; cursor:pointer; }
  #overlayHelp { margin-top:20px; }
 
  #touchControls { position:absolute; inset:0; z-index:7; pointer-events:none; }
@@ -237,6 +250,7 @@
   <button id="startBtn">시작하기</button>
   <input id="nickInput" type="text" maxlength="16" placeholder="닉네임" autocomplete="off">
   <button id="customBtn">🎨 커스텀</button>
+  <button id="mpBtn">🌐 멀티플레이</button>
  </div>
  <p id="overlayHelp">
   <kbd>Tab</kbd> 편집 / 플레이 전환 · <kbd>WASD</kbd> 이동 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프
@@ -249,7 +263,19 @@
  <button id="customClose">닫기</button>
 </div>
 
+<div id="mpPanel" style="display:none;">
+ <h2 style="color:#fff">멀티플레이</h2>
+ <button id="mpHost">방 만들기</button>
+ <div style="display:flex;gap:6px">
+  <input id="mpCodeInput" placeholder="방 코드" autocomplete="off">
+  <button id="mpJoin">참가</button>
+ </div>
+ <div id="mpStatus" style="color:#7dd3fc;font-size:13px;min-height:18px"></div>
+ <button id="mpClose">닫기</button>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 const canvas = document.getElementById('app');
 const overlay = document.getElementById('overlay');
@@ -1792,6 +1818,15 @@ let customOpen = false;
 let customSceneInited = false;
 let customScene, customCam, customRenderer, customFig;
 
+// 멀티플레이 전역 상태 (모두 상단 선언부에 몰아 선언 - TDZ 방지)
+let peer = null;
+let mpConns = [];
+let isHost = false;
+let mpActive = false;
+const remotePlayers = {};
+let mpSendT = 0;
+let mpInited = false;
+
 function respawn() {
  yawObject.position.copy(respawnPoint);
  vertVel = 0; velocity.set(0,0,0);
@@ -1926,6 +1961,15 @@ function physics(dt) {
  hud.textContent = (playerNick ? playerNick + '\n' : '') +
   'x:'+p.x.toFixed(1)+' z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
   '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'')+(onCheckpoint?' · ✓체크포인트':'');
+
+ // 멀티플레이 위치 전송 (~12회/초)
+ if (mpActive && mpConns.length) {
+  mpSendT += dt;
+  if (mpSendT > 0.08) {
+   mpSendT = 0;
+   mpSend();
+  }
+ }
 }
 
 // ---------- Loop ----------
@@ -2101,6 +2145,74 @@ function renderCustom() {
  if (customFig) customFig.rotation.y += 0.01;
  customRenderer.render(customScene, customCam);
 }
+
+// ---------- P2P 멀티플레이어 1단계 : 연결 + 위치 동기화 ----------
+function makeCharacter() {
+ const g = new THREE.Group();
+ const skin=0xe8b88a, shirt=0x3498db, pants=0x2c3e50;
+ const add=(w,h,d,c,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:c}));m.position.set(x,y,z);g.add(m);};
+ add(0.8,0.8,0.8,skin,0,2.1,0); add(1.0,1.2,0.5,shirt,0,1.2,0);
+ add(0.3,1.1,0.3,skin,-0.65,1.2,0); add(0.3,1.1,0.3,skin,0.65,1.2,0);
+ add(0.35,1.1,0.35,pants,-0.25,0.35,0); add(0.35,1.1,0.35,pants,0.25,0.35,0);
+ return g;
+}
+const mpBtn = document.getElementById('mpBtn');
+const mpPanel = document.getElementById('mpPanel');
+const mpHost = document.getElementById('mpHost');
+const mpJoin = document.getElementById('mpJoin');
+const mpCodeInput = document.getElementById('mpCodeInput');
+const mpStatus = document.getElementById('mpStatus');
+const mpClose = document.getElementById('mpClose');
+function mpLog(m){ if (mpStatus) mpStatus.textContent = m; }
+function setupConn(conn) {
+ mpConns.push(conn);
+ conn.on('data', (msg) => handleMpData(conn.peer, msg));
+ conn.on('open', () => mpLog('연결됨: ' + conn.peer));
+ conn.on('close', () => removeRemote(conn.peer));
+}
+function removeRemote(id) {
+ if (remotePlayers[id]) { scene.remove(remotePlayers[id].fig); delete remotePlayers[id]; }
+}
+function handleMpData(id, msg) {
+ let d; try { d = JSON.parse(msg); } catch(e){ return; }
+ if (d && d.t === 'pos') {
+  if (!remotePlayers[id]) {
+   const fig = makeCharacter(); scene.add(fig); remotePlayers[id] = { fig, nick: d.nick };
+  }
+  const rp = remotePlayers[id];
+  rp.fig.position.set(d.x, d.y - 1.7, d.z);
+  rp.fig.rotation.y = d.ry;
+ }
+}
+function mpSend() {
+ if (mpActive && mpConns.length) {
+  const s = { t:'pos', x:yawObject.position.x, y:yawObject.position.y, z:yawObject.position.z, ry:yawObject.rotation.y, nick:playerNick };
+  const str = JSON.stringify(s);
+  mpConns.forEach(c => { if (c.open) c.send(str); });
+ }
+}
+if (mpHost) mpHost.addEventListener('click', (e) => {
+ e.stopPropagation();
+ if (peer) { try { peer.destroy(); } catch(_){} peer = null; mpConns = []; }
+ peer = new Peer();
+ peer.on('open', (id) => { isHost = true; mpActive = true; mpLog('방 코드: ' + id); });
+ peer.on('connection', (conn) => setupConn(conn));
+});
+if (mpJoin) mpJoin.addEventListener('click', (e) => {
+ e.stopPropagation();
+ const code = (mpCodeInput && mpCodeInput.value.trim()) || '';
+ if (!code) { mpLog('방 코드를 입력하세요'); return; }
+ if (peer) { try { peer.destroy(); } catch(_){} peer = null; mpConns = []; }
+ peer = new Peer();
+ peer.on('open', () => {
+  const conn = peer.connect(code);
+  setupConn(conn);
+  mpActive = true; isHost = false;
+ });
+});
+if (mpBtn) mpBtn.addEventListener('click', (e) => { e.stopPropagation(); mpPanel.style.display = 'flex'; });
+if (mpClose) mpClose.addEventListener('click', (e) => { e.stopPropagation(); mpPanel.style.display = 'none'; });
+if (mpCodeInput) { ['pointerdown','touchstart','mousedown','click'].forEach(ev => mpCodeInput.addEventListener(ev, (e) => e.stopPropagation())); }
 </script>
 <div id="texDbg" style="position:absolute;right:12px;bottom:12px;z-index:9999;background:rgba(0,0,0,0.8);color:#0f0;font:12px monospace;padding:8px 10px;border-radius:6px;max-width:320px;white-space:pre-wrap;pointer-events:none;">texDbg: 대기</div>
 </body>
