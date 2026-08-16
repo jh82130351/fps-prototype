@@ -935,6 +935,19 @@ function buildDefaultWorld() {
  addPart(-12, 0.6, 36, 12, 1.2, 12, 0x5a1000, 0, 'lava'); // 용암 웅덩이
 }
 
+// 멀티 전용 아레나 월드 빌더 (싱글과 완전 분리, 항상 동일한 고정 배치)
+function buildArenaWorld() {
+ while (parts.length) removePart(parts[0]);
+ // 평평한 넓은 바닥 + 중앙 스폰대 + 장애물 몇 개 (모두 고정값 = 모두 동일)
+ addPart(0, 0.5, 0, 20, 1, 20, 0x3d5a80); // 중앙 스폰 플랫폼
+ addPart(18, 1, 0, 6, 2, 6, 0x98c1d9);
+ addPart(-18, 1, 0, 6, 2, 6, 0x98c1d9);
+ addPart(0, 1, 18, 6, 2, 6, 0xe0fbfc);
+ addPart(0, 1, -18, 6, 2, 6, 0xe0fbfc);
+ addPart(0, 0.5, 0, 4, 1, 4, 0xffffff, 0, 'checkpoint'); // 중앙 체크포인트
+ rebuildColliders();
+}
+
 // ---------- Cameras ----------
 const aspect = () => window.innerWidth / window.innerHeight;
 const EYE_HEIGHT = 1.7;
@@ -1014,6 +1027,7 @@ makeScaleArrow('d', 0x4488ff, g => g.rotation.x = -Math.PI/2, new THREE.Vector3(
 let mode = 'play';
 const respawnPoint = new THREE.Vector3(0, EYE_HEIGHT, 0);
 function setMode(m) {
+ if (mpActive && m === 'edit') leaveMultiplayer(); // 멀티 중 편집(ESC/뒤로) 진입 시 싱글 복원
  mode = m;
  const editing = m === 'edit';
  modeBadge.textContent = editing ? 'EDIT' : 'PLAY';
@@ -1905,12 +1919,32 @@ const PEER_OPTS = {
 
 // 멀티플레이 연결 성공 시 플레이 진입 공통 함수
 function enterMultiplayerGame() {
- if (!mpBackupWorld) mpBackupWorld = serialize();
+ if (!mpBackupWorld) mpBackupWorld = serialize(); // 싱글 월드 백업
+ buildArenaWorld(); // 멀티 전용 아레나로 전환
+ mode = 'play';
+ yawObject.position.set(0, EYE_HEIGHT + 1.2, 0); // 스폰대 위
+ respawnPoint.set(0, EYE_HEIGHT + 1.2, 0);
+ vertVel = 0; velocity.set(0,0,0);
+ health = MAX_HP; updateHearts();
  if (mpPanel) mpPanel.style.display = 'none';
  if (overlay) overlay.style.display = 'none';
  started = true;
  crosshair.style.display = 'block';
  if (!isTouch) { try { canvas.requestPointerLock(); } catch (e) {} }
+}
+
+// 멀티 종료 시 싱글 월드 복원
+function leaveMultiplayer() {
+ if (peer) { try { peer.destroy(); } catch(_){} peer = null; }
+ mpConns = []; mpActive = false; isHost = false; mpRole = null;
+ // 원격 플레이어 제거
+ for (const id in remotePlayers) { if (remotePlayers[id].fig) scene.remove(remotePlayers[id].fig); }
+ for (const id in remotePlayers) delete remotePlayers[id];
+ // 내 방이면 정리
+ if (fbdb && myRoomCode) { fbdb.ref('rooms/' + myRoomCode).remove().catch(()=>{}); }
+ myRoomCode = null;
+ // 싱글 월드 복원
+ if (mpBackupWorld) { const arr = worldFromJSON(mpBackupWorld); if (arr) { loadFromData(arr); rebuildColliders(); } mpBackupWorld = null; }
 }
 
 function respawn() {
@@ -2413,7 +2447,7 @@ if (mpJoin) mpJoin.addEventListener('click', (e) => {
  });
 });
 if (mpBtn) mpBtn.addEventListener('click', (e) => { e.stopPropagation(); mpPanel.style.display = 'flex'; });
-if (mpClose) mpClose.addEventListener('click', (e) => { e.stopPropagation(); mpPanel.style.display = 'none'; });
+if (mpClose) mpClose.addEventListener('click', (e) => { e.stopPropagation(); if (mpActive) leaveMultiplayer(); mpPanel.style.display = 'none'; });
 if (mpCodeInput) { ['pointerdown','touchstart','mousedown','click'].forEach(ev => mpCodeInput.addEventListener(ev, (e) => e.stopPropagation())); }
 const mpRooms = document.getElementById('mpRooms');
 const roomAdmin = document.getElementById('roomAdmin');
