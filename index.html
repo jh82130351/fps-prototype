@@ -123,8 +123,14 @@
  #startBtn:hover { background:#27ae60; }
  #nickInput { width:220px; padding:10px 14px; font-size:15px; text-align:center; border-radius:8px;
   border:1px solid #3a4553; background:#0f151d; color:#e6edf3; outline:none; }
- #comingSoon { width:220px; padding:10px 14px; font-size:14px; text-align:center; border-radius:8px;
-  border:1px dashed #3a4553; background:rgba(255,255,255,0.04); color:#8b98a5; cursor:not-allowed; }
+ #customBtn { width:220px; padding:14px 14px; font-size:15px; text-align:center; border-radius:10px;
+  border:none; background:#9b59b6; color:#fff; cursor:pointer; font-weight:700; }
+ #customBtn:hover { background:#8e44ad; }
+ #customPanel { position:absolute; inset:0; z-index:11; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:12px; background:rgba(10,15,22,0.92); }
+ #customCanvas { width:280px; height:340px; background:#1a2230; border-radius:12px; }
+ #customClose { padding:10px 28px; font-size:15px; font-weight:700; border:none; border-radius:8px;
+  background:#2ecc71; color:#fff; cursor:pointer; }
  #overlayHelp { margin-top:20px; }
 
  #touchControls { position:absolute; inset:0; z-index:7; pointer-events:none; }
@@ -230,11 +236,17 @@
  <div id="menu">
   <button id="startBtn">시작하기</button>
   <input id="nickInput" type="text" maxlength="16" placeholder="닉네임" autocomplete="off">
-  <div id="comingSoon">🎨 커스텀 · 준비중</div>
+  <button id="customBtn">🎨 커스텀</button>
  </div>
  <p id="overlayHelp">
   <kbd>Tab</kbd> 편집 / 플레이 전환 · <kbd>WASD</kbd> 이동 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프
  </p>
+</div>
+
+<div id="customPanel" style="display:none;">
+ <h2 style="color:#fff;margin-bottom:8px;">커스텀</h2>
+ <canvas id="customCanvas"></canvas>
+ <button id="customClose">닫기</button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -1972,6 +1984,8 @@ function animate() {
  }
  renderer.render(scene, editCam); hud.style.display = 'none'; healthEl.style.display = 'none';
  }
+ // 커스텀 캐릭터 렌더 (패널이 열려 있을 때만, 정의 전 안전 가드)
+ if (typeof customOpen !== 'undefined' && customOpen) renderCustom();
 }
 updateHearts();
 animate();
@@ -2021,6 +2035,68 @@ window.addEventListener('mouseup', (e) => {
  texDbg('적용 성공 face=' + faceName + ' part=' + (p ? 'ok' : 'null'));
  flash(FACE_NAMES[faceName] + ' 면에 텍스처 적용됨');
 });
+
+// ---------- 커스텀 캐릭터 3D 화면 ----------
+const customBtn = document.getElementById('customBtn');
+const customPanel = document.getElementById('customPanel');
+const customClose = document.getElementById('customClose');
+let customOpen = false;
+let customSceneInited = false;
+let customScene, customCam, customRenderer, customFig;
+function initCustomScene() {
+ if (customSceneInited) return; // 중복 생성 방지
+ customSceneInited = true;
+ const cv = document.getElementById('customCanvas');
+ customScene = new THREE.Scene();
+ customCam = new THREE.PerspectiveCamera(45, cv.width / cv.height, 0.1, 100);
+ customCam.position.set(0, 2.2, 5);
+ customCam.lookAt(0, 1.1, 0);
+ customRenderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+ customRenderer.setSize(cv.width, cv.height);
+ customRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+ customScene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 0.9));
+ const dl = new THREE.DirectionalLight(0xffffff, 0.8);
+ dl.position.set(3, 6, 4);
+ customScene.add(dl);
+ customFig = new THREE.Group();
+ const skin = 0xe8b88a, shirt = 0x3498db, pants = 0x2c3e50;
+ // 머리
+ const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), new THREE.MeshStandardMaterial({ color: skin }));
+ head.position.y = 2.1; customFig.add(head);
+ // 몸통
+ const body = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.2, 0.5), new THREE.MeshStandardMaterial({ color: shirt }));
+ body.position.y = 1.2; customFig.add(body);
+ // 양팔
+ const armMat = new THREE.MeshStandardMaterial({ color: skin });
+ const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.1, 0.3), armMat);
+ leftArm.position.set(-0.65, 1.2, 0); customFig.add(leftArm);
+ const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.1, 0.3), armMat);
+ rightArm.position.set(0.65, 1.2, 0); customFig.add(rightArm);
+ // 양다리
+ const legMat = new THREE.MeshStandardMaterial({ color: pants });
+ const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.1, 0.35), legMat);
+ leftLeg.position.set(-0.25, 0.35, 0); customFig.add(leftLeg);
+ const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.1, 0.35), legMat);
+ rightLeg.position.set(0.25, 0.35, 0); customFig.add(rightLeg);
+ customScene.add(customFig);
+}
+if (customBtn) customBtn.addEventListener('click', (e) => {
+ e.stopPropagation();
+ customPanel.style.display = 'flex';
+ customOpen = true;
+ initCustomScene();
+});
+if (customClose) customClose.addEventListener('click', (e) => {
+ e.stopPropagation();
+ customPanel.style.display = 'none';
+ customOpen = false;
+});
+// 커스텀 렌더: 메인 animate 루프 내부에서 호출 (패널이 열려 있을 때만)
+function renderCustom() {
+ if (!customOpen || !customSceneInited) return;
+ if (customFig) customFig.rotation.y += 0.01;
+ customRenderer.render(customScene, customCam);
+}
 </script>
 <div id="texDbg" style="position:absolute;right:12px;bottom:12px;z-index:9999;background:rgba(0,0,0,0.8);color:#0f0;font:12px monospace;padding:8px 10px;border-radius:6px;max-width:320px;white-space:pre-wrap;pointer-events:none;">texDbg: 대기</div>
 </body>
