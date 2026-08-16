@@ -2344,6 +2344,13 @@ function handleMpData(fromConnPeer, msg) {
   remotePlayers[pid] = { fig, nick: d.nick, tag };
  }
  const rp = remotePlayers[pid];
+ // 닉네임이 바뀌었으면 이름표 다시 만들기
+ if (d.nick && d.nick !== rp.nick) {
+  if (rp.tag) rp.fig.remove(rp.tag);
+  const newTag = makeNameTag(d.nick);
+  rp.fig.add(newTag);
+  rp.tag = newTag; rp.nick = d.nick;
+ }
  rp.fig.position.set(d.x, d.y - 1.7, d.z);
  rp.fig.rotation.y = d.ry;
  // 호스트면: 받은 위치를 "보낸 연결"을 제외한 다른 참가자에게 중계
