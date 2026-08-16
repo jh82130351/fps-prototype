@@ -1857,6 +1857,19 @@ let fbdb = null;
 try { firebase.initializeApp(firebaseConfig); fbdb = firebase.database(); } catch (e) { console.log('firebase init 실패', e); }
 let myRoomCode = null;
 
+// 공통 PeerJS 옵션 (호스트/참가 모두 같은 브로커 0.peerjs.com 사용)
+const PEER_OPTS = {
+ host: '0.peerjs.com',
+ port: 443,
+ secure: true,
+ config: {
+  iceServers: [
+   { urls: 'stun:stun.l.google.com:19302' },
+   { urls: 'stun:global.stun.twilio.com:3478' }
+  ]
+ }
+};
+
 function respawn() {
  yawObject.position.copy(respawnPoint);
  vertVel = 0; velocity.set(0,0,0);
@@ -2237,7 +2250,7 @@ function startHost(attempt) {
  mpConns = [];
  const room = makeRoomCode();
  mpLog('방 생성 중... (' + room + ')');
- peer = new Peer(room);
+ peer = new Peer(room, PEER_OPTS);
  peer.on('open', (id) => {
   isHost = true; mpActive = true; myRoomCode = id;
   mpLog('✅ 방 열림 · 코드: ' + id + ' (이 코드를 공유)');
@@ -2260,7 +2273,7 @@ if (mpJoin) mpJoin.addEventListener('click', (e) => {
  if (!code) { mpLog('방 코드를 입력하세요'); return; }
  if (peer) { try { peer.destroy(); } catch(_){} peer = null; mpConns = []; }
  mpLog('서버 연결 중...');
- peer = new Peer();
+ peer = new Peer(undefined, PEER_OPTS);
  let joinTries = 0;
  function tryConnect() {
   joinTries++;
