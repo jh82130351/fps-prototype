@@ -1870,6 +1870,15 @@ const PEER_OPTS = {
  }
 };
 
+// 멀티플레이 연결 성공 시 플레이 진입 공통 함수
+function enterMultiplayerGame() {
+ if (mpPanel) mpPanel.style.display = 'none';
+ if (overlay) overlay.style.display = 'none';
+ started = true;
+ crosshair.style.display = 'block';
+ if (!isTouch) { try { canvas.requestPointerLock(); } catch (e) {} }
+}
+
 function respawn() {
  yawObject.position.copy(respawnPoint);
  vertVel = 0; velocity.set(0,0,0);
@@ -2216,7 +2225,7 @@ function mpLog(m){ if (mpStatus) mpStatus.textContent = m; }
 function setupConn(conn) {
  mpConns.push(conn);
  conn.on('data', (msg) => handleMpData(conn.peer, msg));
- conn.on('open', () => { mpLog('상대 접속됨: ' + conn.peer);
+ conn.on('open', () => { mpLog('상대 접속됨: ' + conn.peer); enterMultiplayerGame();
   if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode + '/count').set(mpConns.length + 1);
  });
  conn.on('close', () => { removeRemote(conn.peer);
@@ -2280,11 +2289,11 @@ if (mpJoin) mpJoin.addEventListener('click', (e) => {
   mpLog('방 ' + code + ' 연결 시도 ' + joinTries + '...');
   const conn = peer.connect(code, { reliable: true });
   let opened = false;
-  conn.on('open', () => { opened = true; mpActive = true; isHost = false; mpLog('✅ 상대와 연결 성공! 시작하기를 눌러 플레이'); });
+  conn.on('open', () => { opened = true; mpActive = true; isHost = false; mpLog('✅ 연결 성공'); enterMultiplayerGame(); });
   conn.on('error', (err) => mpLog('연결 오류: ' + (err.type || err)));
   setupConn(conn);
   // 3초 내 안 열리면 재시도(최대 3회) — 호스트 등록 지연 대비
-  setTimeout(() => { if (!opened && joinTries < 3) tryConnect(); else if (!opened) mpLog('연결 실패 · 호스트가 방을 열어둔 상태인지 확인'); }, 3000);
+  setTimeout(() => { if (opened || mpActive) return; if (joinTries < 3) tryConnect(); else mpLog('연결 실패 · 호스트가 방을 열어둔 상태인지 확인'); }, 3000);
  }
  peer.on('open', () => tryConnect());
  peer.on('error', (err) => {
