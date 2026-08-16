@@ -144,6 +144,13 @@
   background:#9b59b6; color:#fff; cursor:pointer; }
  #mpClose { padding:10px 28px; font-size:15px; font-weight:700; border:none; border-radius:8px;
   background:#2ecc71; color:#fff; cursor:pointer; }
+ #mpRooms { padding:10px 28px; font-size:15px; font-weight:700; border:none; border-radius:8px;
+  background:#e67e22; color:#fff; cursor:pointer; }
+ #roomAdmin { position:absolute; inset:0; z-index:12; display:none; flex-direction:column;
+  align-items:center; justify-content:center; gap:12px; background:rgba(10,15,22,0.95); }
+ #roomList { max-height:50vh; overflow:auto; color:#e6edf3; min-width:260px; text-align:center; }
+ #roomAdminClose { padding:10px 28px; font-size:15px; font-weight:700; border:none; border-radius:8px;
+  background:#e74c3c; color:#fff; cursor:pointer; }
  #overlayHelp { margin-top:20px; }
 
  #touchControls { position:absolute; inset:0; z-index:7; pointer-events:none; }
@@ -271,11 +278,20 @@
   <button id="mpJoin">참가</button>
  </div>
  <div id="mpStatus" style="color:#7dd3fc;font-size:13px;min-height:18px"></div>
+ <button id="mpRooms">방 확인</button>
  <button id="mpClose">닫기</button>
+</div>
+
+<div id="roomAdmin" style="display:none;">
+ <h2 style="color:#fff">방 관리</h2>
+ <div id="roomList" style="max-height:50vh;overflow:auto;color:#e6edf3;min-width:260px"></div>
+ <button id="roomAdminClose">닫기</button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
 const canvas = document.getElementById('app');
 const overlay = document.getElementById('overlay');
@@ -1759,8 +1775,8 @@ function loadFromData(arr) {
 }
 function saveWorld() { try { localStorage.setItem('fpsWorld', serialize()); return true; } catch (e) { return false; } }
 // 페이지 이탈·백그라운드 전환 시 자동 저장 (모바일 대응)
-window.addEventListener('pagehide', () => { saveWorld(); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveWorld(); });
+window.addEventListener('pagehide', () => { saveWorld(); if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode).remove(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { saveWorld(); if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode).remove(); } });
 
 document.getElementById('btnSave').onclick = () => { flash(saveWorld() ? '저장됨' : '저장 불가(미리보기)'); };
 document.getElementById('btnLoad').onclick = () => {
@@ -1826,6 +1842,20 @@ let mpActive = false;
 const remotePlayers = {};
 let mpSendT = 0;
 let mpInited = false;
+
+// Firebase 방 목록/관리 전역 상태
+const firebaseConfig = {
+ apiKey: "AIzaSyDIkroelTWFN40yrLZ0BjTKp_LIF851zAg",
+ authDomain: "dmade-52dfd.firebaseapp.com",
+ databaseURL: "https://dmade-52dfd-default-rtdb.firebaseio.com",
+ projectId: "dmade-52dfd",
+ storageBucket: "dmade-52dfd.firebasestorage.app",
+ messagingSenderId: "848854791770",
+ appId: "1:848854791770:web:474f4877b67a453985ca63"
+};
+let fbdb = null;
+try { firebase.initializeApp(firebaseConfig); fbdb = firebase.database(); } catch (e) { console.log('firebase init 실패', e); }
+let myRoomCode = null;
 
 function respawn() {
  yawObject.position.copy(respawnPoint);
@@ -2173,8 +2203,12 @@ function mpLog(m){ if (mpStatus) mpStatus.textContent = m; }
 function setupConn(conn) {
  mpConns.push(conn);
  conn.on('data', (msg) => handleMpData(conn.peer, msg));
- conn.on('open', () => mpLog('상대 접속됨: ' + conn.peer));
- conn.on('close', () => removeRemote(conn.peer));
+ conn.on('open', () => { mpLog('상대 접속됨: ' + conn.peer);
+  if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode + '/count').set(mpConns.length + 1);
+ });
+ conn.on('close', () => { removeRemote(conn.peer);
+  if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode + '/count').set(mpConns.length + 1);
+ });
 }
 function removeRemote(id) {
  if (remotePlayers[id]) { scene.remove(remotePlayers[id].fig); delete remotePlayers[id]; }
@@ -2202,7 +2236,10 @@ if (mpHost) mpHost.addEventListener('click', (e) => {
  if (peer) { try { peer.destroy(); } catch(_){} peer = null; mpConns = []; }
  const room = makeRoomCode();
  peer = new Peer(room);
- peer.on('open', (id) => { isHost = true; mpActive = true; mpLog('방 코드: ' + id + ' (친구에게 공유)'); });
+ peer.on('open', (id) => { isHost = true; mpActive = true; mpLog('방 코드: ' + id + ' (친구에게 공유)');
+  myRoomCode = id;
+  if (fbdb) fbdb.ref('rooms/' + id).set({ code: id, count: 1, created: Date.now() });
+ });
  peer.on('error', (err) => {
   if (err.type === 'unavailable-id') { // 코드 충돌 시 재시도
    mpLog('코드 충돌, 다시 생성 중...');
@@ -2239,6 +2276,39 @@ if (mpJoin) mpJoin.addEventListener('click', (e) => {
 if (mpBtn) mpBtn.addEventListener('click', (e) => { e.stopPropagation(); mpPanel.style.display = 'flex'; });
 if (mpClose) mpClose.addEventListener('click', (e) => { e.stopPropagation(); mpPanel.style.display = 'none'; });
 if (mpCodeInput) { ['pointerdown','touchstart','mousedown','click'].forEach(ev => mpCodeInput.addEventListener(ev, (e) => e.stopPropagation())); }
+const mpRooms = document.getElementById('mpRooms');
+const roomAdmin = document.getElementById('roomAdmin');
+const roomList = document.getElementById('roomList');
+const roomAdminClose = document.getElementById('roomAdminClose');
+if (mpRooms) mpRooms.addEventListener('click', (e) => {
+ e.stopPropagation();
+ const pw = prompt('관리자 비밀번호');
+ if (pw !== '12345678') { mpLog('비밀번호 틀림'); return; }
+ roomAdmin.style.display = 'flex';
+ watchRooms();
+});
+if (roomAdminClose) roomAdminClose.addEventListener('click', (e) => { e.stopPropagation(); roomAdmin.style.display = 'none'; if (fbdb) fbdb.ref('rooms').off(); });
+function watchRooms() {
+ if (!fbdb) { roomList.textContent = 'DB 연결 안 됨'; return; }
+ fbdb.ref('rooms').on('value', (snap) => {
+  const rooms = snap.val() || {};
+  const keys = Object.keys(rooms);
+  if (!keys.length) { roomList.innerHTML = '<div style="opacity:0.6">열린 방 없음</div>'; return; }
+  roomList.innerHTML = '';
+  keys.forEach((k) => {
+   const r = rooms[k];
+   const row = document.createElement('div');
+   row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px;border-bottom:1px solid #2a3542';
+   row.innerHTML = '<span>코드 <b>' + k + '</b> · ' + (r.count || 0) + '명</span>';
+   const del = document.createElement('button');
+   del.textContent = '삭제'; del.style.cssText = 'background:#e74c3c;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer';
+   del.onclick = () => fbdb.ref('rooms/' + k).remove();
+   row.appendChild(del);
+   roomList.appendChild(row);
+  });
+ });
+}
+if (mpRooms) { ['pointerdown','touchstart','mousedown','click'].forEach(ev => mpRooms.addEventListener(ev, (e) => e.stopPropagation())); }
 </script>
 <div id="texDbg" style="position:absolute;right:12px;bottom:12px;z-index:9999;background:rgba(0,0,0,0.8);color:#0f0;font:12px monospace;padding:8px 10px;border-radius:6px;max-width:320px;white-space:pre-wrap;pointer-events:none;">texDbg: 대기</div>
 </body>
