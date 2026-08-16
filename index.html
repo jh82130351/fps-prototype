@@ -2017,6 +2017,7 @@ function physics(dt) {
  }
 
  // 수직: 물속이면 수영, 아니면 중력+점프
+ const prevFeet = pos.y - EYE_HEIGHT; // 이동 전 발 높이(착지/천장 방향 판정용)
  if (inWater) {
  if (keys['Space']) vertVel = SWIM_UP; // 위로 떠오름
  else if (shift) vertVel = 0; // 유지 (안 가라앉음)
@@ -2037,15 +2038,14 @@ function physics(dt) {
  const lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
  if (lx > -(c.hw+R) && lx < (c.hw+R) && lz > -(c.hd+R) && lz < (c.hd+R)) {
  const top = c.y1 + EYE_HEIGHT;
- if (vertVel <= 0 && pos.y <= top + 0.1 && top > groundY) groundY = top;
- // 천장: 위로 올라가는 중 머리(pos.y)가 블록 밑면에 닿으면 막고 튕김
- const bottom = c.y0 + EYE_HEIGHT; // 블록 밑면 기준 눈높이
- if (vertVel > 0 && pos.y >= bottom - 0.1 && pos.y < top) {
-  // 발이 블록 윗면보다 아래(=블록 몸통에 머리를 박는 상황)일 때만
-  if ((pos.y - EYE_HEIGHT) < c.y0) {
-   pos.y = c.y0 + EYE_HEIGHT - 0.02; // 밑면 바로 아래로 고정
-   vertVel = 0; // 상승 중단
-  }
+ // 착지: 아래로 이동 중이고, 직전에 발이 블록 윗면 위(또는 근처)에 있었을 때만
+ if (vertVel <= 0 && prevFeet >= c.y1 - 0.05 && (pos.y - EYE_HEIGHT) <= c.y1 && top > groundY) {
+  groundY = top;
+ }
+ // 천장: 위로 이동 중이고, 직전에 머리가 블록 밑면 아래에 있었는데 지금 밑면을 넘으면 막음
+ if (vertVel > 0 && (prevFeet + EYE_HEIGHT) <= c.y0 + 0.05 && pos.y > c.y0) {
+  pos.y = c.y0 - 0.02; // 머리를 블록 밑면 바로 아래로
+  vertVel = 0;
  }
  }
  }
