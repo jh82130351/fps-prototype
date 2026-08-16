@@ -288,11 +288,12 @@
  <button id="roomAdminClose">닫기</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js" onerror="document.title='CDN실패-THREE'"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" onerror="document.title='CDN실패-PEERJS'"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" onerror="document.title='CDN실패-FIREBASE1'"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js" onerror="document.title='CDN실패-FIREBASE2'"></script>
 <script>
+document.title = 'MAIN-시작';
 window.addEventListener('error', function(ev){
  var el = document.getElementById('texDbg');
  if (el) el.textContent = '❌ 에러: ' + (ev.message || ev.error) + ' @' + (ev.lineno || '?');
@@ -2048,6 +2049,7 @@ function physics(dt) {
  } catch (e) {}
  if (!loaded) buildDefaultWorld();
  rebuildColliders();
+ document.title = 'MAIN-월드완성';
 })();
 
 let autoSaveT = 0;
