@@ -2038,6 +2038,15 @@ function physics(dt) {
  if (lx > -(c.hw+R) && lx < (c.hw+R) && lz > -(c.hd+R) && lz < (c.hd+R)) {
  const top = c.y1 + EYE_HEIGHT;
  if (vertVel <= 0 && pos.y <= top + 0.1 && top > groundY) groundY = top;
+ // 천장: 위로 올라가는 중 머리(pos.y)가 블록 밑면에 닿으면 막고 튕김
+ const bottom = c.y0 + EYE_HEIGHT; // 블록 밑면 기준 눈높이
+ if (vertVel > 0 && pos.y >= bottom - 0.1 && pos.y < top) {
+  // 발이 블록 윗면보다 아래(=블록 몸통에 머리를 박는 상황)일 때만
+  if ((pos.y - EYE_HEIGHT) < c.y0) {
+   pos.y = c.y0 + EYE_HEIGHT - 0.02; // 밑면 바로 아래로 고정
+   vertVel = 0; // 상승 중단
+  }
+ }
  }
  }
  if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; } else onGround = false;
