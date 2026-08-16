@@ -1173,6 +1173,12 @@ window.addEventListener('keydown', (e) => {
  }
  }
  }
+ if (e.code === 'Escape' && started) {
+ // 플레이 중 ESC → 시작 메뉴 다시 표시 (멀티 중에도 연결은 유지)
+ if (overlay) overlay.style.display = 'flex';
+ crosshair.style.display = 'none';
+ try { document.exitPointerLock && document.exitPointerLock(); } catch(_){}
+ }
  keys[e.code] = true;
 });
 window.addEventListener('keyup', (e) => keys[e.code] = false);
