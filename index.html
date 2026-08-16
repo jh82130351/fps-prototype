@@ -2231,29 +2231,29 @@ function mpSend() {
   mpConns.forEach(c => { if (c.open) c.send(str); });
  }
 }
-if (mpHost) mpHost.addEventListener('click', (e) => {
- e.stopPropagation();
- if (peer) { try { peer.destroy(); } catch(_){} peer = null; mpConns = []; }
+function startHost(attempt) {
+ if (attempt > 5) { mpLog('방 생성 실패(재시도 초과)'); return; }
+ if (peer) { try { peer.destroy(); } catch(_){} peer = null; }
+ mpConns = [];
  const room = makeRoomCode();
+ mpLog('방 생성 중... (' + room + ')');
  peer = new Peer(room);
- peer.on('open', (id) => { isHost = true; mpActive = true; mpLog('방 코드: ' + id + ' (친구에게 공유)');
-  myRoomCode = id;
+ peer.on('open', (id) => {
+  isHost = true; mpActive = true; myRoomCode = id;
+  mpLog('✅ 방 열림 · 코드: ' + id + ' (이 코드를 공유)');
   if (fbdb) fbdb.ref('rooms/' + id).set({ code: id, count: 1, created: Date.now() });
  });
- peer.on('error', (err) => {
-  if (err.type === 'unavailable-id') { // 코드 충돌 시 재시도
-   mpLog('코드 충돌, 다시 생성 중...');
-   try { peer.destroy(); } catch(e){}
-   const room2 = makeRoomCode();
-   peer = new Peer(room2);
-   peer.on('open', (id2) => { isHost = true; mpActive = true; mpLog('방 코드: ' + id2 + ' (친구에게 공유)'); });
-   peer.on('connection', (conn) => setupConn(conn));
-  } else {
-   mpLog('오류: ' + err.type);
-  }
+ peer.on('connection', (conn) => {
+  if (fbdb && myRoomCode) fbdb.ref('rooms/' + myRoomCode + '/count').set(mpConns.length + 2);
+  setupConn(conn);
  });
- peer.on('connection', (conn) => setupConn(conn));
-});
+ peer.on('error', (err) => {
+  if (err.type === 'unavailable-id') { mpLog('코드 충돌, 재생성...'); startHost(attempt + 1); }
+  else if (err.type === 'network' || err.type === 'server-error') { mpLog('서버 오류, 재시도...'); setTimeout(() => startHost(attempt + 1), 800); }
+  else { mpLog('호스트 오류: ' + err.type); }
+ });
+}
+if (mpHost) mpHost.addEventListener('click', (e) => { e.stopPropagation(); startHost(0); });
 if (mpJoin) mpJoin.addEventListener('click', (e) => {
  e.stopPropagation();
  const code = (mpCodeInput && mpCodeInput.value.trim().toUpperCase()) || '';
@@ -2261,15 +2261,21 @@ if (mpJoin) mpJoin.addEventListener('click', (e) => {
  if (peer) { try { peer.destroy(); } catch(_){} peer = null; mpConns = []; }
  mpLog('서버 연결 중...');
  peer = new Peer();
- peer.on('open', () => {
-  mpLog('방 ' + code + ' 에 연결 시도 중...');
+ let joinTries = 0;
+ function tryConnect() {
+  joinTries++;
+  mpLog('방 ' + code + ' 연결 시도 ' + joinTries + '...');
   const conn = peer.connect(code, { reliable: true });
-  conn.on('open', () => { mpActive = true; isHost = false; mpLog('상대와 연결 성공!'); });
+  let opened = false;
+  conn.on('open', () => { opened = true; mpActive = true; isHost = false; mpLog('✅ 상대와 연결 성공! 시작하기를 눌러 플레이'); });
   conn.on('error', (err) => mpLog('연결 오류: ' + (err.type || err)));
   setupConn(conn);
- });
+  // 3초 내 안 열리면 재시도(최대 3회) — 호스트 등록 지연 대비
+  setTimeout(() => { if (!opened && joinTries < 3) tryConnect(); else if (!opened) mpLog('연결 실패 · 호스트가 방을 열어둔 상태인지 확인'); }, 3000);
+ }
+ peer.on('open', () => tryConnect());
  peer.on('error', (err) => {
-  if (err.type === 'peer-unavailable') mpLog('방을 찾을 수 없음 (코드 확인)');
+  if (err.type === 'peer-unavailable') mpLog('방을 찾을 수 없음 · 호스트가 먼저 방을 만들어야 함, 코드/대소문자 확인');
   else mpLog('오류: ' + err.type);
  });
 });
