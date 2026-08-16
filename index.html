@@ -236,7 +236,7 @@
  <div id="menu">
   <button id="startBtn">시작하기</button>
   <input id="nickInput" type="text" maxlength="16" placeholder="닉네임" autocomplete="off">
-  <button id="customBtn">🎨 커스텀</button>
+  <button id="customBtn">🎨 커스텀 v2</button>
  </div>
  <p id="overlayHelp">
   <kbd>Tab</kbd> 편집 / 플레이 전환 · <kbd>WASD</kbd> 이동 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프
@@ -1787,6 +1787,11 @@ const velocity = new THREE.Vector3();
 const forward = new THREE.Vector3(), right = new THREE.Vector3();
 const clock = new THREE.Clock();
 
+// 커스텀 캐릭터 3D 화면 상태 변수 (animate()보다 위에 선언해 TDZ ReferenceError 방지)
+let customOpen = false;
+let customSceneInited = false;
+let customScene, customCam, customRenderer, customFig;
+
 function respawn() {
  yawObject.position.copy(respawnPoint);
  vertVel = 0; velocity.set(0,0,0);
@@ -2040,9 +2045,6 @@ window.addEventListener('mouseup', (e) => {
 const customBtn = document.getElementById('customBtn');
 const customPanel = document.getElementById('customPanel');
 const customClose = document.getElementById('customClose');
-let customOpen = false;
-let customSceneInited = false;
-let customScene, customCam, customRenderer, customFig;
 function initCustomScene() {
  if (customSceneInited) return; // 중복 생성 방지
  customSceneInited = true;
