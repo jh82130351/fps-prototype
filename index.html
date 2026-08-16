@@ -293,6 +293,20 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
+window.addEventListener('error', function(ev){
+ var el = document.getElementById('texDbg');
+ if (el) el.textContent = '❌ 에러: ' + (ev.message || ev.error) + ' @' + (ev.lineno || '?');
+});
+window.addEventListener('unhandledrejection', function(ev){
+ var el = document.getElementById('texDbg');
+ if (el) el.textContent = '❌ 비동기에러: ' + (ev.reason && ev.reason.message ? ev.reason.message : ev.reason);
+});
+window.addEventListener('load', function(){
+ var el = document.getElementById('texDbg');
+ if (typeof THREE === 'undefined') { if (el) el.textContent = '❌ THREE 로드 실패 (CDN 차단?)'; return; }
+ if (typeof Peer === 'undefined' && el) el.textContent = '⚠️ PeerJS 로드 실패';
+ if (typeof firebase === 'undefined' && el) el.textContent = '⚠️ Firebase 로드 실패';
+});
 const canvas = document.getElementById('app');
 const overlay = document.getElementById('overlay');
 const hud = document.getElementById('hud');
