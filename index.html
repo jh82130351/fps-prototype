@@ -1673,9 +1673,11 @@ function serialize() {
     size: t.size || 16,
     faces: (() => {
      const o = {};
-     for (const f of DISPLAY_FACES) {
-      const cv = t.canvases[f];
-      if (cv) o[f] = cv.toDataURL('image/png');
+     if (t.canvases) {
+      for (const f of DISPLAY_FACES) {
+       const cv = t.canvases[f];
+       if (cv) o[f] = cv.toDataURL('image/png');
+      }
      }
      return o;
     })()
