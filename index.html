@@ -236,7 +236,7 @@
  <div id="menu">
   <button id="startBtn">시작하기</button>
   <input id="nickInput" type="text" maxlength="16" placeholder="닉네임" autocomplete="off">
-  <button id="customBtn">🎨 커스텀 v2</button>
+  <button id="customBtn">🎨 커스텀</button>
  </div>
  <p id="overlayHelp">
   <kbd>Tab</kbd> 편집 / 플레이 전환 · <kbd>WASD</kbd> 이동 · <kbd>Shift</kbd> 달리기 · <kbd>Space</kbd> 점프
@@ -2084,17 +2084,12 @@ function initCustomScene() {
 }
 if (customBtn) customBtn.addEventListener('click', (e) => {
  e.stopPropagation();
- texDbg('커스텀 클릭됨 · panel=' + (customPanel ? 'ok' : 'null'));
  try {
   customPanel.style.display = 'flex';
   customOpen = true;
   initCustomScene();
-  texDbg('커스텀 패널 열림 성공');
- } catch (err) {
-  texDbg('커스텀 에러: ' + err.message);
- }
+ } catch (err) {}
 });
-if (customBtn) customBtn.addEventListener('pointerdown', () => texDbg('커스텀 pointerdown 감지'));
 if (customClose) customClose.addEventListener('click', (e) => {
  e.stopPropagation();
  customPanel.style.display = 'none';
@@ -2106,16 +2101,6 @@ function renderCustom() {
  if (customFig) customFig.rotation.y += 0.01;
  customRenderer.render(customScene, customCam);
 }
-setTimeout(() => {
- const b = document.getElementById('customBtn');
- if (!b) { texDbg('customBtn 없음'); return; }
- const r = b.getBoundingClientRect();
- const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
- const topEl = document.elementFromPoint(cx, cy);
- texDbg('버튼중심 최상위요소: ' + (topEl ? (topEl.id || topEl.tagName + '.' + topEl.className) : 'null') +
- ' / 버튼크기 ' + Math.round(r.width) + 'x' + Math.round(r.height) +
- ' pos(' + Math.round(cx) + ',' + Math.round(cy) + ')');
-}, 800);
 </script>
 <div id="texDbg" style="position:absolute;right:12px;bottom:12px;z-index:9999;background:rgba(0,0,0,0.8);color:#0f0;font:12px monospace;padding:8px 10px;border-radius:6px;max-width:320px;white-space:pre-wrap;pointer-events:none;">texDbg: 대기</div>
 </body>
