@@ -2384,8 +2384,9 @@ function updateMovers(t) {
 }
 
 // 모바일 복귀 시 화면 멈춤 방지
-canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); }, false); // 복구 허용
-canvas.addEventListener('webglcontextrestored', () => { try { renderer.render(scene, mode === 'play' ? playCam : editCam); } catch(_){} }, false);
+let glLost = false;
+canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); glLost = true; }, false);
+canvas.addEventListener('webglcontextrestored', () => { glLost = false; try { renderer.render(scene, mode === 'play' ? playCam : editCam); } catch(_){} }, false);
 document.addEventListener('visibilitychange', () => {
  if (document.visibilityState === 'visible') {
   clock.getDelta(); // 밀린 시간 flush(첫 프레임 dt 폭주 방지)
@@ -2443,9 +2444,17 @@ function kickLoop() {
  rafId = requestAnimationFrame(animate);
  try { renderer.render(scene, mode === 'play' ? playCam : editCam); } catch(_){}
 }
-window.addEventListener('pageshow', (e) => { kickLoop(); }); // bfcache 복귀 포함
+window.addEventListener('pageshow', (e) => {
+ if (e.persisted || glLost) { location.reload(); return; } // bfcache 복귀·컨텍스트 손실 → 새로고침
+ kickLoop();
+});
 window.addEventListener('focus', () => { kickLoop(); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') kickLoop(); });
+document.addEventListener('visibilitychange', () => {
+ if (document.visibilityState === 'visible') {
+  if (glLost) { location.reload(); return; }
+  kickLoop();
+ }
+});
 
 updateHearts();
 animate();
