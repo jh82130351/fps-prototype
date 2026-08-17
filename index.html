@@ -1072,6 +1072,12 @@ function buildArenaWorld() {
  let tz3 = bz + 8;
  const C3=[0xe74c3c,0x9b59b6,0xe67e22,0xc0392b];
 
+ // 2차 꼭대기 → 3차 시작 전이 다리 (간격 12.6칸 메우기, 모두 도달 가능하게)
+ addPart(bx, topY, bz + 4, 4, 0.5, 4, 0xf1c40f); // 전이1 (Δz4, 같은 높이)
+ addPart(bx, topY + 0.3, bz + 4, 1.8, 0.5, 1.8, 0x00e5ff, 0, 'jump'); // 점프패드(보조)
+ addPart(bx, topY + 1.2, bz + 8, 4, 0.5, 4, 0xf1c40f); // 전이2 (Δz4, Δy1.2)
+ addPart(bx, topY + 2.3, bz + 11, 3, 0.5, 3, 0xf1c40f); // 전이3 (Δz3, Δy1.1) → 3차 첫 발판 바로 앞
+
  // 구간A: 아주 좁은 징검다리(폭 0.9) 긴 간격 8개 — 정밀 점프
  for (let i=0;i<8;i++){
   ty += 2.3; tz3 += 4.6; // 수직2.3·수평4.6(강화점프 한계 근처)
