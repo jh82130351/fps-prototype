@@ -2213,7 +2213,7 @@ function physics(dt) {
  const half = groundSize / 2;
  let groundY = (Math.abs(pos.x) <= half && Math.abs(pos.z) <= half) ? EYE_HEIGHT : -Infinity;
  for (const c of colliders) {
- if (c.type !== 'solid' && c.type !== 'checkpoint' && c.type !== 'jump') continue;
+ if (c.type !== 'solid' && c.type !== 'checkpoint' && c.type !== 'jump' && c.type !== 'point') continue;
  const ca = Math.cos(c.a), sa = Math.sin(c.a);
  const dx = pos.x - c.cx, dz = pos.z - c.cz;
  const lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
