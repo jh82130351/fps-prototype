@@ -2015,8 +2015,11 @@ function enterMultiplayerGame() {
  try { if (!mpBackupWorld) mpBackupWorld = serialize(); } catch(e){ console.error(e); }
  try { buildArenaWorld(); } catch(e){ console.error('arena build 실패', e); }
  mode = 'play';
- yawObject.position.set(0, EYE_HEIGHT + 1.2, 0); // 스폰대 위
- respawnPoint.set(0, EYE_HEIGHT + 1.2, 0);
+ // 저장된 아레나 체크포인트가 있으면 거기서, 없으면 스폰대에서 시작
+ let sp = { x: 0, y: EYE_HEIGHT + 1.2, z: 0 };
+ try { const saved = JSON.parse(localStorage.getItem('fpsArenaCP') || 'null'); if (saved && typeof saved.y === 'number') sp = saved; } catch(e){}
+ yawObject.position.set(sp.x, sp.y, sp.z);
+ respawnPoint.set(sp.x, sp.y, sp.z);
  vertVel = 0; velocity.set(0,0,0);
  health = MAX_HP; updateHearts();
  if (!isTouch) { try { const pr = canvas.requestPointerLock(); if (pr && pr.catch) pr.catch(()=>{}); } catch (e) {} }
@@ -2177,6 +2180,9 @@ function physics(dt) {
  respawnPoint.set(c.cx, c.y1 + EYE_HEIGHT, c.cz);
  if (cpKey !== lastCheckpointKey) { // 새 체크포인트 도달 시에만
  lastCheckpointKey = cpKey;
+ if (mpActive) { // 아레나에서 찍은 체크포인트를 저장(새로고침 후 복원용)
+ try { localStorage.setItem('fpsArenaCP', JSON.stringify({ x: c.cx, y: c.y1 + EYE_HEIGHT, z: c.cz })); } catch(e){}
+ }
  flash('✓ 체크포인트 저장');
  }
  }
