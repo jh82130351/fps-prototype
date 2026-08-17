@@ -970,8 +970,8 @@ function buildArenaWorld() {
  // 정상 완주대
  y+=3; plat(0,y,z+4,6,6,GOLD); addPart(0,y+0.4,z+4,3,0.4,3,0xffffff,0,'checkpoint');
 
- // 바닥 완충 물
- addPart(0,-3,z/2,160,0.5,z+80,0x2e8fd8,0,'water');
+ // 바닥 킬파트(떨어지면 죽음 → 마지막 체크포인트 부활)
+ addPart(0,-3,z/2,200,1,z+120,0x5a1000,0,'lava');
  rebuildColliders();
 }
 
