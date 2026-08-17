@@ -2442,17 +2442,32 @@ if (mpHost) mpHost.addEventListener('click', (e) => { e.stopPropagation(); start
 const mpMain = document.getElementById('mpMain');
 if (mpMain) mpMain.addEventListener('click', (e) => {
  e.stopPropagation();
- if (!fbdb) { mpLog('DB 연결 안 됨'); return; }
- mpLog('메인 서버 확인 중...');
- // 호스트 존재 여부 확인
- fbdb.ref('rooms/' + MAIN_ROOM).get().then(snap => {
-  const room = snap.val();
-  if (room && room.host) {
+ mpLog('메인 서버 접속 중...');
+ // 브로커 기준: 먼저 호스트 시도 → ID가 이미 있으면(누가 호스트 중) 참가로 전환
+ if (peer) { try { peer.destroy(); } catch(_){} peer = null; }
+ mpConns = [];
+ peer = new Peer(MAIN_ROOM, PEER_OPTS);
+ let decided = false;
+ peer.on('open', (id) => {
+  decided = true;
+  isHost = true; mpRole = 'host'; mpActive = true; myRoomCode = MAIN_ROOM;
+  mpLog('✅ 메인 서버 호스트 · 대기 중');
+  if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM).set({ code: MAIN_ROOM, host: id, count: 1, created: Date.now() });
+  enterMultiplayerGame();
+ });
+ peer.on('connection', (conn) => {
+  setupConn(conn);
+  conn.on('open', () => { if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM + '/count').set(mpConns.length + 1); });
+ });
+ peer.on('error', (err) => {
+  if (err.type === 'unavailable-id' && !decided) {
+   decided = true;
+   try { peer.destroy(); } catch(_){}
    joinMain(); // 이미 호스트 있음 → 참가
-  } else {
-   hostMain(); // 아무도 없음 → 내가 호스트
+  } else if (!decided) {
+   mpLog('접속 오류: ' + err.type);
   }
- }).catch(() => hostMain());
+ });
 });
 
 function hostMain() {
