@@ -1155,6 +1155,7 @@ const keys = {};
 // ---------- Mobile touch input ----------
 const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 let touchMove = { x: 0, y: 0 }; // 조이스틱 방향 (-1~1)
+let joyTouchId = null; // 조이스틱을 잡은 손가락 id
 let touchRun = false;
 let touchLookId = null, touchLookLastX = 0, touchLookLastY = 0;
 
@@ -1187,9 +1188,20 @@ function joyReset() {
  joyEl.classList.remove('run');
  joyKnob.style.left = '35px'; joyKnob.style.top = '35px';
 }
-joyEl.addEventListener('touchstart', (e) => { e.preventDefault(); joyUpdate(e.touches[0]); }, { passive: false });
-joyEl.addEventListener('touchmove', (e) => { e.preventDefault(); joyUpdate(e.touches[0]); }, { passive: false });
-joyEl.addEventListener('touchend', (e) => { e.preventDefault(); joyReset(); }, { passive: false });
+joyEl.addEventListener('touchstart', (e) => {
+ e.preventDefault();
+ if (joyTouchId === null) { const t = e.changedTouches[0]; joyTouchId = t.identifier; joyUpdate(t); }
+}, { passive: false });
+window.addEventListener('touchmove', (e) => {
+ if (joyTouchId === null) return;
+ for (const t of e.changedTouches) { if (t.identifier === joyTouchId) { e.preventDefault(); joyUpdate(t); break; } }
+}, { passive: false });
+window.addEventListener('touchend', (e) => {
+ for (const t of e.changedTouches) { if (t.identifier === joyTouchId) { joyTouchId = null; joyReset(); break; } }
+});
+window.addEventListener('touchcancel', (e) => {
+ for (const t of e.changedTouches) { if (t.identifier === joyTouchId) { joyTouchId = null; joyReset(); break; } }
+});
 
 btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); keys['Space'] = true; }, { passive: false });
 btnJump.addEventListener('touchend', (e) => { e.preventDefault(); keys['Space'] = false; }, { passive: false });
