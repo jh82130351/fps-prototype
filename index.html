@@ -404,7 +404,9 @@ grid.position.y = 0.01; scene.add(grid);
 
 // ---------- Parts ----------
 const boxMat = [0xe74c3c, 0xf39c12, 0x3498db, 0x9b59b6, 0x1abc9c];
-const TYPES = ['solid', 'water', 'checkpoint', 'lava', 'jump'];
+const TYPES = ['solid', 'water', 'checkpoint', 'lava', 'jump', 'point'];
+let playerPoints = parseInt(localStorage.getItem('fpsPoints')|| '0', 10) ||0;
+const ARENA_SPAWN = { x: 0, y: EYE_HEIGHT + 1.2, z: 0 }; // 처음 스폰대
 const parts = [];
 let colliders = [];
 let movers = []; // 움직이는/회전하는 파트들
@@ -427,6 +429,10 @@ function applyAppearance(p) {
  } else if (p.type === 'jump') {
  mat.color.setHex(0x00e5ff); mat.transparent = false; mat.opacity = 1;
  mat.emissive.setHex(0x00e5ff); mat.emissiveIntensity = 0.9;
+ mat.side = THREE.FrontSide; mat.depthWrite = true;
+ } else if (p.type === 'point') {
+ mat.color.setHex(0xffcc00); mat.transparent = false; mat.opacity = 1;
+ mat.emissive.setHex(0xffcc00); mat.emissiveIntensity = 0.8;
  mat.side = THREE.FrontSide; mat.depthWrite = true;
  } else {
  mat.color.setHex(p.color); mat.transparent = false; mat.opacity = 1;
@@ -1108,6 +1114,8 @@ function buildArenaWorld() {
 
  // 최종 정상(진짜 완주대) + 체크포인트 — 마지막 발판과 비슷한 높이로 도달 가능하게
  ty+=1.2; addPart(0, ty, tz3+5, 6,1,6, 0xffd700); addPart(0, ty+0.5, tz3+5, 3,0.5,3, 0xffffff,0,'checkpoint');
+ // 포인트 받기 발판 (완주대 위, 밟으면 포인트+1 & 처음 스폰 복귀)
+ addPart(0, ty+0.5, tz3+8, 2.5, 0.5, 2.5, 0xffcc00, 0, 'point');
 
  // 바닥 킬파트(전체 아래) — 떨어지면 죽음 (범위를 3차까지 확장)
  addPart(0, -3, (z+tz3)/2, 300, 1, (tz3) + 220, 0x5a1000, 0, 'lava');
@@ -1795,7 +1803,7 @@ function renderProps() {
  const p = selected, m = p.mesh.position;
  const f = (v) => v.toFixed(2);
  const deg = Math.round(p.rot * 180 / Math.PI);
- const typeNames = { solid:'일반', water:'물', checkpoint:'체크포인트', lava:'용암', jump:'점프패드' };
+ const typeNames = { solid:'일반', water:'물', checkpoint:'체크포인트', lava:'용암', jump:'점프패드', point:'포인트' };
  let opts = '';
  TYPES.forEach(t => { opts += '<option value="'+t+'"'+(p.type===t?' selected':'')+'>'+typeNames[t]+'</option>'; });
  propsBody.innerHTML =
@@ -2223,6 +2231,27 @@ function physics(dt) {
  }
  }
  if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; } else onGround = false;
+ // 포인트 발판: 윗면에 서면 포인트+1, 처음 스폰대로 복귀
+ if (onGround) {
+ for (const c of colliders) {
+ if (c.type !== 'point') continue;
+ const ca=Math.cos(c.a), sa=Math.sin(c.a);
+ const dx=pos.x-c.cx, dz=pos.z-c.cz;
+ const lx=dx*ca+dz*sa, lz=-dx*sa+dz*ca;
+ const top=c.y1+EYE_HEIGHT;
+ if (lx>-(c.hw+R)&&lx<(c.hw+R)&&lz>-(c.hd+R)&&lz<(c.hd+R) && Math.abs(pos.y-top)<0.2) {
+ playerPoints += 1;
+ try { localStorage.setItem('fpsPoints', String(playerPoints)); } catch(e){}
+ flash('🏆 포인트 +1 (총 ' + playerPoints + ')');
+ // 처음 스폰대로 복귀 + 체크포인트도 처음으로 리셋
+ yawObject.position.set(ARENA_SPAWN.x, ARENA_SPAWN.y, ARENA_SPAWN.z);
+ respawnPoint.set(ARENA_SPAWN.x, ARENA_SPAWN.y, ARENA_SPAWN.z);
+ vertVel = 0; velocity.set(0,0,0); lastCheckpointKey = null;
+ try { localStorage.removeItem('fpsArenaCP'); } catch(e){} // 저장된 체크포인트도 초기화(처음부터)
+ break;
+ }
+ }
+ }
  // 아레나에선 초록 그라운드 평면(EYE_HEIGHT 기본 바닥)을 밟으면 죽음
  if (mpActive && onGround && Math.abs(groundY - EYE_HEIGHT) < 0.001
  && Math.abs(pos.x) <= half && Math.abs(pos.z) <= half) {
@@ -2298,7 +2327,7 @@ function physics(dt) {
  inWater = nowInWater;
 
  const p = pos;
- hud.textContent = (playerNick ? playerNick + '\n' : '') +
+ hud.textContent = (playerNick ? playerNick + '\n' : '') + '🏆 ' + playerPoints + '\n' +
   'x:'+p.x.toFixed(1)+' z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
   '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'')+(onCheckpoint?' · ✓체크포인트':'');
 
