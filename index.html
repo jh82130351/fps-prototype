@@ -970,11 +970,52 @@ function buildArenaWorld() {
  z+=5; pad(3,y-4.7,z); // (설명: 필요시 좌표 미세조정)
  cp(0,y,z);
 
- // 정상 완주대
- y+=3; plat(0,y,z+4,6,6,GOLD); addPart(0,y+0.4,z+4,3,0.4,3,0xffffff,0,'checkpoint');
+ // 1차 정상(중간 완주대 + 체크포인트) — 여기서 2차 박스타워로 진입
+ y+=3; plat(0,y,z+4,6,6,GOLD);
+ addPart(0, y+0.9, z+4, 3, 0.5, 3, 0xffffff, 0, 'checkpoint');
 
- // 바닥 킬파트(떨어지면 죽음 → 마지막 체크포인트 부활)
- addPart(0,-3,z/2,200,1,z+120,0x5a1000,0,'lava');
+ // ===== 2차: 박스 타워 (4면 벽 통 안에서 지그재그 상승) =====
+ const bx = 0, bz = z + 22; // 박스 중심(1차 정상에서 조금 앞)
+ const H = 2.2, W = 11; // 벽 두께 참고, 통 반폭
+ const baseY = y; // 통 바닥 높이(1차 정상과 비슷)
+ const floors = 14; // 층 수
+ const step = 2.2; // 층 높이차
+ const topY = baseY + floors * step;
+
+ // 통 바닥
+ addPart(bx, baseY - 0.5, bz, W*2, 1, W*2, 0x2c3e50);
+ addPart(bx, baseY, bz, 4, 0.5, 4, 0xffffff, 0, 'checkpoint'); // 입구 체크포인트
+
+ // 4면 벽 (통) — 위로 길게, 안이 빈 상자
+ const wallH = (floors + 2) * step;
+ const wy = baseY + wallH/2;
+ addPart(bx, wy, bz + W, W*2, wallH, 0.6, 0x34495e); // 앞벽
+ addPart(bx, wy, bz - W, W*2, wallH, 0.6, 0x34495e); // 뒤벽
+ addPart(bx + W, wy, bz, 0.6, wallH, W*2, 0x34495e); // 우벽
+ addPart(bx - W, wy, bz, 0.6, wallH, W*2, 0x34495e); // 좌벽
+
+ // 내부 지그재그 발판 (벽에 붙어 좌우 번갈아 상승)
+ const C2=[0x2ecc71,0xf1c40f,0xe67e22,0xe74c3c,0x9b59b6,0x1abc9c];
+ for (let i = 0; i < floors; i++) {
+ const fy = baseY + (i+1) * step;
+ // 좌우/앞뒤 네 벽을 순환하며 붙이기
+ const side = i % 4;
+ let px = bx, pz = bz, pw = 4, pd = 4;
+ if (side === 0) { px = bx - (W-2.5); pw = 5; pd = 3; } // 좌벽 붙음
+ else if (side === 1) { pz = bz + (W-2.5); pw = 3; pd = 5; } // 앞벽 붙음
+ else if (side === 2) { px = bx + (W-2.5); pw = 5; pd = 3; } // 우벽 붙음
+ else { pz = bz - (W-2.5); pw = 3; pd = 5; } // 뒤벽 붙음
+ addPart(px, fy, pz, pw, 0.5, pd, C2[i % C2.length]);
+ // 중간중간 킬파트(회피) — 4층마다 중앙에 작은 용암
+ if (i > 0 && i % 4 === 0) addPart(bx, fy, bz, 2.5, 0.5, 2.5, 0x5a1000, 0, 'lava');
+ }
+
+ // 통 꼭대기 탈출구 + 최종 완주대
+ addPart(bx, topY, bz, 6, 0.5, 6, 0xffd700); // 꼭대기 발판
+ addPart(bx, topY+0.9, bz, 3, 0.5, 3, 0xffffff, 0, 'checkpoint'); // 최종 완주 체크포인트
+
+ // 바닥 킬파트(1차·2차 전체 아래) — 떨어지면 죽음
+ addPart(0, -3, (z+bz)/2, 240, 1, (z+bz) + 160, 0x5a1000, 0, 'lava');
  rebuildColliders();
 }
 
