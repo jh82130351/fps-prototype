@@ -982,17 +982,22 @@ function buildArenaWorld() {
  const step = 2.2; // 층 높이차
  const topY = baseY + floors * step;
 
+ // 1차 정상(z+7 부근) → 박스 바닥 앞(z+11) 사이를 잇는 다리
+ addPart(bx, baseY, z + 9, 5, 0.5, 6, 0x88c0d0); // 연결 다리
  // 통 바닥
  addPart(bx, baseY - 0.5, bz, W*2, 1, W*2, 0x2c3e50);
- addPart(bx, baseY, bz, 4, 0.5, 4, 0xffffff, 0, 'checkpoint'); // 입구 체크포인트
+ addPart(bx, baseY + 0.3, bz - (W - 3), 4, 0.5, 4, 0xffffff, 0, 'checkpoint'); // 입구(문 안쪽) 체크포인트
 
  // 4면 벽 (통) — 위로 길게, 안이 빈 상자
  const wallH = (floors + 2) * step;
  const wy = baseY + wallH/2;
  addPart(bx, wy, bz + W, W*2, wallH, 0.6, 0x34495e); // 앞벽
- addPart(bx, wy, bz - W, W*2, wallH, 0.6, 0x34495e); // 뒤벽
  addPart(bx + W, wy, bz, 0.6, wallH, W*2, 0x34495e); // 우벽
  addPart(bx - W, wy, bz, 0.6, wallH, W*2, 0x34495e); // 좌벽
+ // 뒤벽(타워 쪽): 아래 4칸을 입구로 뚫고 윗부분만 벽
+ const doorH = 4.5;
+ const upperH = wallH - doorH;
+ addPart(bx, baseY + doorH + upperH/2, bz - W, W*2, upperH, 0.6, 0x34495e); // 문 위 윗벽
 
  // 내부 지그재그 발판 (벽에 붙어 좌우 번갈아 상승)
  const C2=[0x2ecc71,0xf1c40f,0xe67e22,0xe74c3c,0x9b59b6,0x1abc9c];
