@@ -936,7 +936,7 @@ function buildArenaWorld() {
  const pad =(x,y,z)=>addPart(x,y,z,2,0.5,2,0x00e5ff,0,'jump');
  const water=(x,y,z,w,d)=>addPart(x,y,z,w,2,d,0x2e8fd8,0,'water');
  // 체크포인트를 발판 표면 높이에 맞춤(윗면 = 발판 윗면). 부활이 발판 위에서 되게.
- const cp =(x,y,z)=>addPart(x,y,z,2.5,0.5,2.5,0xffffff,0,'checkpoint');
+ const cp =(x,y,z)=>addPart(x,y+0.5,z,2.5,0.5,2.5,0xffffff,0,'checkpoint');
 
  // 스폰대
  addPart(0,0.5,0,10,1,10,0x3d5a80); cp(0,1,0);
@@ -2070,6 +2070,11 @@ function physics(dt) {
  }
  }
  if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; } else onGround = false;
+ // 아레나에선 초록 그라운드 평면(EYE_HEIGHT 기본 바닥)을 밟으면 죽음
+ if (mpActive && onGround && Math.abs(groundY - EYE_HEIGHT) < 0.001
+ && Math.abs(pos.x) <= half && Math.abs(pos.z) <= half) {
+ respawn(); return;
+ }
  // 점프패드: 윗면에 착지하는 순간 크게 튕김
  if (onGround) {
  for (const c of colliders) {
