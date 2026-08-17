@@ -1106,8 +1106,8 @@ function buildArenaWorld() {
  rotKill(-4, cStartY + 2.3*2 + 2.6, tz3 - 9, 11, 2.2, 0);
  rotKill(-4, cStartY + 2.3*4 + 2.6, tz3 - 2, 11, -2.2, 1.5);
 
- // 최종 정상(진짜 완주대) + 체크포인트
- ty+=3; addPart(0, ty, tz3+5, 6,1,6, 0xffd700); addPart(0, ty+0.6, tz3+5, 3,0.5,3, 0xffffff,0,'checkpoint');
+ // 최종 정상(진짜 완주대) + 체크포인트 — 마지막 발판과 비슷한 높이로 도달 가능하게
+ ty+=1.2; addPart(0, ty, tz3+5, 6,1,6, 0xffd700); addPart(0, ty+0.5, tz3+5, 3,0.5,3, 0xffffff,0,'checkpoint');
 
  // 바닥 킬파트(전체 아래) — 떨어지면 죽음 (범위를 3차까지 확장)
  addPart(0, -3, (z+tz3)/2, 300, 1, (tz3) + 220, 0x5a1000, 0, 'lava');
