@@ -2378,7 +2378,7 @@ function updateMovers(t) {
   } else if (mv.kind === 'rotate') {
    const ang = t * mv.speed + mv.phase;
    mv.part.mesh.rotation.y = ang;
-   mv.col.a = ang;
+   mv.col.a = -ang; // 충돌식이 rotation.y와 반대 방향이라 부호 맞춤 (시각=판정 일치)
   }
  }
 }
