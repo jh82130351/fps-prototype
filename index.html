@@ -2393,8 +2393,9 @@ document.addEventListener('visibilitychange', () => {
  }
 });
 
+let rafId = null;
 function animate() {
- requestAnimationFrame(animate);
+ rafId = requestAnimationFrame(animate);
  touchControls.style.display = (isTouch && mode === 'play') ? 'block' : 'none';
  const dt = Math.min(clock.getDelta(), 0.05);
  updateGlow(dt);
@@ -2435,6 +2436,17 @@ function animate() {
  // 커스텀 캐릭터 렌더 (패널이 열려 있을 때만, 정의 전 안전 가드)
  if (typeof customOpen !== 'undefined' && customOpen) renderCustom();
 }
+function kickLoop() {
+ // 밀린 시간 flush + 루프가 멈춰있으면 다시 시작
+ try { clock.getDelta(); } catch(_){}
+ if (rafId !== null) { cancelAnimationFrame(rafId); }
+ rafId = requestAnimationFrame(animate);
+ try { renderer.render(scene, mode === 'play' ? playCam : editCam); } catch(_){}
+}
+window.addEventListener('pageshow', (e) => { kickLoop(); }); // bfcache 복귀 포함
+window.addEventListener('focus', () => { kickLoop(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') kickLoop(); });
+
 updateHearts();
 animate();
 
