@@ -407,6 +407,7 @@ const boxMat = [0xe74c3c, 0xf39c12, 0x3498db, 0x9b59b6, 0x1abc9c];
 const TYPES = ['solid', 'water', 'checkpoint', 'lava', 'jump'];
 const parts = [];
 let colliders = [];
+let movers = []; // 움직이는/회전하는 파트들
 
 function applyAppearance(p) {
  const mats = Array.isArray(p.mesh.material) ? p.mesh.material : [p.mesh.material];
@@ -930,11 +931,24 @@ function buildDefaultWorld() {
 // 멀티 전용 아레나 월드 빌더 (싱글과 완전 분리, 항상 동일한 고정 배치)
 function buildArenaWorld() {
  while (parts.length) removePart(parts[0]);
+ movers = []; // 무버 초기화
  const GREEN=0x2ecc71, YEL=0xf1c40f, ORG=0xe67e22, RED=0xe74c3c, GOLD=0xffd700, ICE=0xd6f5ff;
  const plat=(x,y,z,w,d,col)=>addPart(x,y,z,w,0.5,d,col);
  const kill=(x,y,z,w,d)=>addPart(x,y,z,w,0.5,d,0x5a1000,0,'lava');
  const pad =(x,y,z)=>addPart(x,y,z,2,0.5,2,0x00e5ff,0,'jump');
  const water=(x,y,z,w,d)=>addPart(x,y,z,w,2,d,0x2e8fd8,0,'water');
+ // 움직이는 발판: (a)→(b) 왕복
+ const movePlat = (ax,ay,az, bx,by,bz, w,d, col, speed, phase) => {
+  const p = addPart(ax,ay,az, w,0.5,d, col);
+  movers.push({ kind:'move', part:p, ax,ay,az, bx,by,bz, speed:speed||1, phase:phase||0, col:null });
+  return p;
+ };
+ // 회전 킬파트 바: 중심 pivot에서 회전(길쭉한 용암)
+ const rotKill = (x,y,z, len, speed, phase) => {
+  const p = addPart(x,y,z, len,0.5,1.2, 0x5a1000, 0, 'lava');
+  movers.push({ kind:'rotate', part:p, speed:speed||1, phase:phase||0, col:null });
+  return p;
+ };
  // 체크포인트를 발판 표면 높이에 맞춤(윗면 = 발판 윗면). 부활이 발판 위에서 되게.
  const cp =(x,y,z)=>addPart(x,y+0.5,z,2.5,0.5,2.5,0xffffff,0,'checkpoint');
 
@@ -974,16 +988,16 @@ function buildArenaWorld() {
  y+=3; plat(0,y,z+4,6,6,GOLD);
  addPart(0, y+0.9, z+4, 3, 0.5, 3, 0xffffff, 0, 'checkpoint');
 
- // ===== 2차: 박스 타워 (4면 벽 통 안에서 지그재그 상승) =====
- const bx = 0, bz = z + 22; // 박스 중심(1차 정상에서 조금 앞)
- const H = 2.2, W = 11; // 벽 두께 참고, 통 반폭
- const baseY = y; // 통 바닥 높이(1차 정상과 비슷)
- const floors = 14; // 층 수
- const step = 2.2; // 층 높이차
+ // ===== 2차: 박스 타워 (4면 벽 통, 확대판: W=16, 24층) =====
+ const bx = 0, bz = z + 30; // 박스 중심(1차 정상에서 조금 앞)
+ const W = 16; // 통 반폭
+ const baseY = y; // 통 바닥 높이
+ const floors = 24; // 층 수
+ const step = 2.4; // 층 높이차
  const topY = baseY + floors * step;
 
- // 1차 정상(z+7 부근) → 박스 바닥 앞(z+11) 사이를 잇는 다리
- addPart(bx, baseY, z + 9, 5, 0.5, 6, 0x88c0d0); // 연결 다리
+ // 1차 정상 → 박스 입구 연결 다리
+ addPart(bx, baseY, z + 12, 5, 0.5, 6, 0x88c0d0); // 연결 다리
  // 통 바닥
  addPart(bx, baseY - 0.5, bz, W*2, 1, W*2, 0x2c3e50);
  addPart(bx, baseY + 0.3, bz - (W - 3), 4, 0.5, 4, 0xffffff, 0, 'checkpoint'); // 입구(문 안쪽) 체크포인트
@@ -994,26 +1008,73 @@ function buildArenaWorld() {
  addPart(bx, wy, bz + W, W*2, wallH, 0.6, 0x34495e); // 앞벽
  addPart(bx + W, wy, bz, 0.6, wallH, W*2, 0x34495e); // 우벽
  addPart(bx - W, wy, bz, 0.6, wallH, W*2, 0x34495e); // 좌벽
- // 뒤벽(타워 쪽): 아래 4칸을 입구로 뚫고 윗부분만 벽
+ // 뒤벽(타워 쪽): 아래 문 높이만큼 입구로 뚫고 윗부분만 벽
  const doorH = 4.5;
  const upperH = wallH - doorH;
  addPart(bx, baseY + doorH + upperH/2, bz - W, W*2, upperH, 0.6, 0x34495e); // 문 위 윗벽
 
- // 내부 지그재그 발판 (벽에 붙어 좌우 번갈아 상승)
+ // ===== 내부 기믹 층 (24층, 4벽 순환 + 특수 기믹 섞음) =====
  const C2=[0x2ecc71,0xf1c40f,0xe67e22,0xe74c3c,0x9b59b6,0x1abc9c];
+ const INSET = 2.5; // 벽에서 안쪽 거리
  for (let i = 0; i < floors; i++) {
- const fy = baseY + (i+1) * step;
- // 좌우/앞뒤 네 벽을 순환하며 붙이기
- const side = i % 4;
- let px = bx, pz = bz, pw = 4, pd = 4;
- if (side === 0) { px = bx - (W-2.5); pw = 5; pd = 3; } // 좌벽 붙음
- else if (side === 1) { pz = bz + (W-2.5); pw = 3; pd = 5; } // 앞벽 붙음
- else if (side === 2) { px = bx + (W-2.5); pw = 5; pd = 3; } // 우벽 붙음
- else { pz = bz - (W-2.5); pw = 3; pd = 5; } // 뒤벽 붙음
- addPart(px, fy, pz, pw, 0.5, pd, C2[i % C2.length]);
- // 중간중간 킬파트(회피) — 4층마다 중앙에 작은 용암
- if (i > 0 && i % 4 === 0) addPart(bx, fy, bz, 2.5, 0.5, 2.5, 0x5a1000, 0, 'lava');
+  const fy = baseY + (i+1) * step;
+  const side = i % 4;
+  let px = bx, pz = bz, pw = 4, pd = 4, col = C2[i % C2.length];
+
+  // 특수 기믹 층 판정
+  const g = i % 6; // 0:점프패드, 1:정적, 2:움직이는발판, 3:킬파트, 4:정적, 5:외줄/징검다리 / 물은 특정 층
+
+  if (g === 0) {
+   // 점프패드 층: 한 층 크게 도약 (아래 발판 위에 패드)
+   if (side === 0) { px = bx - (W-INSET); pw = 5; pd = 3; }
+   else if (side === 1) { pz = bz + (W-INSET); pw = 3; pd = 5; }
+   else if (side === 2) { px = bx + (W-INSET); pw = 5; pd = 3; }
+   else { pz = bz - (W-INSET); pw = 3; pd = 5; }
+   addPart(px, fy, pz, pw, 0.5, pd, col);
+   addPart(px, fy + 0.3, pz, 2, 0.5, 2, 0x00e5ff, 0, 'jump'); // 점프패드
+  } else if (g === 2) {
+   // 움직이는 발판 (좌우 왕복)
+   if (side === 0) { movePlat(bx-(W-4), fy, bz, bx-(W-9), fy, bz, 5, 3, 0xf39c12, 1.4, i*0.5); }
+   else if (side === 1) { movePlat(bx, fy, bz+(W-4), bx, fy, bz+(W-9), 3, 5, 0xf39c12, 1.4, i*0.5); }
+   else if (side === 2) { movePlat(bx+(W-4), fy, bz, bx+(W-9), fy, bz, 5, 3, 0xf39c12, 1.4, i*0.5); }
+   else { movePlat(bx, fy, bz-(W-4), bx, fy, bz-(W-9), 3, 5, 0xf39c12, 1.4, i*0.5); }
+  } else if (g === 3) {
+   // 킬파트 층: 벽 발판 + 중간 킬파트
+   if (side === 0) { px = bx - (W-INSET); pw = 5; pd = 3; }
+   else if (side === 1) { pz = bz + (W-INSET); pw = 3; pd = 5; }
+   else if (side === 2) { px = bx + (W-INSET); pw = 5; pd = 3; }
+   else { pz = bz - (W-INSET); pw = 3; pd = 5; }
+   addPart(px, fy, pz, pw, 0.5, pd, col);
+   addPart(bx, fy, bz, 2.5, 0.5, 2.5, 0x5a1000, 0, 'lava'); // 중앙 킬파트
+  } else if (g === 5) {
+   // 좁은 외줄/징검다리: 벽끼리 건너는 가는 다리
+   if (side === 0) { addPart(bx, fy, bz, 1.0, 0.5, 26, 0xe67e22); } // 좌→우 외줄
+   else if (side === 1) { addPart(bx, fy, bz, 26, 0.5, 1.0, 0xe67e22); } // 앞→뒤 외줄
+   else if (side === 2) { for (let k=-9;k<=9;k+=6) addPart(bx + k, fy, bz, 3.5, 3.5, 0.5, 0x1abc9c); } // 징검다리
+   else { for (let k=-9;k<=9;k+=6) addPart(bx, fy, bz + k, 0.5, 3.5, 3.5, 0x1abc9c); } // 징검다리
+  } else {
+   // 정적 지그재그 발판 (4벽 순환)
+   if (side === 0) { px = bx - (W-INSET); pw = 5; pd = 3; }
+   else if (side === 1) { pz = bz + (W-INSET); pw = 3; pd = 5; }
+   else if (side === 2) { px = bx + (W-INSET); pw = 5; pd = 3; }
+   else { pz = bz - (W-INSET); pw = 3; pd = 5; }
+   addPart(px, fy, pz, pw, 0.5, pd, col);
+  }
+
+  // 6층마다 체크포인트 (받침 발판 + 체크포인트)
+  if (i > 0 && i % 6 === 0) {
+   addPart(bx, fy, bz, 3, 0.5, 3, 0x88c0d0);
+   addPart(bx, fy + 0.5, bz, 2.5, 0.5, 2.5, 0xffffff, 0, 'checkpoint');
+  }
  }
+
+ // 물 구간: 중간 층 하나를 물로 채워 수영 상승 (i=10 근처 11층)
+ const wfY = baseY + 11 * step;
+ addPart(bx, wfY - 0.5, bz, 26, 1.5, 26, 0x2e8fd8, 0, 'water'); // 물층
+
+ // 회전 킬파트 바 2개 (중앙에서 도는 용암)
+ rotKill(bx, baseY + 7 * step, bz, 10, 1.2, 0);
+ rotKill(bx, baseY + 18 * step, bz, 10, -1.2, 2);
 
  // 통 꼭대기 탈출구 + 최종 완주대
  addPart(bx, topY, bz, 6, 0.5, 6, 0xffd700); // 꼭대기 발판
@@ -1022,6 +1083,8 @@ function buildArenaWorld() {
  // 바닥 킬파트(1차·2차 전체 아래) — 떨어지면 죽음
  addPart(0, -3, (z+bz)/2, 240, 1, (z+bz) + 160, 0x5a1000, 0, 'lava');
  rebuildColliders();
+ // 무버를 해당 콜라이더에 연결(이후 매 프레임 그 콜라이더를 갱신)
+ for (const mv of movers) { const idx = parts.indexOf(mv.part); if (idx >= 0) mv.col = colliders[idx]; }
 }
 
 // ---------- Cameras ----------
@@ -2243,6 +2306,25 @@ function updateGlow(dt) {
  }
 }
 
+function updateMovers(t) {
+ for (const mv of movers) {
+  if (!mv.col) continue;
+  if (mv.kind === 'move') {
+   const s = (Math.sin(t * mv.speed + mv.phase) + 1) / 2; // 0~1
+   const nx = mv.ax + (mv.bx - mv.ax) * s;
+   const ny = mv.ay + (mv.by - mv.ay) * s;
+   const nz = mv.az + (mv.bz - mv.az) * s;
+   mv.part.mesh.position.set(nx, ny, nz);
+   mv.col.cx = nx; mv.col.cz = nz;
+   mv.col.y0 = ny - mv.part.h/2; mv.col.y1 = ny + mv.part.h/2;
+  } else if (mv.kind === 'rotate') {
+   const ang = t * mv.speed + mv.phase;
+   mv.part.mesh.rotation.y = ang;
+   mv.col.a = ang;
+  }
+ }
+}
+
 function animate() {
  requestAnimationFrame(animate);
  touchControls.style.display = (isTouch && mode === 'play') ? 'block' : 'none';
@@ -2253,6 +2335,7 @@ function animate() {
  if (mode === 'play') {
  gizmo.visible = false;
  scaleGizmo.visible = false;
+ if (movers.length) updateMovers(clock.getElapsedTime());
  physics(dt); renderer.render(scene, playCam); hud.style.display = 'block'; healthEl.style.display = 'block';
  } else {
  if (selected && activeTool === 'move') {
