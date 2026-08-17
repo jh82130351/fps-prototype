@@ -404,7 +404,7 @@ grid.position.y = 0.01; scene.add(grid);
 
 // ---------- Parts ----------
 const boxMat = [0xe74c3c, 0xf39c12, 0x3498db, 0x9b59b6, 0x1abc9c];
-const TYPES = ['solid', 'water', 'checkpoint', 'lava'];
+const TYPES = ['solid', 'water', 'checkpoint', 'lava', 'jump'];
 const parts = [];
 let colliders = [];
 
@@ -422,6 +422,10 @@ function applyAppearance(p) {
  } else if (p.type === 'lava') {
  mat.color.setHex(0x5a1000); mat.transparent = false; mat.opacity = 1;
  mat.emissive.setHex(0xff4400); mat.emissiveIntensity = 1.0;
+ mat.side = THREE.FrontSide; mat.depthWrite = true;
+ } else if (p.type === 'jump') {
+ mat.color.setHex(0x00e5ff); mat.transparent = false; mat.opacity = 1;
+ mat.emissive.setHex(0x00e5ff); mat.emissiveIntensity = 0.9;
  mat.side = THREE.FrontSide; mat.depthWrite = true;
  } else {
  mat.color.setHex(p.color); mat.transparent = false; mat.opacity = 1;
@@ -926,50 +930,48 @@ function buildDefaultWorld() {
 // 멀티 전용 아레나 월드 빌더 (싱글과 완전 분리, 항상 동일한 고정 배치)
 function buildArenaWorld() {
  while (parts.length) removePart(parts[0]);
- const GREEN=0x2ecc71, YEL=0xf1c40f, ORG=0xe67e22, RED=0xe74c3c, GRAY=0xbdc3c7, GOLD=0xffd700;
- const KILL=0xff2200; // 킬파트(용암) 색은 타입으로 자동 표시되지만 참고용
-
- // 헬퍼: 발판/킬파트/체크포인트
+ const GREEN=0x2ecc71, YEL=0xf1c40f, ORG=0xe67e22, RED=0xe74c3c, GOLD=0xffd700, ICE=0xd6f5ff;
  const plat=(x,y,z,w,d,col)=>addPart(x,y,z,w,0.5,d,col);
  const kill=(x,y,z,w,d)=>addPart(x,y,z,w,0.5,d,0x5a1000,0,'lava');
+ const pad =(x,y,z)=>addPart(x,y,z,2,0.5,2,0x00e5ff,0,'jump');
+ const water=(x,y,z,w,d)=>addPart(x,y,z,w,2,d,0x2e8fd8,0,'water');
  const cp =(x,y,z)=>addPart(x,y+0.4,z,2.5,0.4,2.5,0xffffff,0,'checkpoint');
 
  // 스폰대
  addPart(0,0.5,0,10,1,10,0x3d5a80); cp(0,1,0);
-
  let z=8, y=1;
 
- // === 1구간 (초록·쉬움): 평탄한 넓은 길 + 데미지(킬)블럭 회피 ===
- // 긴 바닥길
- addPart(0,y,z+10,6,0.5,26,GREEN);
- // 길 위에 피해야 할 킬파트를 좌우 번갈아 배치(닿으면 죽음)
- kill(-1.5,y+0.3,z+4,2.5,2.5);
- kill(1.5,y+0.3,z+10,2.5,2.5);
- kill(-1.5,y+0.3,z+16,2.5,2.5);
- kill(1.5,y+0.3,z+22,2.5,2.5);
- z=z+24; cp(0,y,z); // 1구간 끝 체크포인트
+ // 1구간(초록·쉬움): 킬파트 회피 길
+ addPart(0,y,z+8,6,0.5,22,GRN);
+ kill(-1.5,y+0.3,z+3,2.5,2.5); kill(1.5,y+0.3,z+9,2.5,2.5); kill(-1.5,y+0.3,z+15,2.5,2.5);
+ z+=20; cp(0,y,z);
 
- // === 2구간 (노랑·보통): 징검다리 점프 + 사이 킬파트 ===
- for(let i=0;i<5;i++){ y+=1.4; z+=5; const x=(i%2?3:-3); plat(x,y,z,2,2,YEL); if(i<4) kill(0,y+0.3,z+2.5,3,1.2); }
+ // 2구간(노랑): 점프패드로 크게 올라 다음 발판
+ z+=5; pad(0,y+0.3,z); // 점프패드
+ y+=5; z+=8; plat(0,y,z,3,3,YEL); // 패드로 도달하는 높은 발판
  cp(0,y,z);
 
- // === 3구간 (주황·어려움): 좁은 외나무 + 중간 킬파트 벽 ===
- y+=1.4; z+=6; addPart(0,y,z+6,1.2,0.5,14,ORG); // 좁은 다리
- kill(0,y+1.2,z+6,1.2,1.2); // 다리 중간 위에 공중 킬(점프로 넘기)
- z+=14; cp(0,y,z);
+ // 3구간(주황): 좁은 외줄 + 징검다리
+ z+=5; addPart(0,y,z+5,1.0,0.5,10,ORG); // 좁은 외줄
+ z+=12;
+ for(let i=0;i<4;i++){ z+=4.5; const x=(i%2?2.5:-2.5); plat(x,y,z,1.6,1.6,ORG); } // 징검다리
+ cp(0,y,z);
 
- // === 4구간 (빨강·매우 어려움): 회오리 나선 + 나선 안쪽 킬파트 ===
- const cxc=0, czc=z+16, R2=7;
- for(let i=0;i<14;i++){ y+=1.2; const a=i*0.7; plat(cxc+Math.cos(a)*R2,y,czc+Math.sin(a)*R2,1.8,1.8,RED); }
- kill(cxc,y-2,czc,4,4); // 나선 중앙 바닥에 큰 킬(떨어지면 죽음)
- cp(cxc,y,czc);
+ // 4구간: 물 점프 — 물에 빠져 떠오른 뒤 다음 발판으로
+ z+=4; water(0,y-1,z+4,8,8); // 물웅덩이(점프로 건너거나 수영)
+ z+=9; y+=1.5; plat(0,y,z,3,3,ICE);
+ cp(0,y,z);
 
- // === 정상 완주대(금색) ===
- y+=1.5; addPart(cxc,y,czc,6,1,6,GOLD); cp(cxc,y,czc);
+ // 5구간(빨강·어려움): 점프패드 연속 + 킬파트 사이
+ z+=5; pad(0,y+0.3,z); y+=5; z+=7; plat(-3,y,z,2,2,RED); kill(0,y+0.3,z,2,2); plat(3,y,z,2,2,RED);
+ z+=5; pad(3,y-4.7,z); // (설명: 필요시 좌표 미세조정)
+ cp(0,y,z);
 
- // 낙하 완충 물(넓게, 낮게) — 킬파트 아닌 곳에서 떨어지면 물로
- addPart(0,-3,czc/2,140,0.5,czc+80,0x2e8fd8,0,'water');
+ // 정상 완주대
+ y+=3; plat(0,y,z+4,6,6,GOLD); addPart(0,y+0.4,z+4,3,0.4,3,0xffffff,0,'checkpoint');
 
+ // 바닥 완충 물
+ addPart(0,-3,z/2,160,0.5,z+80,0x2e8fd8,0,'water');
  rebuildColliders();
 }
 
@@ -1640,7 +1642,7 @@ function renderProps() {
  const p = selected, m = p.mesh.position;
  const f = (v) => v.toFixed(2);
  const deg = Math.round(p.rot * 180 / Math.PI);
- const typeNames = { solid:'일반', water:'물', checkpoint:'체크포인트', lava:'용암' };
+ const typeNames = { solid:'일반', water:'물', checkpoint:'체크포인트', lava:'용암', jump:'점프패드' };
  let opts = '';
  TYPES.forEach(t => { opts += '<option value="'+t+'"'+(p.type===t?' selected':'')+'>'+typeNames[t]+'</option>'; });
  propsBody.innerHTML =
@@ -2047,7 +2049,7 @@ function physics(dt) {
  const half = groundSize / 2;
  let groundY = (Math.abs(pos.x) <= half && Math.abs(pos.z) <= half) ? EYE_HEIGHT : -Infinity;
  for (const c of colliders) {
- if (c.type !== 'solid' && c.type !== 'checkpoint') continue;
+ if (c.type !== 'solid' && c.type !== 'checkpoint' && c.type !== 'jump') continue;
  const ca = Math.cos(c.a), sa = Math.sin(c.a);
  const dx = pos.x - c.cx, dz = pos.z - c.cz;
  const lx = dx*ca + dz*sa, lz = -dx*sa + dz*ca;
@@ -2065,6 +2067,20 @@ function physics(dt) {
  }
  }
  if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; } else onGround = false;
+ // 점프패드: 윗면에 착지하는 순간 크게 튕김
+ if (onGround) {
+ for (const c of colliders) {
+ if (c.type !== 'jump') continue;
+ const ca=Math.cos(c.a), sa=Math.sin(c.a);
+ const dx=pos.x-c.cx, dz=pos.z-c.cz;
+ const lx=dx*ca+dz*sa, lz=-dx*sa+dz*ca;
+ const top=c.y1+EYE_HEIGHT;
+ if (lx>-(c.hw+R)&&lx<(c.hw+R)&&lz>-(c.hd+R)&&lz<(c.hd+R) && Math.abs(pos.y-top)<0.15) {
+  vertVel = JUMP_SPEED * 2.4; // 강하게 튕겨 오름
+  onGround = false;
+ }
+ }
+ }
 
  // 공허 낙하: y가 -140 이하로 내려가면 사망 → 부활
  // 공허: y가 -140 아래면 15틱(0.75초)마다 15 데미지, 0되면 사망→부활
