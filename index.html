@@ -926,48 +926,49 @@ function buildDefaultWorld() {
 // 멀티 전용 아레나 월드 빌더 (싱글과 완전 분리, 항상 동일한 고정 배치)
 function buildArenaWorld() {
  while (parts.length) removePart(parts[0]);
- const C = [0xe74c3c,0xf39c12,0xf1c40f,0x2ecc71,0x1abc9c,0x3498db,0x9b59b6];
- let y = 1; // 현재 높이
- // 시작 스폰대 + 체크포인트
- addPart(0, 0.5, 0, 10, 1, 10, 0x3d5a80);
- addPart(0, 0.5, 0, 3, 1, 3, 0xffffff, 0, 'checkpoint');
+ const GREEN=0x2ecc71, YEL=0xf1c40f, ORG=0xe67e22, RED=0xe74c3c, GRAY=0xbdc3c7, GOLD=0xffd700;
+ const KILL=0xff2200; // 킬파트(용암) 색은 타입으로 자동 표시되지만 참고용
 
- // 구간1: 지그재그 계단 (좌우로 꺾이며 상승) 6개
- for (let i = 0; i < 6; i++) {
- y += 1.6;
- const x = (i % 2 === 0) ? 4 : -4;
- const z = 8 + i * 4;
- addPart(x, y, z, 3, 0.5, 3, C[i % C.length]);
- }
+ // 헬퍼: 발판/킬파트/체크포인트
+ const plat=(x,y,z,w,d,col)=>addPart(x,y,z,w,0.5,d,col);
+ const kill=(x,y,z,w,d)=>addPart(x,y,z,w,0.5,d,0x5a1000,0,'lava');
+ const cp =(x,y,z)=>addPart(x,y+0.4,z,2.5,0.4,2.5,0xffffff,0,'checkpoint');
 
- // 구간2: 징검다리 (작은 발판, 멀리 점프) 5개
- let bz = 8 + 6 * 4;
- for (let i = 0; i < 5; i++) {
- y += 1.0;
- bz += 6; // 간격 넓게
- const x = (i % 2 === 0) ? -3 : 3;
- addPart(x, y, bz, 1.6, 0.5, 1.6, C[(i+2) % C.length]);
- }
+ // 스폰대
+ addPart(0,0.5,0,10,1,10,0x3d5a80); cp(0,1,0);
 
- // 구간3: 외나무다리 (길고 좁은 통로)
- y += 1.2; bz += 8;
- addPart(0, y, bz + 6, 1.2, 0.5, 14, 0xecf0f1); // 좁고 긴 다리
+ let z=8, y=1;
 
- // 구간4: 회오리 나선 (돌면서 상승) 16개
- const cx = 0, czc = bz + 18, R2 = 7;
- for (let i = 0; i < 16; i++) {
- y += 1.1;
- const a = i * 0.7;
- addPart(cx + Math.cos(a) * R2, y, czc + Math.sin(a) * R2, 2.0, 0.5, 2.0, C[i % C.length]);
- }
+ // === 1구간 (초록·쉬움): 평탄한 넓은 길 + 데미지(킬)블럭 회피 ===
+ // 긴 바닥길
+ addPart(0,y,z+10,6,0.5,26,GREEN);
+ // 길 위에 피해야 할 킬파트를 좌우 번갈아 배치(닿으면 죽음)
+ kill(-1.5,y+0.3,z+4,2.5,2.5);
+ kill(1.5,y+0.3,z+10,2.5,2.5);
+ kill(-1.5,y+0.3,z+16,2.5,2.5);
+ kill(1.5,y+0.3,z+22,2.5,2.5);
+ z=z+24; cp(0,y,z); // 1구간 끝 체크포인트
 
- // 정상 완주대 + 체크포인트
- y += 1.5;
- addPart(cx, y, czc, 6, 1, 6, 0xffd700);
- addPart(cx, y + 0.6, czc, 3, 0.4, 3, 0xffffff, 0, 'checkpoint');
+ // === 2구간 (노랑·보통): 징검다리 점프 + 사이 킬파트 ===
+ for(let i=0;i<5;i++){ y+=1.4; z+=5; const x=(i%2?3:-3); plat(x,y,z,2,2,YEL); if(i<4) kill(0,y+0.3,z+2.5,3,1.2); }
+ cp(0,y,z);
 
- // 낙하 완충 물 (넓게, 낮게) — 떨어져도 데미지 없이 재도전
- addPart(0, -2, czc/2, 120, 0.5, czc + 60, 0x2e8fd8, 0, 'water');
+ // === 3구간 (주황·어려움): 좁은 외나무 + 중간 킬파트 벽 ===
+ y+=1.4; z+=6; addPart(0,y,z+6,1.2,0.5,14,ORG); // 좁은 다리
+ kill(0,y+1.2,z+6,1.2,1.2); // 다리 중간 위에 공중 킬(점프로 넘기)
+ z+=14; cp(0,y,z);
+
+ // === 4구간 (빨강·매우 어려움): 회오리 나선 + 나선 안쪽 킬파트 ===
+ const cxc=0, czc=z+16, R2=7;
+ for(let i=0;i<14;i++){ y+=1.2; const a=i*0.7; plat(cxc+Math.cos(a)*R2,y,czc+Math.sin(a)*R2,1.8,1.8,RED); }
+ kill(cxc,y-2,czc,4,4); // 나선 중앙 바닥에 큰 킬(떨어지면 죽음)
+ cp(cxc,y,czc);
+
+ // === 정상 완주대(금색) ===
+ y+=1.5; addPart(cxc,y,czc,6,1,6,GOLD); cp(cxc,y,czc);
+
+ // 낙하 완충 물(넓게, 낮게) — 킬파트 아닌 곳에서 떨어지면 물로
+ addPart(0,-3,czc/2,140,0.5,czc+80,0x2e8fd8,0,'water');
 
  rebuildColliders();
 }
