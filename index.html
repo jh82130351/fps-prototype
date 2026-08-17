@@ -942,7 +942,7 @@ function buildArenaWorld() {
  let z=8, y=1;
 
  // 1구간(초록·쉬움): 킬파트 회피 길
- addPart(0,y,z+8,6,0.5,22,GRN);
+ addPart(0,y,z+8,6,0.5,22,GREEN);
  kill(-1.5,y+0.3,z+3,2.5,2.5); kill(1.5,y+0.3,z+9,2.5,2.5); kill(-1.5,y+0.3,z+15,2.5,2.5);
  z+=20; cp(0,y,z);
 
@@ -1952,17 +1952,17 @@ const PEER_OPTS = {
 
 // 멀티플레이 연결 성공 시 플레이 진입 공통 함수
 function enterMultiplayerGame() {
- if (!mpBackupWorld) mpBackupWorld = serialize(); // 싱글 월드 백업
- buildArenaWorld(); // 멀티 전용 아레나로 전환
+ if (mpPanel) mpPanel.style.display = 'none';
+ if (overlay) overlay.style.display = 'none';
+ started = true;
+ crosshair.style.display = 'block';
+ try { if (!mpBackupWorld) mpBackupWorld = serialize(); } catch(e){ console.error(e); }
+ try { buildArenaWorld(); } catch(e){ console.error('arena build 실패', e); }
  mode = 'play';
  yawObject.position.set(0, EYE_HEIGHT + 1.2, 0); // 스폰대 위
  respawnPoint.set(0, EYE_HEIGHT + 1.2, 0);
  vertVel = 0; velocity.set(0,0,0);
  health = MAX_HP; updateHearts();
- if (mpPanel) mpPanel.style.display = 'none';
- if (overlay) overlay.style.display = 'none';
- started = true;
- crosshair.style.display = 'block';
  if (!isTouch) { try { const pr = canvas.requestPointerLock(); if (pr && pr.catch) pr.catch(()=>{}); } catch (e) {} }
 }
 
