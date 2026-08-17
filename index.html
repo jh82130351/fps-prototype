@@ -406,7 +406,7 @@ grid.position.y = 0.01; scene.add(grid);
 const boxMat = [0xe74c3c, 0xf39c12, 0x3498db, 0x9b59b6, 0x1abc9c];
 const TYPES = ['solid', 'water', 'checkpoint', 'lava', 'jump', 'point'];
 let playerPoints = parseInt(localStorage.getItem('fpsPoints')|| '0', 10) ||0;
-const ARENA_SPAWN = { x: 0, y: EYE_HEIGHT + 1.2, z: 0 }; // 처음 스폰대
+const ARENA_SPAWN = { x: 0, y: 1.7 + 1.2, z: 0 }; // 처음 스폰대 (EYE_HEIGHT=1.7 리터럴로 TDZ 회피)
 const parts = [];
 let colliders = [];
 let movers = []; // 움직이는/회전하는 파트들
