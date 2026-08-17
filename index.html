@@ -935,7 +935,8 @@ function buildArenaWorld() {
  const kill=(x,y,z,w,d)=>addPart(x,y,z,w,0.5,d,0x5a1000,0,'lava');
  const pad =(x,y,z)=>addPart(x,y,z,2,0.5,2,0x00e5ff,0,'jump');
  const water=(x,y,z,w,d)=>addPart(x,y,z,w,2,d,0x2e8fd8,0,'water');
- const cp =(x,y,z)=>addPart(x,y+0.4,z,2.5,0.4,2.5,0xffffff,0,'checkpoint');
+ // 체크포인트를 발판 표면 높이에 맞춤(윗면 = 발판 윗면). 부활이 발판 위에서 되게.
+ const cp =(x,y,z)=>addPart(x,y,z,2.5,0.5,2.5,0xffffff,0,'checkpoint');
 
  // 스폰대
  addPart(0,0.5,0,10,1,10,0x3d5a80); cp(0,1,0);
