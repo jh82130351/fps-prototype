@@ -2383,6 +2383,16 @@ function updateMovers(t) {
  }
 }
 
+// 모바일 복귀 시 화면 멈춤 방지
+canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); }, false); // 복구 허용
+canvas.addEventListener('webglcontextrestored', () => { try { renderer.render(scene, mode === 'play' ? playCam : editCam); } catch(_){} }, false);
+document.addEventListener('visibilitychange', () => {
+ if (document.visibilityState === 'visible') {
+  clock.getDelta(); // 밀린 시간 flush(첫 프레임 dt 폭주 방지)
+  try { renderer.render(scene, mode === 'play' ? playCam : editCam); } catch(_){} // 즉시 한 프레임 그려 깨우기
+ }
+});
+
 function animate() {
  requestAnimationFrame(animate);
  touchControls.style.display = (isTouch && mode === 'play') ? 'block' : 'none';
