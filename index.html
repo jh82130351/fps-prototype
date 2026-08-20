@@ -2196,7 +2196,7 @@ function sendChat(){
  }
  chatInput.focus(); // 전송 후에도 계속 치기 편하게 포커스 유지 (모바일 키보드 유지)
 }
-if(chatBtn) chatBtn.addEventListener('click',(e)=>{ e.stopPropagation(); chatBox.style.display='flex'; chatBtn.style.display='none'; chatInput.focus(); });
+if(chatBtn) chatBtn.addEventListener('click',(e)=>{ e.stopPropagation(); chatBox.style.display='flex'; chatBtn.style.display='none'; });
 if(chatClose) chatClose.addEventListener('click',(e)=>{ e.stopPropagation(); chatBox.style.display='none'; chatBtn.style.display='block'; });
 if(chatSend) chatSend.addEventListener('click',(e)=>{ e.stopPropagation(); sendChat(); });
 if(chatInput) chatInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendChat(); } e.stopPropagation(); });
