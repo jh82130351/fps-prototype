@@ -184,7 +184,7 @@
 
 <!-- 멀티플레이 채팅 UI -->
 <button id="chatBtn" style="position:fixed;left:12px;bottom:12px;z-index:50;width:52px;height:52px;border:none;border-radius:14px;background:#2ecc71;color:#fff;font-size:24px;cursor:pointer;display:none;">💬</button>
-<div id="chatBox" style="position:fixed;left:12px;bottom:160px;z-index:60;width:min(320px,80vw);background:rgba(20,28,36,0.95);border-radius:12px;padding:10px;display:none;flex-direction:column;gap:8px;">
+<div id="chatBox" style="position:fixed;left:12px;bottom:12px;z-index:60;width:min(320px,80vw);background:rgba(20,28,36,0.95);border-radius:12px;padding:10px;display:none;flex-direction:column;gap:8px;">
  <div id="chatLog" style="height:180px;overflow-y:auto;color:#e6edf3;font-size:13px;line-height:1.5;"></div>
  <div style="display:flex;gap:6px;">
  <input id="chatInput" maxlength="120" placeholder="메시지..." style="flex:1;padding:8px;border-radius:8px;border:1px solid #33404d;background:#0d1117;color:#fff;font-size:14px;" />
@@ -2200,6 +2200,11 @@ if(chatBtn) chatBtn.addEventListener('click',(e)=>{ e.stopPropagation(); chatBox
 if(chatClose) chatClose.addEventListener('click',(e)=>{ e.stopPropagation(); chatBox.style.display='none'; chatBtn.style.display='block'; });
 if(chatSend) chatSend.addEventListener('click',(e)=>{ e.stopPropagation(); sendChat(); });
 if(chatInput) chatInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendChat(); } e.stopPropagation(); });
+if (chatInput) {
+ // 입력칸을 탭한 그 순간(사용자 제스처) 직접 focus → 모바일 키보드 확실히 열림
+ chatInput.addEventListener('touchend', (e) => { e.stopPropagation(); chatInput.focus(); });
+ chatInput.addEventListener('click', (e) => { e.stopPropagation(); chatInput.focus(); });
+}
 // 안전장치: 채팅 요소 위 터치가 다른 터치 로직에 가로채이지 않도록 (chatInput은 preventDefault 하지 않음 — 키보드가 떠야 함)
 [chatBox, chatBtn, chatInput, chatSend, chatClose].forEach(el=>{ if(el) el.addEventListener('touchstart', e=>e.stopPropagation()); });
 // ═══ 멀티플레이 채팅 끝 ═══
