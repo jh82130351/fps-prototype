@@ -1328,6 +1328,8 @@ document.addEventListener('touchstart', (e) => {
  for (const t of e.changedTouches) {
   if (t.clientX > window.innerWidth / 2 && touchLookId === null) {
    if (joyEl.contains(t.target) || btnJump.contains(t.target)) continue;
+   if (chatBox && chatBox.contains(t.target)) continue; // 채팅창 위 터치는 시점회전 제외
+   if (chatBtn && chatBtn.contains(t.target)) continue; // 채팅 버튼도 제외
    touchLookId = t.identifier;
    touchLookLastX = t.clientX; touchLookLastY = t.clientY;
   }
@@ -2197,6 +2199,8 @@ if(chatBtn) chatBtn.addEventListener('click',(e)=>{ e.stopPropagation(); chatBox
 if(chatClose) chatClose.addEventListener('click',(e)=>{ e.stopPropagation(); chatBox.style.display='none'; chatBtn.style.display='block'; });
 if(chatSend) chatSend.addEventListener('click',(e)=>{ e.stopPropagation(); sendChat(); });
 if(chatInput) chatInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendChat(); } e.stopPropagation(); });
+// 안전장치: 채팅 요소 위 터치가 다른 터치 로직에 가로채이지 않도록 (chatInput은 preventDefault 하지 않음 — 키보드가 떠야 함)
+[chatBox, chatBtn, chatInput, chatSend, chatClose].forEach(el=>{ if(el) el.addEventListener('touchstart', e=>e.stopPropagation()); });
 // ═══ 멀티플레이 채팅 끝 ═══
 
 function respawn() {
