@@ -2097,15 +2097,26 @@ const PEER_OPTS = {
  config: {
   iceServers: [
    { urls: 'stun:stun.l.google.com:19302' },
+   { urls: 'stun:fpsgame.metered.live:80' },
    {
-    urls: [
-     'turn:global.relay.metered.ca:80',
-     'turn:global.relay.metered.ca:80?transport=tcp',
-     'turn:global.relay.metered.ca:443',
-     'turns:global.relay.metered.ca:443?transport=tcp'
-    ],
-    username: 'e8dd65b92c62d3e2a8f8e6a0',
-    credential: 'uWdWNmkhvyqTEswO'
+    urls: 'turn:fpsgame.metered.live:80',
+    username: 'daefa6e956d03951630e8a09',
+    credential: 'hMv97IbCZ2gpYGTV'
+   },
+   {
+    urls: 'turn:fpsgame.metered.live:80?transport=tcp',
+    username: 'daefa6e956d03951630e8a09',
+    credential: 'hMv97IbCZ2gpYGTV'
+   },
+   {
+    urls: 'turn:fpsgame.metered.live:443',
+    username: 'daefa6e956d03951630e8a09',
+    credential: 'hMv97IbCZ2gpYGTV'
+   },
+   {
+    urls: 'turns:fpsgame.metered.live:443?transport=tcp',
+    username: 'daefa6e956d03951630e8a09',
+    credential: 'hMv97IbCZ2gpYGTV'
    }
   ]
  }
