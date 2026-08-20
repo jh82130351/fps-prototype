@@ -182,6 +182,17 @@
 <div id="hud"></div>
 <div id="mode" class="play">PLAY</div>
 
+<!-- 멀티플레이 채팅 UI -->
+<button id="chatBtn" style="position:fixed;left:12px;bottom:12px;z-index:50;width:52px;height:52px;border:none;border-radius:14px;background:#2ecc71;color:#fff;font-size:24px;cursor:pointer;display:none;">💬</button>
+<div id="chatBox" style="position:fixed;left:12px;bottom:12px;z-index:51;width:min(320px,80vw);background:rgba(20,28,36,0.95);border-radius:12px;padding:10px;display:none;flex-direction:column;gap:8px;">
+ <div id="chatLog" style="height:180px;overflow-y:auto;color:#e6edf3;font-size:13px;line-height:1.5;"></div>
+ <div style="display:flex;gap:6px;">
+ <input id="chatInput" maxlength="120" placeholder="메시지..." style="flex:1;padding:8px;border-radius:8px;border:1px solid #33404d;background:#0d1117;color:#fff;font-size:14px;" />
+ <button id="chatSend" style="background:#2ecc71;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;">전송</button>
+ <button id="chatClose" style="background:#455;color:#fff;border:none;border-radius:8px;padding:8px 10px;cursor:pointer;">✕</button>
+ </div>
+</div>
+
 <!-- 모바일 전용 모드 전환 버튼 (EDIT 모드에서도 표시되도록 touchControls 밖 배치) -->
 <button id="modeToggleButton" class="m" style="display:none;">편집모드</button>
 
@@ -2139,6 +2150,8 @@ function enterMultiplayerGame() {
  vertVel = 0; velocity.set(0,0,0);
  health = MAX_HP; updateHearts();
  if (!isTouch) { try { const pr = canvas.requestPointerLock(); if (pr && pr.catch) pr.catch(()=>{}); } catch (e) {} }
+ // 멀티 접속 중에만 채팅 버튼 표시
+ if(chatBtn) chatBtn.style.display='block';
 }
 
 // 멀티 종료 시 싱글 월드 복원
@@ -2153,7 +2166,38 @@ function leaveMultiplayer() {
  myRoomCode = null;
  // 싱글 월드 복원
  if (mpBackupWorld) { const arr = worldFromJSON(mpBackupWorld); if (arr) { loadFromData(arr); rebuildColliders(); } mpBackupWorld = null; }
+ // 채팅 UI 숨김
+ if(chatBtn) chatBtn.style.display='none';
+ if(chatBox) chatBox.style.display='none';
 }
+
+// ═══ 멀티플레이 채팅 ═══
+const chatBtn=document.getElementById('chatBtn'), chatBox=document.getElementById('chatBox');
+const chatLog=document.getElementById('chatLog'), chatInput=document.getElementById('chatInput');
+const chatSend=document.getElementById('chatSend'), chatClose=document.getElementById('chatClose');
+
+function addChatLine(nick, text, self){
+ if(!chatLog) return;
+ const d=document.createElement('div');
+ d.innerHTML='<b style="color:'+(self?'#7CFC98':'#7dd3fc')+'">'+(nick||'익명')+':</b> '+text.replace(/</g,'&lt;');
+ chatLog.appendChild(d); chatLog.scrollTop=chatLog.scrollHeight;
+ while(chatLog.children.length>50) chatLog.removeChild(chatLog.firstChild);
+}
+function sendChat(){
+ const text=(chatInput.value||'').trim(); if(!text) return;
+ chatInput.value='';
+ addChatLine(playerNick, text, true);
+ const myId=(peer&&peer.id)?peer.id:'me';
+ const packet=JSON.stringify({t:'chat', id:myId, nick:playerNick, text:text});
+ if(mpActive && mpConns.length){
+  mpConns.forEach(c=>{ if(c.open){ try{c.send(packet);}catch(e){} } });
+ }
+}
+if(chatBtn) chatBtn.addEventListener('click',(e)=>{ e.stopPropagation(); chatBox.style.display='flex'; chatBtn.style.display='none'; setTimeout(()=>chatInput.focus(),50); });
+if(chatClose) chatClose.addEventListener('click',(e)=>{ e.stopPropagation(); chatBox.style.display='none'; chatBtn.style.display='block'; });
+if(chatSend) chatSend.addEventListener('click',(e)=>{ e.stopPropagation(); sendChat(); });
+if(chatInput) chatInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendChat(); } e.stopPropagation(); });
+// ═══ 멀티플레이 채팅 끝 ═══
 
 function respawn() {
  yawObject.position.copy(respawnPoint);
@@ -2637,6 +2681,14 @@ function removeRemote(peerId) {
 }
 function handleMpData(fromConnPeer, msg) {
  let d; try { d = JSON.parse(msg); } catch(e){ return; }
+ // 채팅 메시지 처리
+ if (d && d.t === 'chat') {
+  const myId = (peer && peer.id) ? peer.id : 'me';
+  if (d.id !== myId) addChatLine(d.nick, String(d.text||'').slice(0,120), false);
+  // 호스트면 다른 참가자에게 릴레이(자기가 보낸 연결 제외)
+  if (isHost) { mpConns.forEach(c=>{ if(c.open && c.peer!==fromConnPeer){ try{c.send(msg);}catch(e){} } }); }
+  return;
+ }
  if (!d || d.t !== 'pos') return;
  const pid = d.id || fromConnPeer; // 실제 발신 플레이어 id
  const myId = (peer && peer.id) ? peer.id : 'me';
