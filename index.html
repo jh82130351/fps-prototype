@@ -184,7 +184,7 @@
 
 <!-- 멀티플레이 채팅 UI -->
 <button id="chatBtn" style="position:fixed;left:12px;bottom:12px;z-index:50;width:52px;height:52px;border:none;border-radius:14px;background:#2ecc71;color:#fff;font-size:24px;cursor:pointer;display:none;">💬</button>
-<div id="chatBox" style="position:fixed;left:12px;bottom:12px;z-index:51;width:min(320px,80vw);background:rgba(20,28,36,0.95);border-radius:12px;padding:10px;display:none;flex-direction:column;gap:8px;">
+<div id="chatBox" style="position:fixed;left:12px;bottom:160px;z-index:60;width:min(320px,80vw);background:rgba(20,28,36,0.95);border-radius:12px;padding:10px;display:none;flex-direction:column;gap:8px;">
  <div id="chatLog" style="height:180px;overflow-y:auto;color:#e6edf3;font-size:13px;line-height:1.5;"></div>
  <div style="display:flex;gap:6px;">
  <input id="chatInput" maxlength="120" placeholder="메시지..." style="flex:1;padding:8px;border-radius:8px;border:1px solid #33404d;background:#0d1117;color:#fff;font-size:14px;" />
@@ -2196,7 +2196,7 @@ function sendChat(){
  }
  chatInput.focus(); // 전송 후에도 계속 치기 편하게 포커스 유지 (모바일 키보드 유지)
 }
-if(chatBtn) chatBtn.addEventListener('click',(e)=>{ e.stopPropagation(); chatBox.style.display='flex'; chatBtn.style.display='none'; });
+if(chatBtn) chatBtn.addEventListener('click',(e)=>{ e.stopPropagation(); chatBox.style.display='flex'; chatBtn.style.display='none'; if(typeof touchControls!=='undefined'&&touchControls) touchControls.style.display='none'; });
 if(chatClose) chatClose.addEventListener('click',(e)=>{ e.stopPropagation(); chatBox.style.display='none'; chatBtn.style.display='block'; });
 if(chatSend) chatSend.addEventListener('click',(e)=>{ e.stopPropagation(); sendChat(); });
 if(chatInput) chatInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendChat(); } e.stopPropagation(); });
@@ -2457,7 +2457,7 @@ document.addEventListener('visibilitychange', () => {
 let rafId = null;
 function animate() {
  rafId = requestAnimationFrame(animate);
- touchControls.style.display = (isTouch && mode === 'play') ? 'block' : 'none';
+ touchControls.style.display = (isTouch && mode === 'play' && !(chatBox && chatBox.style.display==='flex')) ? 'block' : 'none';
  const dt = Math.min(clock.getDelta(), 0.05);
  updateGlow(dt);
  waterOverlay.style.opacity = (mode === 'play' && inWater) ? '1' : '0';
