@@ -1353,6 +1353,9 @@ document.addEventListener('touchend', (e) => {
  }
 });
 window.addEventListener('keydown', (e) => {
+ // 채팅 입력 중에는 게임 조작 키 처리를 하지 않음(타이핑 우선)
+ const ae = document.activeElement;
+ if (ae && (ae.id === 'chatInput' || ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
  if (e.code === 'Space') e.preventDefault();
  if (e.code === 'Tab') { e.preventDefault(); setMode(mode === 'play' ? 'edit' : 'play'); return; }
  if (mode === 'edit') {
@@ -2203,7 +2206,7 @@ if(chatInput) chatInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e
 if (chatInput) {
  // 입력칸을 탭한 그 순간(사용자 제스처) 직접 focus → 모바일 키보드 확실히 열림
  chatInput.addEventListener('touchend', (e) => { e.stopPropagation(); chatInput.focus(); });
- chatInput.addEventListener('click', (e) => { e.stopPropagation(); chatInput.focus(); });
+ chatInput.addEventListener('click', (e) => { e.stopPropagation(); });
 }
 // 안전장치: 채팅 요소 위 터치가 다른 터치 로직에 가로채이지 않도록 (chatInput은 preventDefault 하지 않음 — 키보드가 떠야 함)
 [chatBox, chatBtn, chatInput, chatSend, chatClose].forEach(el=>{ if(el) el.addEventListener('touchstart', e=>e.stopPropagation()); });
