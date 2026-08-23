@@ -2764,28 +2764,10 @@ if (mpHost) mpHost.addEventListener('click', (e) => { e.stopPropagation(); start
 const mpMain = document.getElementById('mpMain');
 if (mpMain) mpMain.addEventListener('click', (e) => {
  e.stopPropagation();
- mpLog('메인 서버 확인 중...');
+ mpLog('메인 서버 접속 중...');
+ // 브로커 기준: 먼저 호스트 시도 → ID가 이미 있으면(누가 호스트 중) 참가로 전환
  if (peer) { try { peer.destroy(); } catch(_){} peer = null; }
  mpConns = [];
- // Firebase에 호스트 기록이 있으면 참가 우선, 없으면 호스트 시도 (2.5초 내 응답 없으면 호스트 시도)
- if (fbdb) {
-  let settled = false;
-  const go = (fn) => { if (settled) return; settled = true; fn(); };
-  const to = setTimeout(() => go(tryBecomeHost), 2500); // Firebase 지연 대비
-  fbdb.ref('rooms/' + MAIN_ROOM).get().then((snap) => {
-   clearTimeout(to);
-   const room = snap.val();
-   if (room && room.host) { go(() => joinMain(0)); }
-   else { go(tryBecomeHost); }
-  }).catch(() => { clearTimeout(to); go(tryBecomeHost); });
- } else {
-  tryBecomeHost();
- }
-});
-
-function tryBecomeHost() {
- mpLog('메인 서버 호스트 시도...');
- if (peer) { try { peer.destroy(); } catch(_){} peer = null; }
  peer = new Peer(MAIN_ROOM, PEER_OPTS);
  let decided = false;
  peer.on('open', (id) => {
@@ -2800,10 +2782,15 @@ function tryBecomeHost() {
   conn.on('open', () => { if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM + '/count').set(mpConns.length + 1); });
  });
  peer.on('error', (err) => {
-  if (err.type === 'unavailable-id' && !decided) { decided = true; try { peer.destroy(); } catch(_){} joinMain(0); }
-  else if (!decided) { mpLog('접속 오류: ' + err.type); }
+  if (err.type === 'unavailable-id' && !decided) {
+   decided = true;
+   try { peer.destroy(); } catch(_){}
+   joinMain(); // 이미 호스트 있음 → 참가
+  } else if (!decided) {
+   mpLog('접속 오류: ' + err.type);
+  }
  });
-}
+});
 
 function hostMain() {
  mpLog('메인 서버 호스트로 시작...');
@@ -2829,54 +2816,33 @@ function hostMain() {
  window.addEventListener('pagehide', () => { if (mpRole === 'host' && fbdb) fbdb.ref('rooms/' + MAIN_ROOM).remove(); });
 }
 
-function joinMain(tries) {
- tries = tries || 0;
- mpLog('메인 서버 참가 중... (' + (tries + 1) + ')');
+function joinMain(forceRelay) {
+ mpLog(forceRelay ? '메인 서버 참가 중(릴레이)...' : '메인 서버 참가 중...');
  if (peer) { try { peer.destroy(); } catch(_){} }
  mpConns = [];
- peer = new Peer(undefined, PEER_OPTS);
+ // 릴레이 강제 시 iceTransportPolicy:'relay'를 추가한 옵션 사용
+ let opts = PEER_OPTS;
+ if (forceRelay) {
+  opts = { host: PEER_OPTS.host, port: PEER_OPTS.port, secure: PEER_OPTS.secure,
+   config: { iceServers: PEER_OPTS.config.iceServers, iceTransportPolicy: 'relay' } };
+ }
+ peer = new Peer(undefined, opts);
  peer.on('open', () => {
   const conn = peer.connect(MAIN_ROOM, { reliable: true });
   let opened = false;
   conn.on('open', () => { opened = true; mpActive = true; isHost = false; mpRole = 'client'; mpLog('✅ 메인 서버 접속 성공'); enterMultiplayerGame(); });
   conn.on('error', (err) => mpLog('연결 오류: ' + (err.type || err)));
   setupConn(conn);
-  // === ICE 진단: relay 후보 확보 여부 + 연결 상태 ===
-  (function(){
-  const diag=document.getElementById('mpDiag'); if(diag) diag.style.display='block';
-  let relay=0,srflx=0,host=0;
-  const attach=()=>{
-  const pc=conn.peerConnection; if(!pc){ setTimeout(attach,300); return; }
-  pc.addEventListener('icecandidate',(ev)=>{
-  if(ev.candidate&&ev.candidate.candidate){
-  const c=ev.candidate.candidate;
-  if(c.indexOf('typ relay')!==-1)relay++; else if(c.indexOf('typ srflx')!==-1)srflx++; else if(c.indexOf('typ host')!==-1)host++;
-  if(diag) diag.textContent='후보 relay:'+relay+' srflx:'+srflx+' host:'+host;
-  }
-  });
-  pc.addEventListener('iceconnectionstatechange',()=>{
-  if(diag) diag.textContent='ICE:'+pc.iceConnectionState+' (relay '+relay+')';
-  });
-  };
-  attach();
-  })();
+  // 일반 방식이 5초 내 실패하면 → TURN 릴레이 강제로 재시도(1회)
   setTimeout(() => {
    if (opened || mpActive) return;
-   if (tries < 4) { try { peer.destroy(); } catch(_){} joinMain(tries + 1); } // 재시도(전파 대기)
-   else {
-    // 여러 번 시도해도 안 되면 진짜 호스트가 없는 것 → 낡은 기록 정리 후 내가 호스트
-    mpLog('호스트 응답 없음 → 내가 호스트로 전환');
-    if (fbdb) { fbdb.ref('rooms/' + MAIN_ROOM).remove().catch(()=>{}); }
-    tryBecomeHost();
-   }
-  }, 4000);
+   if (!forceRelay) { mpLog('직접 연결 실패 → TURN 릴레이로 재시도'); joinMain(true); }
+   else { mpLog('연결 실패 · 잠시 후 다시 시도해줘'); }
+  }, 5000);
  });
  peer.on('error', (err) => {
-  if (err.type === 'peer-unavailable') {
-   // 호스트를 아직 못 찾음: 전파 지연일 수 있으니 재시도(즉시 호스트 승계 금지)
-   if (tries < 4) { try { peer.destroy(); } catch(_){} setTimeout(() => joinMain(tries + 1), 1200); }
-   else { mpLog('호스트 없음 → 내가 호스트로'); if (fbdb) { fbdb.ref('rooms/' + MAIN_ROOM).remove().catch(()=>{}); } tryBecomeHost(); }
-  } else { mpLog('참가 오류: ' + err.type); }
+  if (err.type === 'peer-unavailable') { mpLog('호스트 없음 → 내가 호스트로'); hostMain(); } // 자동 승계
+  else mpLog('오류: ' + err.type);
  });
 }
 if (mpJoin) mpJoin.addEventListener('click', (e) => {
