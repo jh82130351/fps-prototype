@@ -2831,6 +2831,26 @@ function joinMain(forceRelay) {
   let opened = false;
   conn.on('open', () => { opened = true; mpActive = true; isHost = false; mpRole = 'client'; mpLog('✅ 메인 서버 접속 성공'); enterMultiplayerGame(); });
   conn.on('error', (err) => mpLog('연결 오류: ' + (err.type || err)));
+  // === 진단: ICE 후보(relay 확보 여부)와 연결 상태를 화면에 표시 ===
+  let relayCount = 0, srflxCount = 0, hostCount = 0;
+  const attachDiag = () => {
+  const pc = conn.peerConnection;
+  if (!pc) { setTimeout(attachDiag, 300); return; } // PeerJS가 pc를 붙일 때까지 대기
+  pc.addEventListener('icecandidate', (ev) => {
+  if (ev.candidate && ev.candidate.candidate) {
+  const c = ev.candidate.candidate;
+  if (c.indexOf('typ relay') !== -1) relayCount++;
+  else if (c.indexOf('typ srflx') !== -1) srflxCount++;
+  else if (c.indexOf('typ host') !== -1) hostCount++;
+  mpLog('후보 relay:' + relayCount + ' srflx:' + srflxCount + ' host:' + hostCount);
+  }
+  });
+  pc.addEventListener('iceconnectionstatechange', () => {
+  mpLog('ICE 상태: ' + pc.iceConnectionState + ' (relay ' + relayCount + '개)');
+  });
+  };
+  attachDiag();
+
   setupConn(conn);
   // 일반 방식이 5초 내 실패하면 → TURN 릴레이 강제로 재시도(1회)
   setTimeout(() => {
