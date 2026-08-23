@@ -2814,18 +2814,29 @@ function hostMain() {
  window.addEventListener('pagehide', () => { if (mpRole === 'host' && fbdb) fbdb.ref('rooms/' + MAIN_ROOM).remove(); });
 }
 
-function joinMain() {
- mpLog('메인 서버 참가 중...');
+function joinMain(forceRelay) {
+ mpLog(forceRelay ? '메인 서버 참가 중(릴레이)...' : '메인 서버 참가 중...');
  if (peer) { try { peer.destroy(); } catch(_){} }
  mpConns = [];
- peer = new Peer(undefined, PEER_OPTS);
+ // 릴레이 강제 시 iceTransportPolicy:'relay'를 추가한 옵션 사용
+ let opts = PEER_OPTS;
+ if (forceRelay) {
+  opts = { host: PEER_OPTS.host, port: PEER_OPTS.port, secure: PEER_OPTS.secure,
+   config: { iceServers: PEER_OPTS.config.iceServers, iceTransportPolicy: 'relay' } };
+ }
+ peer = new Peer(undefined, opts);
  peer.on('open', () => {
   const conn = peer.connect(MAIN_ROOM, { reliable: true });
   let opened = false;
   conn.on('open', () => { opened = true; mpActive = true; isHost = false; mpRole = 'client'; mpLog('✅ 메인 서버 접속 성공'); enterMultiplayerGame(); });
   conn.on('error', (err) => mpLog('연결 오류: ' + (err.type || err)));
   setupConn(conn);
-  setTimeout(() => { if (opened || mpActive) return; mpLog('연결 실패 · 폰과 PC를 같은 와이파이로 두고 재시도'); }, 6000);
+  // 일반 방식이 5초 내 실패하면 → TURN 릴레이 강제로 재시도(1회)
+  setTimeout(() => {
+   if (opened || mpActive) return;
+   if (!forceRelay) { mpLog('직접 연결 실패 → TURN 릴레이로 재시도'); joinMain(true); }
+   else { mpLog('연결 실패 · 잠시 후 다시 시도해줘'); }
+  }, 5000);
  });
  peer.on('error', (err) => {
   if (err.type === 'peer-unavailable') { mpLog('호스트 없음 → 내가 호스트로'); hostMain(); } // 자동 승계
