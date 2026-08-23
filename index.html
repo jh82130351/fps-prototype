@@ -2766,13 +2766,17 @@ if (mpMain) mpMain.addEventListener('click', (e) => {
  mpLog('메인 서버 확인 중...');
  if (peer) { try { peer.destroy(); } catch(_){} peer = null; }
  mpConns = [];
- // Firebase에 호스트 기록이 있으면 참가 우선, 없으면 호스트 시도
+ // Firebase에 호스트 기록이 있으면 참가 우선, 없으면 호스트 시도 (2.5초 내 응답 없으면 호스트 시도)
  if (fbdb) {
+  let settled = false;
+  const go = (fn) => { if (settled) return; settled = true; fn(); };
+  const to = setTimeout(() => go(tryBecomeHost), 2500); // Firebase 지연 대비
   fbdb.ref('rooms/' + MAIN_ROOM).get().then((snap) => {
+   clearTimeout(to);
    const room = snap.val();
-   if (room && room.host) { joinMain(0); } // 호스트 있음 → 참가(재시도 포함)
-   else { tryBecomeHost(); } // 없음 → 호스트 시도
-  }).catch(() => tryBecomeHost());
+   if (room && room.host) { go(() => joinMain(0)); }
+   else { go(tryBecomeHost); }
+  }).catch(() => { clearTimeout(to); go(tryBecomeHost); });
  } else {
   tryBecomeHost();
  }
