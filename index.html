@@ -173,6 +173,7 @@
 </style>
 </head>
 <body>
+<div id="mpDiag" style="position:fixed;top:4px;left:50%;transform:translateX(-50%);z-index:99999;background:#000;color:#0f0;font:bold 12px monospace;padding:4px 10px;border-radius:8px;max-width:90vw;text-align:center;display:none;"></div>
 <canvas id="app" tabindex="0"></canvas>
 <div id="crosshair"></div>
 <div id="health"></div>
@@ -2840,6 +2841,25 @@ function joinMain(tries) {
   conn.on('open', () => { opened = true; mpActive = true; isHost = false; mpRole = 'client'; mpLog('✅ 메인 서버 접속 성공'); enterMultiplayerGame(); });
   conn.on('error', (err) => mpLog('연결 오류: ' + (err.type || err)));
   setupConn(conn);
+  // === ICE 진단: relay 후보 확보 여부 + 연결 상태 ===
+  (function(){
+  const diag=document.getElementById('mpDiag'); if(diag) diag.style.display='block';
+  let relay=0,srflx=0,host=0;
+  const attach=()=>{
+  const pc=conn.peerConnection; if(!pc){ setTimeout(attach,300); return; }
+  pc.addEventListener('icecandidate',(ev)=>{
+  if(ev.candidate&&ev.candidate.candidate){
+  const c=ev.candidate.candidate;
+  if(c.indexOf('typ relay')!==-1)relay++; else if(c.indexOf('typ srflx')!==-1)srflx++; else if(c.indexOf('typ host')!==-1)host++;
+  if(diag) diag.textContent='후보 relay:'+relay+' srflx:'+srflx+' host:'+host;
+  }
+  });
+  pc.addEventListener('iceconnectionstatechange',()=>{
+  if(diag) diag.textContent='ICE:'+pc.iceConnectionState+' (relay '+relay+')';
+  });
+  };
+  attach();
+  })();
   setTimeout(() => {
    if (opened || mpActive) return;
    if (tries < 4) { try { peer.destroy(); } catch(_){} joinMain(tries + 1); } // 재시도(전파 대기)
