@@ -184,9 +184,9 @@
 <div id="mode" class="play">PLAY</div>
 
 <!-- 멀티플레이 채팅 UI -->
-<button id="chatBtn" style="position:fixed;left:12px;bottom:12px;z-index:50;width:52px;height:52px;border:none;border-radius:14px;background:#2ecc71;color:#fff;font-size:15px;line-height:1.1;cursor:pointer;display:none;">💬<br>😀</button>
+<button id="chatBtn" style="position:fixed;left:12px;bottom:12px;z-index:50;width:52px;height:52px;border:none;border-radius:14px;background:#2ecc71;color:#fff;font-size:15px;line-height:1.1;cursor:pointer;display:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;">💬<br>😀</button>
 <button id="emoteBtn" style="position:fixed;right:12px;bottom:150px;z-index:50;width:52px;height:52px;border:none;border-radius:14px;background:#9b59b6;color:#fff;font-size:24px;cursor:pointer;display:none;">😀</button>
-<div id="emoteBar" style="position:fixed;right:12px;bottom:150px;z-index:51;background:rgba(20,28,36,0.95);border-radius:12px;padding:8px;display:none;gap:6px;flex-wrap:wrap;max-width:220px;"></div>
+<div id="emoteBar" style="position:fixed;right:12px;bottom:150px;z-index:51;background:rgba(20,28,36,0.95);border-radius:12px;padding:8px;display:none;gap:6px;flex-wrap:wrap;max-width:220px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;"></div>
 <div id="chatBox" style="position:fixed;left:12px;bottom:12px;z-index:60;width:min(320px,80vw);background:rgba(20,28,36,0.95);border-radius:12px;padding:10px;display:none;flex-direction:column;gap:8px;">
  <div id="chatLog" style="height:180px;overflow-y:auto;color:#e6edf3;font-size:13px;line-height:1.5;"></div>
  <div style="display:flex;gap:6px;">
@@ -2229,7 +2229,7 @@ function openEmote(){ buildEmoteBar(); if(emoteBar){ emoteBar.style.display='fle
 function chatPressStart(){ chatLongFired=false; chatPressTimer=setTimeout(()=>{ chatLongFired=true; openEmote(); },400); }
 function chatPressEnd(e){ if(chatPressTimer){ clearTimeout(chatPressTimer); chatPressTimer=null; } if(!chatLongFired){ if(e&&e.preventDefault)e.preventDefault(); openChat(); } }
 if(chatBtn){
- chatBtn.addEventListener('touchstart',(e)=>{ e.stopPropagation(); chatPressStart(); },{passive:false});
+ chatBtn.addEventListener('touchstart',(e)=>{ e.preventDefault(); e.stopPropagation(); chatPressStart(); },{passive:false});
  chatBtn.addEventListener('touchend',(e)=>{ e.stopPropagation(); chatPressEnd(e); });
  chatBtn.addEventListener('mousedown',(e)=>{ e.stopPropagation(); chatPressStart(); });
  chatBtn.addEventListener('mouseup',(e)=>{ e.stopPropagation(); chatPressEnd(e); });
