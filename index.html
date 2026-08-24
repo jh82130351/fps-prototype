@@ -2021,7 +2021,7 @@ function loadFromData(arr) {
 }
 function saveWorld() { try { localStorage.setItem('fpsWorld', serialize()); return true; } catch (e) { return false; } }
 // 페이지 이탈·백그라운드 전환 시 자동 저장 (모바일 대응)
-window.addEventListener('pagehide', () => { if (!mpActive) saveWorld(); if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode).remove(); });
+window.addEventListener('pagehide', () => { if (!mpActive) saveWorld(); if (fbMeRef) { try { fbMeRef.remove(); } catch(e){} } });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { if (!mpActive) saveWorld(); } });
 
 document.getElementById('btnSave').onclick = () => { flash(saveWorld() ? '저장됨' : '저장 불가(미리보기)'); };
@@ -2081,6 +2081,12 @@ let customSceneInited = false;
 let customScene, customCam, customRenderer, customFig;
 
 // 멀티플레이 전역 상태 (모두 상단 선언부에 몰아 선언 - TDZ 방지)
+// ⓛ 내 고유 ID + Firebase 동기화 상태 (P2P 제거, Firebase RDB 위치 동기화로 전환)
+const myPlayerId = 'p_' + Math.random().toString(36).slice(2, 10);
+let fbPlayersRef = null; // players 전체 참조
+let fbMeRef = null; // 내 위치 참조
+let mpSyncOn = false; // Firebase 동기화 중?
+let lastFbSend = 0; // 전송 스로틀용
 let peer = null;
 let mpConns = [];
 let isHost = false;
@@ -2103,8 +2109,8 @@ let fbdb = null;
 try { firebase.initializeApp(firebaseConfig); fbdb = firebase.database(); } catch (e) { console.log('firebase init 실패', e); }
 let myRoomCode = null;
 let mpBackupWorld = null; // 멀티 진입 시 싱글 월드 백업
-const MAIN_ROOM = 'MAIN01'; // 메인 서버 고정 방 코드(PeerJS ID)
-let mpRole = null; // 'host' | 'client' | null
+const MAIN_ROOM = 'MAIN01'; // 메인 서버 고정 방 코드 (유지, 참조 안전)
+let mpRole = null; // 'host' | 'client' | null (유지, 참조 안전)
 
 // 공통 PeerJS 옵션 (호스트/참가 모두 같은 브로커 0.peerjs.com 사용)
 const PEER_OPTS = {
@@ -2163,19 +2169,16 @@ function enterMultiplayerGame() {
 
 // 멀티 종료 시 싱글 월드 복원
 function leaveMultiplayer() {
- if (peer) { try { peer.destroy(); } catch(_){} peer = null; }
- mpConns = []; mpActive = false; isHost = false; mpRole = null;
- // 원격 플레이어 제거
+ mpActive = false; mpSyncOn = false;
+ if (fbPlayersRef) { try { fbPlayersRef.off(); } catch(e){} fbPlayersRef = null; }
+ if (fbMeRef) { try { fbMeRef.remove(); } catch(e){} fbMeRef = null; }
+ if (fbdb) { try { fbdb.ref('chat').off(); } catch(e){} }
  for (const id in remotePlayers) { if (remotePlayers[id].fig) scene.remove(remotePlayers[id].fig); }
  for (const id in remotePlayers) delete remotePlayers[id];
- // 내 방이면 정리
- if (fbdb && myRoomCode) { fbdb.ref('rooms/' + myRoomCode).remove().catch(()=>{}); }
- myRoomCode = null;
+ if (chatBtn) chatBtn.style.display = 'none';
+ if (chatBox) chatBox.style.display = 'none';
  // 싱글 월드 복원
  if (mpBackupWorld) { const arr = worldFromJSON(mpBackupWorld); if (arr) { loadFromData(arr); rebuildColliders(); } mpBackupWorld = null; }
- // 채팅 UI 숨김
- if(chatBtn) chatBtn.style.display='none';
- if(chatBox) chatBox.style.display='none';
 }
 
 // ═══ 멀티플레이 채팅 ═══
@@ -2194,10 +2197,9 @@ function sendChat(){
  const text=(chatInput.value||'').trim(); if(!text) return;
  chatInput.value='';
  addChatLine(playerNick, text, true);
- const myId=(peer&&peer.id)?peer.id:'me';
- const packet=JSON.stringify({t:'chat', id:myId, nick:playerNick, text:text});
- if(mpActive && mpConns.length){
-  mpConns.forEach(c=>{ if(c.open){ try{c.send(packet);}catch(e){} } });
+ // --- Firebase 채팅 전송 ---
+ if (mpSyncOn && fbdb) {
+  fbdb.ref('chat').push({ nick: playerNick, text: text, t: Date.now() });
  }
  chatInput.focus(); // 전송 후에도 계속 치기 편하게 포커스 유지 (모바일 키보드 유지)
 }
@@ -2672,204 +2674,64 @@ const mpStatus = document.getElementById('mpStatus');
 const mpClose = document.getElementById('mpClose');
 function mpBarShow(m){}
 function mpLog(m){ if (mpStatus) mpStatus.textContent = m; }
-if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM + '/count').on('value', s => {
- const n = s.val(); const el = document.getElementById('mpMainInfo');
- if (el) el.textContent = (n ? ('현재 ' + n + '명 접속 중') : '비어있음 (첫 접속 시 호스트가 됩니다)');
-});
-function setupConn(conn) {
- mpConns.push(conn); conn.on('data', (msg) => { if (!conn._got) { conn._got = true; mpBarShow('상대 데이터 수신 시작 ✅'); } handleMpData(conn.peer, msg); });
- conn.on('open', () => { mpLog('상대 접속됨: ' + conn.peer); enterMultiplayerGame();
-  if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode + '/count').set(mpConns.length + 1);
- });
- conn.on('close', () => { removeRemote(conn.peer);
-  if (fbdb && isHost && myRoomCode) fbdb.ref('rooms/' + myRoomCode + '/count').set(mpConns.length + 1);
- });
-}
-function removeRemote(peerId) {
- // conn.peer(또는 d.id)로 직접 저장된 항목 제거
- if (remotePlayers[peerId]) { scene.remove(remotePlayers[peerId].fig); delete remotePlayers[peerId]; }
- // 매칭 보강: 같은 플레이어를 다른 key로 저장했을 수도 있으니 해당 fig 제거 후 삭제
- for (const id in remotePlayers) {
-  if (id === peerId) continue; // 위에서 이미 처리
-  if (remotePlayers[id].connPeer === peerId) { scene.remove(remotePlayers[id].fig); delete remotePlayers[id]; }
- }
-}
-function handleMpData(fromConnPeer, msg) {
- let d; try { d = JSON.parse(msg); } catch(e){ return; }
- // 채팅 메시지 처리
- if (d && d.t === 'chat') {
-  const myId = (peer && peer.id) ? peer.id : 'me';
-  if (d.id !== myId) addChatLine(d.nick, String(d.text||'').slice(0,120), false);
-  // 호스트면 다른 참가자에게 릴레이(자기가 보낸 연결 제외)
-  if (isHost) { mpConns.forEach(c=>{ if(c.open && c.peer!==fromConnPeer){ try{c.send(msg);}catch(e){} } }); }
-  return;
- }
- if (!d || d.t !== 'pos') return;
- const pid = d.id || fromConnPeer; // 실제 발신 플레이어 id
- const myId = (peer && peer.id) ? peer.id : 'me';
- if (pid === myId) return; // 내 데이터는 무시(에코 방지)
- if (!remotePlayers[pid]) {
-  const fig = makeCharacter(); const tag = makeNameTag(d.nick); fig.add(tag); scene.add(fig);
-  remotePlayers[pid] = { fig, nick: d.nick, tag };
- }
- const rp = remotePlayers[pid];
- // 닉네임이 바뀌었으면 이름표 다시 만들기
- if (d.nick && d.nick !== rp.nick) {
-  if (rp.tag) rp.fig.remove(rp.tag);
-  const newTag = makeNameTag(d.nick);
-  rp.fig.add(newTag);
-  rp.tag = newTag; rp.nick = d.nick;
- }
- rp.fig.position.set(d.x, d.y - 1.7, d.z);
- rp.fig.rotation.y = d.ry;
- // 호스트면: 받은 위치를 "보낸 연결"을 제외한 다른 참가자에게 중계
- if (isHost) {
-  mpConns.forEach(c => { if (c.open && c.peer !== fromConnPeer) { try { c.send(msg); } catch(e){} } });
- }
-}
+// P2P rooms 카운트 구독 제거 — Firebase players로 대체됨
 function mpSend() {
- if (mpActive && mpConns.length) {
- const myId = (peer && peer.id) ? peer.id : 'me';
- const s = { t:'pos', id: myId, x:yawObject.position.x, y:yawObject.position.y, z:yawObject.position.z, ry:yawObject.rotation.y, nick:playerNick };
- const str = JSON.stringify(s);
- mpConns.forEach(c => { if (c.open) c.send(str); });
- }
+ if (!mpSyncOn || !fbMeRef) return;
+ const now = performance.now();
+ if (now - lastFbSend < 80) return; // 초당 ~12회 스로틀
+ lastFbSend = now;
+ fbMeRef.set({ x: yawObject.position.x, y: yawObject.position.y, z: yawObject.position.z,
+  ry: yawObject.rotation.y, nick: playerNick, t: Date.now() });
 }
-function startHost(attempt) {
- if (attempt > 5) { mpLog('방 생성 실패(재시도 초과)'); return; }
- if (peer) { try { peer.destroy(); } catch(_){} peer = null; }
- mpConns = [];
- const room = makeRoomCode();
- mpLog('방 생성 중... (' + room + ')');
- peer = new Peer(room, PEER_OPTS);
- peer.on('open', (id) => {
-  isHost = true; mpActive = true; myRoomCode = id;
-  mpLog('✅ 방 열림 · 코드: ' + id + ' (이 코드를 공유)');
-  if (fbdb) fbdb.ref('rooms/' + id).set({ code: id, count: 1, created: Date.now() });
- });
- peer.on('disconnected', () => mpBarShow('브로커 연결 끊김(재연결 시도)'));
- peer.on('close', () => mpBarShow('peer 닫힘'));
- peer.on('connection', (conn) => {
-  if (fbdb && myRoomCode) fbdb.ref('rooms/' + myRoomCode + '/count').set(mpConns.length + 2);
-  setupConn(conn);
- });
- peer.on('error', (err) => {
-  if (err.type === 'unavailable-id') { mpLog('코드 충돌, 재생성...'); startHost(attempt + 1); }
-  else if (err.type === 'network' || err.type === 'server-error') { mpLog('서버 오류, 재시도...'); setTimeout(() => startHost(attempt + 1), 800); }
-  else { mpLog('호스트 오류: ' + err.type); }
- });
-}
-if (mpHost) mpHost.addEventListener('click', (e) => { e.stopPropagation(); startHost(0); });
+// P2P '방 만들기' 제거 — 모두 Firebase 동기화로 전환
+if (mpHost) mpHost.addEventListener('click', (e) => { e.stopPropagation(); if (!fbdb) { mpLog('DB 연결 안 됨'); return; } startFirebaseSync(); });
 
 const mpMain = document.getElementById('mpMain');
 if (mpMain) mpMain.addEventListener('click', (e) => {
  e.stopPropagation();
- mpLog('메인 서버 접속 중...');
- // 브로커 기준: 먼저 호스트 시도 → ID가 이미 있으면(누가 호스트 중) 참가로 전환
- if (peer) { try { peer.destroy(); } catch(_){} peer = null; }
- mpConns = [];
- peer = new Peer(MAIN_ROOM, PEER_OPTS);
- let decided = false;
- peer.on('open', (id) => {
-  decided = true;
-  isHost = true; mpRole = 'host'; mpActive = true; myRoomCode = MAIN_ROOM;
-  mpLog('✅ 메인 서버 호스트 · 대기 중');
-  if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM).set({ code: MAIN_ROOM, host: id, count: 1, created: Date.now() });
-  enterMultiplayerGame();
- });
- peer.on('connection', (conn) => {
-  setupConn(conn);
-  conn.on('open', () => { if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM + '/count').set(mpConns.length + 1); });
- });
- peer.on('error', (err) => {
-  if (err.type === 'unavailable-id' && !decided) {
-   decided = true;
-   try { peer.destroy(); } catch(_){}
-   joinMain(); // 이미 호스트 있음 → 참가
-  } else if (!decided) {
-   mpLog('접속 오류: ' + err.type);
-  }
- });
+ if (!fbdb) { mpLog('DB 연결 안 됨'); return; }
+ startFirebaseSync();
 });
 
-function hostMain() {
- mpLog('메인 서버 호스트로 시작...');
- if (peer) { try { peer.destroy(); } catch(_){} }
- mpConns = [];
- peer = new Peer(MAIN_ROOM, PEER_OPTS); // 고정 코드로 호스트
- peer.on('open', (id) => {
-  isHost = true; mpRole = 'host'; mpActive = true; myRoomCode = MAIN_ROOM;
-  mpLog('✅ 메인 서버 호스트 · 접속 대기 중');
-  if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM).set({ code: MAIN_ROOM, host: id, count: 1, created: Date.now() });
-  enterMultiplayerGame();
+// ═══ Firebase 위치 동기화 시작 (P2P/호스트/턴/NAT 개념 제거) ═══
+function startFirebaseSync() {
+ mpActive = true; mpSyncOn = true;
+ mpLog('✅ 멀티 접속됨 (Firebase 동기화)');
+ fbPlayersRef = fbdb.ref('players');
+ fbMeRef = fbdb.ref('players/' + myPlayerId);
+ // 접속 끊기면 자동으로 내 데이터 삭제
+ try { fbMeRef.onDisconnect().remove(); } catch(e){}
+ // 다른 플레이어 변화 구독
+ fbPlayersRef.on('child_added', onPlayerUpdate);
+ fbPlayersRef.on('child_changed', onPlayerUpdate);
+ fbPlayersRef.on('child_removed', (snap) => {
+  const id = snap.key;
+  if (remotePlayers[id]) { if (remotePlayers[id].fig) scene.remove(remotePlayers[id].fig); delete remotePlayers[id]; }
  });
- peer.on('connection', (conn) => {
-  setupConn(conn);
-  conn.on('open', () => { if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM + '/count').set(mpConns.length + 1); });
-  conn.on('close', () => { if (fbdb) fbdb.ref('rooms/' + MAIN_ROOM + '/count').set(Math.max(1, mpConns.length + 1)); });
+ // 채팅 구독 (최근 메시지)
+ fbdb.ref('chat').limitToLast(1).on('child_added', (snap) => {
+  const c = snap.val(); if (!c) return;
+  if (c.nick === playerNick) return; // 내 메시지 스킵 (로컬 addChatLine으로 이미 표시)
+  if (c.t && Date.now() - c.t < 15000) addChatLine(c.nick, String(c.text||'').slice(0,120), false);
  });
- peer.on('error', (err) => {
-  if (err.type === 'unavailable-id') { mpLog('이미 호스트 있음 → 참가'); joinMain(); } // 경쟁 상황: 남이 먼저 호스트됨
-  else mpLog('호스트 오류: ' + err.type);
- });
- // 호스트 나갈 때 방 정리(다음 사람이 승계하도록)
- window.addEventListener('pagehide', () => { if (mpRole === 'host' && fbdb) fbdb.ref('rooms/' + MAIN_ROOM).remove(); });
+ enterMultiplayerGame();
 }
 
-function joinMain(forceRelay) {
- mpLog(forceRelay ? '메인 서버 참가 중(릴레이)...' : '메인 서버 참가 중...');
- if (peer) { try { peer.destroy(); } catch(_){} }
- mpConns = [];
- // 릴레이 강제 시 iceTransportPolicy:'relay'를 추가한 옵션 사용
- let opts = PEER_OPTS;
- if (forceRelay) {
-  opts = { host: PEER_OPTS.host, port: PEER_OPTS.port, secure: PEER_OPTS.secure,
-   config: { iceServers: PEER_OPTS.config.iceServers, iceTransportPolicy: 'relay' } };
+function onPlayerUpdate(snap) {
+ const id = snap.key; if (id === myPlayerId) return; // 내 것 무시
+ const d = snap.val(); if (!d || typeof d.x !== 'number') return;
+ if (!remotePlayers[id]) {
+  const fig = makeCharacter(); const tag = makeNameTag(d.nick); fig.add(tag); scene.add(fig);
+  remotePlayers[id] = { fig, nick: d.nick, tag };
  }
- peer = new Peer(undefined, opts);
- peer.on('open', () => {
-  const conn = peer.connect(MAIN_ROOM, { reliable: true });
-  let opened = false;
-  conn.on('open', () => { opened = true; mpActive = true; isHost = false; mpRole = 'client'; mpLog('✅ 메인 서버 접속 성공'); enterMultiplayerGame(); });
-  conn.on('error', (err) => mpLog('연결 오류: ' + (err.type || err)));
-  setupConn(conn);
-  // 일반 방식이 5초 내 실패하면 → TURN 릴레이 강제로 재시도(1회)
-  setTimeout(() => {
-   if (opened || mpActive) return;
-   if (!forceRelay) { mpLog('직접 연결 실패 → TURN 릴레이로 재시도'); joinMain(true); }
-   else { mpLog('연결 실패 · 잠시 후 다시 시도해줘'); }
-  }, 5000);
- });
- peer.on('error', (err) => {
-  if (err.type === 'peer-unavailable') { mpLog('호스트 없음 → 내가 호스트로'); hostMain(); } // 자동 승계
-  else mpLog('오류: ' + err.type);
- });
+ const rp = remotePlayers[id];
+ if (d.nick && d.nick !== rp.nick) { if (rp.tag) rp.fig.remove(rp.tag); const nt = makeNameTag(d.nick); rp.fig.add(nt); rp.tag = nt; rp.nick = d.nick; }
+ rp.fig.position.set(d.x, d.y - 1.7, d.z);
+ rp.fig.rotation.y = d.ry;
 }
-if (mpJoin) mpJoin.addEventListener('click', (e) => {
- e.stopPropagation();
- const code = (mpCodeInput && mpCodeInput.value.trim().toUpperCase()) || '';
- if (!code) { mpLog('방 코드를 입력하세요'); return; }
- if (peer) { try { peer.destroy(); } catch(_){} peer = null; mpConns = []; }
- mpLog('서버 연결 중...');
- peer = new Peer(undefined, PEER_OPTS);
- let joinTries = 0;
- function tryConnect() {
-  joinTries++;
-  mpLog('방 ' + code + ' 연결 시도 ' + joinTries + '...');
-  const conn = peer.connect(code, { reliable: true });
-  let opened = false;
-  conn.on('open', () => { opened = true; mpActive = true; isHost = false; mpLog('✅ 연결 성공'); enterMultiplayerGame(); });
-  conn.on('error', (err) => mpLog('연결 오류: ' + (err.type || err)));
-  setupConn(conn);
-  // 3초 내 안 열리면 재시도(최대 3회) — 호스트 등록 지연 대비
-  setTimeout(() => { if (opened || mpActive) return; if (joinTries < 3) tryConnect(); else mpLog('연결 실패 · 호스트가 방을 열어둔 상태인지 확인'); }, 3000);
- }
- peer.on('open', () => tryConnect());
- peer.on('error', (err) => {
-  if (err.type === 'peer-unavailable') mpLog('방을 찾을 수 없음 · 호스트가 먼저 방을 만들어야 함, 코드/대소문자 확인');
-  else mpLog('오류: ' + err.type);
- });
-});
+
+// P2P '참가' 제거 — 모두 Firebase 동기화로 전환
+if (mpJoin) mpJoin.addEventListener('click', (e) => { e.stopPropagation(); if (!fbdb) { mpLog('DB 연결 안 됨'); return; } startFirebaseSync(); });
 if (mpBtn) mpBtn.addEventListener('click', (e) => { e.stopPropagation(); mpPanel.style.display = 'flex'; });
 if (mpClose) mpClose.addEventListener('click', (e) => { e.stopPropagation(); if (mpActive) leaveMultiplayer(); mpPanel.style.display = 'none'; });
 if (mpCodeInput) { ['pointerdown','touchstart','mousedown','click'].forEach(ev => mpCodeInput.addEventListener(ev, (e) => e.stopPropagation())); }
