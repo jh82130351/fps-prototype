@@ -185,6 +185,8 @@
 
 <!-- 멀티플레이 채팅 UI -->
 <button id="chatBtn" style="position:fixed;left:12px;bottom:12px;z-index:50;width:52px;height:52px;border:none;border-radius:14px;background:#2ecc71;color:#fff;font-size:24px;cursor:pointer;display:none;">💬</button>
+<button id="emoteBtn" style="position:fixed;right:12px;bottom:150px;z-index:50;width:52px;height:52px;border:none;border-radius:14px;background:#9b59b6;color:#fff;font-size:24px;cursor:pointer;display:none;">😀</button>
+<div id="emoteBar" style="position:fixed;right:12px;bottom:150px;z-index:51;background:rgba(20,28,36,0.95);border-radius:12px;padding:8px;display:none;gap:6px;flex-wrap:wrap;max-width:220px;"></div>
 <div id="chatBox" style="position:fixed;left:12px;bottom:12px;z-index:60;width:min(320px,80vw);background:rgba(20,28,36,0.95);border-radius:12px;padding:10px;display:none;flex-direction:column;gap:8px;">
  <div id="chatLog" style="height:180px;overflow-y:auto;color:#e6edf3;font-size:13px;line-height:1.5;"></div>
  <div style="display:flex;gap:6px;">
@@ -2181,6 +2183,7 @@ function enterMultiplayerGame() {
  if (!isTouch) { try { const pr = canvas.requestPointerLock(); if (pr && pr.catch) pr.catch(()=>{}); } catch (e) {} }
  // 멀티 접속 중에만 채팅 버튼 표시
  if(chatBtn) chatBtn.style.display='block';
+ if(emoteBtn) emoteBtn.style.display='block';
 }
 
 // 멀티 종료 시 싱글 월드 복원
@@ -2193,6 +2196,7 @@ function leaveMultiplayer() {
  for (const id in remotePlayers) delete remotePlayers[id];
  if (chatBtn) chatBtn.style.display = 'none';
  if (chatBox) chatBox.style.display = 'none';
+ if(emoteBtn) emoteBtn.style.display='none'; if(emoteBar) emoteBar.style.display='none';
  // 싱글 월드 복원
  if (mpBackupWorld) { const arr = worldFromJSON(mpBackupWorld); if (arr) { loadFromData(arr); rebuildColliders(); } mpBackupWorld = null; }
 }
@@ -2857,7 +2861,31 @@ function onPlayerUpdate(snap) {
  rp.tx = d.x; rp.ty = d.y - 1.7; rp.tz = d.z; rp.tr = d.ry;
  // 처음 생성 직후엔 목표로 바로 스냅(멀리서 날아오는 것 방지)
  if (rp.fresh) { rp.fig.position.set(rp.tx, rp.ty, rp.tz); rp.fig.rotation.y = rp.tr; rp.fresh = false; }
+ if (d.face !== undefined && d.face !== rp.face) {
+  rp.face = d.face;
+  // 머리 메시(그룹의 첫 자식이 head) 재질 교체
+  const head = rp.fig.children.find(ch => ch.geometry && ch.geometry.parameters && ch.geometry.parameters.width===0.8 && ch.geometry.parameters.height===0.8);
+  if (head) head.material = headMaterials(d.face, d.skin!==undefined?d.skin:0xe8b88a);
+ }
 }
+
+const emoteBtn = document.getElementById('emoteBtn');
+const emoteBar = document.getElementById('emoteBar');
+function buildEmoteBar() {
+ if (!emoteBar) return; emoteBar.innerHTML='';
+ for (let i=0;i<FACE_COUNT;i++){
+  const c=document.createElement('canvas'); c.width=44;c.height=44;
+  c.style.cssText='border-radius:8px;cursor:pointer;border:2px solid '+(myFace===i?'#fff':'#0006');
+  const tex=drawFaceCanvas(i, myColors.skin);
+  c.getContext('2d').drawImage(tex.image,0,0,44,44);
+  c.onclick=(e)=>{ e.stopPropagation(); myFace=i; try{localStorage.setItem('fpsFace',String(i));}catch(_){}
+  emoteBar.style.display='none'; emoteBtn.style.display='block'; };
+  emoteBar.appendChild(c);
+ }
+}
+if (emoteBtn) emoteBtn.addEventListener('click',(e)=>{ e.stopPropagation(); buildEmoteBar(); emoteBar.style.display='flex'; emoteBtn.style.display='none'; });
+// 표정바 바깥/다시 버튼으로 닫기: 표정 고르면 자동 닫힘(위). 다시 열려면 버튼.
+if (emoteBar) emoteBar.addEventListener('click',(e)=>e.stopPropagation());
 
 // P2P '참가' 제거 — 모두 Firebase 동기화로 전환
 if (mpJoin) mpJoin.addEventListener('click', (e) => { e.stopPropagation(); if (!fbdb) { mpLog('DB 연결 안 됨'); return; } startFirebaseSync(); });
