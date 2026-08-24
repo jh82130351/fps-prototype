@@ -2087,6 +2087,7 @@ let fbPlayersRef = null; // players 전체 참조
 let fbMeRef = null; // 내 위치 참조
 let mpSyncOn = false; // Firebase 동기화 중?
 let lastFbSend = 0; // 전송 스로틀용
+let mpPlayerCount = 0; // 현재 접속 인원(나 포함)
 let peer = null;
 let mpConns = [];
 let isHost = false;
@@ -2399,7 +2400,7 @@ function physics(dt) {
  inWater = nowInWater;
 
  const p = pos;
- hud.textContent = (playerNick ? playerNick + '\n' : '') + '🏆 ' + playerPoints + '\n' +
+ hud.textContent = (playerNick ? playerNick + '\n' : '') + '🏆 ' + playerPoints + (mpActive ? ' 👥 ' + mpPlayerCount : '') + '\n' +
   'x:'+p.x.toFixed(1)+' z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
   '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'')+(onCheckpoint?' · ✓체크포인트':'');
 
@@ -2674,6 +2675,14 @@ const mpStatus = document.getElementById('mpStatus');
 const mpClose = document.getElementById('mpClose');
 function mpBarShow(m){}
 function mpLog(m){ if (mpStatus) mpStatus.textContent = m; }
+// 앱 시작 시: 메인 서버 현재 인원 미리 표시 (접속 전에도 패널에 보이게)
+if (fbdb) {
+ fbdb.ref('players').on('value', (snap) => {
+  const n = snap.numChildren();
+  const el = document.getElementById('mpMainInfo');
+  if (el) el.textContent = n > 0 ? ('현재 ' + n + '명 접속 중') : '비어있음';
+ });
+}
 // P2P rooms 카운트 구독 제거 — Firebase players로 대체됨
 function mpSend() {
  if (!mpSyncOn || !fbMeRef) return;
@@ -2704,6 +2713,12 @@ function startFirebaseSync() {
  // 다른 플레이어 변화 구독
  fbPlayersRef.on('child_added', onPlayerUpdate);
  fbPlayersRef.on('child_changed', onPlayerUpdate);
+ // 접속 인원 실시간 표시
+ fbPlayersRef.on('value', (snap) => {
+  mpPlayerCount = snap.numChildren();
+  const el = document.getElementById('mpMainInfo');
+  if (el) el.textContent = '현재 ' + mpPlayerCount + '명 접속 중';
+ });
  fbPlayersRef.on('child_removed', (snap) => {
   const id = snap.key;
   if (remotePlayers[id]) { if (remotePlayers[id].fig) scene.remove(remotePlayers[id].fig); delete remotePlayers[id]; }
