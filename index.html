@@ -2456,6 +2456,25 @@ function updateMovers(t) {
  }
 }
 
+function lerpAngle(a, b, t) {
+ let diff = b - a;
+ while (diff > Math.PI) diff -= Math.PI * 2;
+ while (diff < -Math.PI) diff += Math.PI * 2;
+ return a + diff * t;
+}
+function updateRemotePlayers(dt) {
+ const k = Math.min(1, dt * 12); // 따라가는 속도(클수록 빠르게 스냅)
+ for (const id in remotePlayers) {
+  const rp = remotePlayers[id];
+  if (rp.tx === undefined) continue;
+  const p = rp.fig.position;
+  p.x += (rp.tx - p.x) * k;
+  p.y += (rp.ty - p.y) * k;
+  p.z += (rp.tz - p.z) * k;
+  rp.fig.rotation.y = lerpAngle(rp.fig.rotation.y, rp.tr, k);
+ }
+}
+
 // 모바일 복귀 시 화면 멈춤 방지
 let glLost = false;
 canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); glLost = true; }, false);
@@ -2479,6 +2498,7 @@ function animate() {
  gizmo.visible = false;
  scaleGizmo.visible = false;
  if (movers.length) updateMovers(clock.getElapsedTime());
+ updateRemotePlayers(dt);
  physics(dt); renderer.render(scene, playCam); hud.style.display = 'block'; healthEl.style.display = 'block';
  } else {
  if (selected && activeTool === 'move') {
@@ -2737,12 +2757,14 @@ function onPlayerUpdate(snap) {
  const d = snap.val(); if (!d || typeof d.x !== 'number') return;
  if (!remotePlayers[id]) {
   const fig = makeCharacter(); const tag = makeNameTag(d.nick); fig.add(tag); scene.add(fig);
-  remotePlayers[id] = { fig, nick: d.nick, tag };
+  remotePlayers[id] = { fig, nick: d.nick, tag, fresh: true, tx: d.x, ty: d.y - 1.7, tz: d.z, tr: d.ry };
  }
  const rp = remotePlayers[id];
  if (d.nick && d.nick !== rp.nick) { if (rp.tag) rp.fig.remove(rp.tag); const nt = makeNameTag(d.nick); rp.fig.add(nt); rp.tag = nt; rp.nick = d.nick; }
- rp.fig.position.set(d.x, d.y - 1.7, d.z);
- rp.fig.rotation.y = d.ry;
+ // 목표 위치/회전 저장 (매 프레임 보간해서 이동)
+ rp.tx = d.x; rp.ty = d.y - 1.7; rp.tz = d.z; rp.tr = d.ry;
+ // 처음 생성 직후엔 목표로 바로 스냅(멀리서 날아오는 것 방지)
+ if (rp.fresh) { rp.fig.position.set(rp.tx, rp.ty, rp.tz); rp.fig.rotation.y = rp.tr; rp.fresh = false; }
 }
 
 // P2P '참가' 제거 — 모두 Firebase 동기화로 전환
