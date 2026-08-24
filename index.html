@@ -279,6 +279,14 @@
 <div id="customPanel" style="display:none;">
  <h2 style="color:#fff;margin-bottom:8px;">커스텀</h2>
  <canvas id="customCanvas"></canvas>
+ <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:12px;">
+  <div style="color:#fff;font-size:13px;">피부색</div>
+  <div id="palSkin" class="pal" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:280px;"></div>
+  <div style="color:#fff;font-size:13px;">상의색</div>
+  <div id="palShirt" class="pal" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:280px;"></div>
+  <div style="color:#fff;font-size:13px;">바지색</div>
+  <div id="palPants" class="pal" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:280px;"></div>
+ </div>
  <button id="customClose">닫기</button>
 </div>
 
@@ -2079,6 +2087,9 @@ const clock = new THREE.Clock();
 let customOpen = false;
 let customSceneInited = false;
 let customScene, customCam, customRenderer, customFig;
+let customParts = null; // 커스텀 미리보기 부위 메시 (head/body/arms/legs)
+let myColors = { skin: 0xe8b88a, shirt: 0x3498db, pants: 0x2c3e50 };
+try { const s = JSON.parse(localStorage.getItem('fpsColors') || 'null'); if (s && s.skin !== undefined) myColors = s; } catch(e){}
 
 // 멀티플레이 전역 상태 (모두 상단 선언부에 몰아 선언 - TDZ 방지)
 // ⓛ 내 고유 ID + Firebase 동기화 상태 (P2P 제거, Firebase RDB 위치 동기화로 전환)
@@ -2618,7 +2629,7 @@ function initCustomScene() {
  dl.position.set(3, 6, 4);
  customScene.add(dl);
  customFig = new THREE.Group();
- const skin = 0xe8b88a, shirt = 0x3498db, pants = 0x2c3e50;
+ const skin = myColors.skin, shirt = myColors.shirt, pants = myColors.pants;
  // 머리
  const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), new THREE.MeshStandardMaterial({ color: skin }));
  head.position.y = 2.1; customFig.add(head);
@@ -2637,6 +2648,7 @@ function initCustomScene() {
  leftLeg.position.set(-0.25, 0.35, 0); customFig.add(leftLeg);
  const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.1, 0.35), legMat);
  rightLeg.position.set(0.25, 0.35, 0); customFig.add(rightLeg);
+ customParts = { head, body, arms: armMat, legs: legMat };
  customScene.add(customFig);
 }
 if (customBtn) customBtn.addEventListener('click', (e) => {
@@ -2645,6 +2657,10 @@ if (customBtn) customBtn.addEventListener('click', (e) => {
   customPanel.style.display = 'flex';
   customOpen = true;
   initCustomScene();
+  buildPalette('palSkin', SKIN_COLORS, 'skin');
+  buildPalette('palShirt', CLOTH_COLORS, 'shirt');
+  buildPalette('palPants', CLOTH_COLORS, 'pants');
+  applyCustomColors();
  } catch (err) {}
 });
 if (customClose) customClose.addEventListener('click', (e) => {
@@ -2653,6 +2669,30 @@ if (customClose) customClose.addEventListener('click', (e) => {
  customOpen = false;
 });
 // 커스텀 렌더: 메인 animate 루프 내부에서 호출 (패널이 열려 있을 때만)
+const SKIN_COLORS = [0xe8b88a,0xf1c27d,0xffdbac,0xc68642,0x8d5524,0x5c3a21,0xffe0bd,0xd8a86b];
+const CLOTH_COLORS = [0x3498db,0xe74c3c,0x2ecc71,0xf1c40f,0x9b59b6,0xe67e22,0x1abc9c,0xffffff,0x2c3e50,0x111111,0xff69b4,0x00e5ff];
+function buildPalette(elId, colors, key) {
+ const el = document.getElementById(elId); if (!el) return;
+ el.innerHTML = '';
+ colors.forEach((c) => {
+  const b = document.createElement('div');
+  b.style.cssText = 'width:28px;height:28px;border-radius:6px;cursor:pointer;border:2px solid ' + (myColors[key]===c?'#fff':'#0006') + ';background:#' + c.toString(16).padStart(6,'0');
+  b.onclick = () => {
+   myColors[key] = c;
+   try { localStorage.setItem('fpsColors', JSON.stringify(myColors)); } catch(e){}
+   applyCustomColors();
+   buildPalette(elId, colors, key); // 선택 테두리 갱신
+  };
+  el.appendChild(b);
+ });
+}
+function applyCustomColors() {
+ if (!customParts) return;
+ customParts.head.material.color.setHex(myColors.skin);
+ customParts.arms.color.setHex(myColors.skin);
+ customParts.body.material.color.setHex(myColors.shirt);
+ customParts.legs.color.setHex(myColors.pants);
+}
 function renderCustom() {
  if (!customOpen || !customSceneInited) return;
  if (customFig) customFig.rotation.y += 0.01;
@@ -2666,9 +2706,10 @@ function makeRoomCode() {
  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
  return s;
 }
-function makeCharacter() {
+function makeCharacter(colors) {
  const g = new THREE.Group();
- const skin=0xe8b88a, shirt=0x3498db, pants=0x2c3e50;
+ const c = colors || {};
+ const skin=c.skin!==undefined?c.skin:0xe8b88a, shirt=c.shirt!==undefined?c.shirt:0x3498db, pants=c.pants!==undefined?c.pants:0x2c3e50;
  const add=(w,h,d,c,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:c}));m.position.set(x,y,z);g.add(m);};
  add(0.8,0.8,0.8,skin,0,2.1,0); add(1.0,1.2,0.5,shirt,0,1.2,0);
  add(0.3,1.1,0.3,skin,-0.65,1.2,0); add(0.3,1.1,0.3,skin,0.65,1.2,0);
@@ -2710,7 +2751,7 @@ function mpSend() {
  if (now - lastFbSend < 80) return; // 초당 ~12회 스로틀
  lastFbSend = now;
  fbMeRef.set({ x: yawObject.position.x, y: yawObject.position.y, z: yawObject.position.z,
-  ry: yawObject.rotation.y, nick: playerNick, t: Date.now() });
+  ry: yawObject.rotation.y, nick: playerNick, skin: myColors.skin, shirt: myColors.shirt, pants: myColors.pants, t: Date.now() });
 }
 // P2P '방 만들기' 제거 — 모두 Firebase 동기화로 전환
 if (mpHost) mpHost.addEventListener('click', (e) => { e.stopPropagation(); if (!fbdb) { mpLog('DB 연결 안 됨'); return; } startFirebaseSync(); });
@@ -2756,7 +2797,7 @@ function onPlayerUpdate(snap) {
  const id = snap.key; if (id === myPlayerId) return; // 내 것 무시
  const d = snap.val(); if (!d || typeof d.x !== 'number') return;
  if (!remotePlayers[id]) {
-  const fig = makeCharacter(); const tag = makeNameTag(d.nick); fig.add(tag); scene.add(fig);
+  const fig = makeCharacter({skin:d.skin, shirt:d.shirt, pants:d.pants}); const tag = makeNameTag(d.nick); fig.add(tag); scene.add(fig);
   remotePlayers[id] = { fig, nick: d.nick, tag, fresh: true, tx: d.x, ty: d.y - 1.7, tz: d.z, tr: d.ry };
  }
  const rp = remotePlayers[id];
