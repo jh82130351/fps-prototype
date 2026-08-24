@@ -2404,8 +2404,8 @@ function physics(dt) {
   'x:'+p.x.toFixed(1)+' z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
   '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'')+(onCheckpoint?' · ✓체크포인트':'');
 
- // 멀티플레이 위치 전송 (~12회/초)
- if (mpActive && mpConns.length) {
+ // 멀티플레이 위치 전송 (Firebase 동기화 중이면)
+ if (mpActive && mpSyncOn) {
   mpSendT += dt;
   if (mpSendT > 0.08) {
    mpSendT = 0;
