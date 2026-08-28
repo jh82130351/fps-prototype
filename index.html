@@ -1012,6 +1012,35 @@ function buildArenaWorld() {
  addPart(100, 0.05, 0, 40, 0.3, 40, 0x4a7c3a); // 사냥터 풀밭
  addPart(100, 2, 0, 6, 4, 0.5, 0x8d6e4a); // 사냥터 표지판 기둥
 
+ // ===== 마을 장식 =====
+ const TRUNK=0x6b4423, LEAF=0x2e7d32, LAMP=0x2c3e50, LIGHT=0xfff3b0, BENCH=0x8d6e4a, FLOWER1=0xe74c3c, FLOWER2=0xf1c40f, FLOWER3=0xff69b4;
+ // 나무: 기둥 + 잎 뭉치
+ const tree=(x,z)=>{ addPart(x,1.5,z,0.8,3,0.8,TRUNK); addPart(x,3.6,z,2.6,2.2,2.6,LEAF); addPart(x,4.9,z,1.8,1.4,1.8,LEAF); };
+ // 가로등: 기둥 + 불빛
+ const lamp=(x,z)=>{ addPart(x,1.8,z,0.3,3.6,0.3,LAMP); addPart(x,3.7,z,0.6,0.6,0.6,LIGHT); };
+ // 벤치
+ const bench=(x,z,rot)=>{ addPart(x,0.6,z,3,0.3,1,BENCH,rot||0); addPart(x,1.1,z-0.4,3,0.8,0.2,BENCH,rot||0); };
+ // 화분/꽃밭 (작은 색 블록)
+ const flower=(x,z,c)=>{ addPart(x,0.35,z,0.9,0.5,0.9,0x5d4037); addPart(x,0.75,z,0.6,0.3,0.6,c); };
+
+ // 광장 둘레 나무들
+ tree(-16,6); tree(16,6); tree(-16,-2); tree(16,-2); tree(-30,4); tree(30,4);
+ // 가로등(광장 네 귀퉁이 + 길가)
+ lamp(-14,-6); lamp(14,-6); lamp(-14,10); lamp(14,10);
+ lamp(48,6); lamp(64,-6); lamp(84,6); // 사냥터 가는 길가
+ // 벤치(광장)
+ bench(-6,8); bench(6,8);
+ // 꽃밭(광장 가장자리)
+ flower(-10,4,FLOWER1); flower(-8,4,FLOWER2); flower(-6,4,FLOWER3);
+ flower(10,4,FLOWER2); flower(8,4,FLOWER1); flower(6,4,FLOWER3);
+ // 우물(광장 한쪽)
+ addPart(-10,0.6,-6,3,1.2,3,0x7f8c8d); addPart(-10,1.3,-6,2.2,0.4,2.2,WATER,0,'water');
+ addPart(-11.3,2.4,-6,0.3,2.4,0.3,TRUNK); addPart(-8.7,2.4,-6,0.3,2.4,0.3,TRUNK); addPart(-10,3.7,-6,3.2,0.4,1,ROOF);
+ // 나무 상자(잡화점 앞 분위기)
+ addPart(20,0.6,-4,1.2,1.2,1.2,WOOD); addPart(21.3,0.6,-4,1.2,1.2,1.2,WOOD); addPart(20.6,1.8,-4,1.2,1.2,1.2,WOOD);
+ // 사냥터 입구 문(돌기둥 두 개)
+ addPart(92,2,-5,1.5,4,1.5,STONE); addPart(92,2,5,1.5,4,1.5,STONE); addPart(92,4.3,0,12,0.8,1.5,STONE);
+
  rebuildColliders();
 }
 
