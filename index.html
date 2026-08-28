@@ -1227,6 +1227,7 @@ makeScaleArrow('d', 0x4488ff, g => g.rotation.x = -Math.PI/2, new THREE.Vector3(
 let mode = 'play';
 const respawnPoint = new THREE.Vector3(0, EYE_HEIGHT, 0);
 function setMode(m) {
+ if (mpActive && m === 'edit') return; // 메인 서버에서는 편집모드 금지
  if (mpActive && m === 'edit') leaveMultiplayer(); // 멀티 중 편집(ESC/뒤로) 진입 시 싱글 복원
  mode = m;
  const editing = m === 'edit';
@@ -1266,7 +1267,7 @@ function setMode(m) {
   const inPlay = mode === 'play';
   modeToggleBtn.textContent = inPlay ? '편집모드' : '플레이로'; // 누르면 갈 모드
   modeToggleBtn.classList.toggle('editing', !inPlay); // 편집 중이면 상단으로
-  modeToggleBtn.style.display = isTouch ? 'block' : 'none';
+  modeToggleBtn.style.display = (isTouch && !mpActive) ? 'block' : 'none';
  }
 }
 
@@ -1370,7 +1371,7 @@ window.addEventListener('keydown', (e) => {
  const ae = document.activeElement;
  if (ae && (ae.id === 'chatInput' || ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
  if (e.code === 'Space') e.preventDefault();
- if (e.code === 'Tab') { e.preventDefault(); setMode(mode === 'play' ? 'edit' : 'play'); return; }
+ if (e.code === 'Tab') { e.preventDefault(); if (mpActive) return; setMode(mode === 'play' ? 'edit' : 'play'); return; }
  if (mode === 'edit') {
  if (e.code === 'Digit1') { setTool('move'); return; }
  if (e.code === 'Digit2') { setTool('rotate'); return; }
@@ -2181,6 +2182,7 @@ function enterMultiplayerGame() {
  vertVel = 0; velocity.set(0,0,0);
  health = MAX_HP; updateHearts();
  if (!isTouch) { try { const pr = canvas.requestPointerLock(); if (pr && pr.catch) pr.catch(()=>{}); } catch (e) {} }
+ if (modeToggleBtn) modeToggleBtn.style.display = 'none';
  // 멀티 접속 중에만 채팅 버튼 표시
  if(chatBtn) chatBtn.style.display='block';
  // 표정은 채팅 버튼 길게 누르기로 (별도 버튼 미사용)
@@ -2189,6 +2191,7 @@ function enterMultiplayerGame() {
 // 멀티 종료 시 싱글 월드 복원
 function leaveMultiplayer() {
  mpActive = false; mpSyncOn = false;
+ if (modeToggleBtn && isTouch) modeToggleBtn.style.display = 'block';
  if (fbPlayersRef) { try { fbPlayersRef.off(); } catch(e){} fbPlayersRef = null; }
  if (fbMeRef) { try { fbMeRef.remove(); } catch(e){} fbMeRef = null; }
  if (fbdb) { try { fbdb.ref('chat').off(); } catch(e){} }
