@@ -2040,11 +2040,10 @@ function enterMultiplayerGame() {
  try { if (!mpBackupWorld) mpBackupWorld = serialize(); } catch(e){ console.error(e); }
  try { buildArenaWorld(); } catch(e){ console.error('arena build 실패', e); }
  mode = 'play';
- // 저장된 아레나 체크포인트가 있으면 거기서, 없으면 스폰대에서 시작
- let sp = { x: 0, y: EYE_HEIGHT + 1.2, z: 0 };
- try { const saved = JSON.parse(localStorage.getItem('fpsArenaCP') || 'null'); if (saved && typeof saved.y === 'number') sp = saved; } catch(e){}
- yawObject.position.set(sp.x, sp.y, sp.z);
- respawnPoint.set(sp.x, sp.y, sp.z);
+ // 마을(RPG)에서는 항상 광장에서 시작 (옛 타워 체크포인트 무시)
+ yawObject.position.set(ARENA_SPAWN.x, ARENA_SPAWN.y, ARENA_SPAWN.z);
+ respawnPoint.set(ARENA_SPAWN.x, ARENA_SPAWN.y, ARENA_SPAWN.z);
+ try { localStorage.removeItem('fpsArenaCP'); } catch(e){} // 낡은 체크포인트 정리
  vertVel = 0; velocity.set(0,0,0);
  health = MAX_HP; updateHearts();
  if (!isTouch) { try { const pr = canvas.requestPointerLock(); if (pr && pr.catch) pr.catch(()=>{}); } catch (e) {} }
