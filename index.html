@@ -430,7 +430,7 @@ grid.position.y = 0.01; scene.add(grid);
 const boxMat = [0xe74c3c, 0xf39c12, 0x3498db, 0x9b59b6, 0x1abc9c];
 const TYPES = ['solid', 'water', 'checkpoint', 'lava', 'jump', 'point'];
 let playerPoints = parseInt(localStorage.getItem('fpsPoints')|| '0', 10) ||0;
-const ARENA_SPAWN = { x: 0, y: 1.7 + 1.2, z: 0 }; // 처음 스폰대 (EYE_HEIGHT=1.7 리터럴로 TDZ 회피)
+const ARENA_SPAWN = { x: 0, y: 1.7 + 0.5, z: -6 }; // 마을 광장(분수 앞)에서 시작
 const parts = [];
 let colliders = [];
 let movers = []; // 움직이는/회전하는 파트들
@@ -961,191 +961,58 @@ function buildDefaultWorld() {
 // 멀티 전용 아레나 월드 빌더 (싱글과 완전 분리, 항상 동일한 고정 배치)
 function buildArenaWorld() {
  while (parts.length) removePart(parts[0]);
- movers = []; // 무버 초기화
- const GREEN=0x2ecc71, YEL=0xf1c40f, ORG=0xe67e22, RED=0xe74c3c, GOLD=0xffd700, ICE=0xd6f5ff;
- const plat=(x,y,z,w,d,col)=>addPart(x,y,z,w,0.5,d,col);
- const kill=(x,y,z,w,d)=>addPart(x,y,z,w,0.5,d,0x5a1000,0,'lava');
- const pad =(x,y,z)=>addPart(x,y,z,2,0.5,2,0x00e5ff,0,'jump');
- const water=(x,y,z,w,d)=>addPart(x,y,z,w,2,d,0x2e8fd8,0,'water');
- // 움직이는 발판: (a)→(b) 왕복
- const movePlat = (ax,ay,az, bx,by,bz, w,d, col, speed, phase) => {
-  const p = addPart(ax,ay,az, w,0.5,d, col);
-  movers.push({ kind:'move', part:p, ax,ay,az, bx,by,bz, speed:speed||1, phase:phase||0, col:null });
-  return p;
- };
- // 회전 킬파트 바: 중심 pivot에서 회전(길쭉한 용암)
- const rotKill = (x,y,z, len, speed, phase) => {
-  const p = addPart(x,y,z, len,0.5,1.2, 0x5a1000, 0, 'lava');
-  movers.push({ kind:'rotate', part:p, speed:speed||1, phase:phase||0, col:null });
-  return p;
- };
- // 움직이는 킬파트: (a)→(b) 왕복 (좌우로 가로지르는 용암)
- const moveKill = (ax,ay,az, bx2,by,bz2, w,d, speed, phase) => {
-  const p = addPart(ax,ay,az, w,0.5,d, 0x5a1000, 0, 'lava');
-  movers.push({ kind:'move', part:p, ax,ay,az, bx:bx2,by,bz:bz2, speed:speed||1, phase:phase||0, col:null });
-  return p;
- };
- // 체크포인트를 발판 표면 높이에 맞춤(윗면 = 발판 윗면). 부활이 발판 위에서 되게.
- const cp =(x,y,z)=>addPart(x,y+0.5,z,2.5,0.5,2.5,0xffffff,0,'checkpoint');
+ movers = [];
 
- // 스폰대
- addPart(0,0.5,0,10,1,10,0x3d5a80); cp(0,1,0);
- let z=8, y=1;
+ // 색
+ const GROUND=0x6ab04c, PLAZA=0xd9c8a0, PATH=0xb8956a, WOOD=0x8d6e4a, ROOF=0xc0392b,
+ WALL=0xe8dcc0, DOOR=0x5a3d2b, WATER=0x2e8fd8, STONE=0x95a5a6;
 
- // 1구간(초록·쉬움): 킬파트 회피 길
- addPart(0,y,z+8,6,0.5,22,GREEN);
- kill(-1.5,y+0.3,z+3,2.5,2.5); kill(1.5,y+0.3,z+9,2.5,2.5); kill(-1.5,y+0.3,z+15,2.5,2.5);
- z+=20; cp(0,y,z);
+ // 바닥(넓은 풀밭)
+ addPart(0, -0.5, 0, 200, 1, 200, GROUND);
+ // 중앙 광장(돌바닥)
+ addPart(0, 0.05, 0, 40, 0.3, 40, PLAZA);
 
- // 2구간(노랑): 점프패드로 크게 올라 다음 발판
- z+=5; pad(0,y+0.3,z); // 점프패드
- y+=5; z+=8; plat(0,y,z,3,3,YEL); // 패드로 도달하는 높은 발판
- cp(0,y,z);
-
- // 3구간(주황): 좁은 외줄 + 징검다리
- z+=5; addPart(0,y,z+5,1.0,0.5,10,ORG); // 좁은 외줄
- z+=12;
- for(let i=0;i<4;i++){ z+=4.5; const x=(i%2?2.5:-2.5); plat(x,y,z,1.6,1.6,ORG); } // 징검다리
- cp(0,y,z);
-
- // 4구간: 물 점프 — 물에 빠져 떠오른 뒤 다음 발판으로
- z+=4; water(0,y-1,z+4,8,8); // 물웅덩이(점프로 건너거나 수영)
- z+=9; y+=1.5; plat(0,y,z,3,3,ICE);
- // 이 구간 체크포인트만 받침 발판과 함께 한 단계 낮게
- addPart(0, y - 1.5, z + 3, 3, 0.5, 3, 0x88c0d0); // 받침 발판
- addPart(0, y - 1.5, z + 3, 2.5, 0.5, 2.5, 0xffffff, 0, 'checkpoint'); // 그 위 체크포인트(낮게)
-
- // 5구간(빨강·어려움): 점프패드 연속 + 킬파트 사이
- z+=5; pad(0,y+0.3,z); y+=5; z+=7; plat(-3,y,z,2,2,RED); kill(0,y+0.3,z,2,2); plat(3,y,z,2,2,RED);
- z+=5; pad(3,y-4.7,z); // (설명: 필요시 좌표 미세조정)
- cp(0,y,z);
-
- // 1차 정상(중간 완주대 + 체크포인트) — 여기서 2차 박스타워로 진입
- y+=3; plat(0,y,z+4,6,6,GOLD);
- addPart(0, y+0.9, z+4, 3, 0.5, 3, 0xffffff, 0, 'checkpoint');
-
- // ===== 2차: 박스 타워 (4면 벽 통, 확대판: W=16, 24층) =====
- const bx = 0, bz = z + 30; // 박스 중심(1차 정상에서 조금 앞)
- const W = 16; // 통 반폭
- const baseY = y; // 통 바닥 높이
- const floors = 24; // 층 수
- const step = 2.4; // 층 높이차
- const topY = baseY + floors * step;
-
- // 1차 정상 → 박스 입구 연결 다리
- addPart(bx, baseY, z + 12, 5, 0.5, 6, 0x88c0d0); // 연결 다리
- // 통 바닥
- addPart(bx, baseY - 0.5, bz, W*2, 1, W*2, 0x2c3e50);
- addPart(bx, baseY + 0.3, bz - (W - 3), 4, 0.5, 4, 0xffffff, 0, 'checkpoint'); // 입구(문 안쪽) 체크포인트
-
- // 4면 벽 (통) — 위로 길게, 안이 빈 상자
- const wallH = (floors + 2) * step;
- const wy = baseY + wallH/2;
- addPart(bx, wy, bz + W, W*2, wallH, 0.6, 0x34495e); // 앞벽
- addPart(bx + W, wy, bz, 0.6, wallH, W*2, 0x34495e); // 우벽
- addPart(bx - W, wy, bz, 0.6, wallH, W*2, 0x34495e); // 좌벽
- // 뒤벽(타워 쪽): 아래 문 높이만큼 입구로 뚫고 윗부분만 벽
- const doorH = 4.5;
- const upperH = wallH - doorH;
- addPart(bx, baseY + doorH + upperH/2, bz - W, W*2, upperH, 0.6, 0x34495e); // 문 위 윗벽
-
- // ===== 내부 기믹 층 (24층, 나선 경로 + 특수 기믹 섞음) =====
- const C2=[0x2ecc71,0xf1c40f,0xe67e22,0xe74c3c,0x9b59b6,0x1abc9c];
- // 내부 나선 경로: 반지름 R 원을 작은 각도로 돌며 상승 (연속 발판 간 ≈ arcStep 칸)
- const R = W - 4; // 벽에서 안쪽(반지름 12)
- const arcStep = 0.42; // 각도 증가(작게 → 발판 간 거리 ≈ R*arcStep ≈ 5칸)
- for (let i = 0; i < floors; i++) {
- const fy = baseY + (i+1) * step;
- const ang = i * arcStep;
- const cxp = bx + Math.cos(ang) * R;
- const czp = bz + Math.sin(ang) * R;
- const col = C2[i % C2.length];
- const g = i % 6; // 기믹 종류
-
- if (g === 0) {
- // 점프패드: 발판 + 그 위 패드 (다음 발판은 나선상 바로 다음이라 도달 쉬움)
- addPart(cxp, fy, czp, 3.5, 0.5, 3.5, col);
- addPart(cxp, fy + 0.3, czp, 1.8, 0.5, 1.8, 0x00e5ff, 0, 'jump');
- } else if (g === 2) {
- // 움직이는 발판: 나선 접선 방향으로 짧게 왕복
- const tx = -Math.sin(ang), tz = Math.cos(ang); // 접선
- movePlat(cxp - tx*2, fy, czp - tz*2, cxp + tx*2, fy, czp + tz*2, 3, 3, 0xf39c12, 1.4, i*0.5);
- } else if (g === 3) {
- // 킬파트 회피: 발판 + 발판 가장자리에 작은 킬(중앙 아님, 밟는 곳은 안전)
- addPart(cxp, fy, czp, 3.5, 0.5, 3.5, col);
- addPart(cxp + Math.cos(ang)*2.2, fy + 0.3, czp + Math.sin(ang)*2.2, 1.5, 0.5, 1.5, 0x5a1000, 0, 'lava');
- } else if (g === 5) {
- // 좁은 발판(외줄 느낌)
- addPart(cxp, fy, czp, 1.4, 0.5, 1.4, 0xe67e22);
- } else {
- // 정적 발판
- addPart(cxp, fy, czp, 3.2, 0.5, 3.2, col);
+ // 건물 헬퍼: 벽 4면 + 지붕, 앞면 가운데 문 구멍. (cx,cz)중심, w×d, 높이 h, 문은 -z쪽
+ function building(cx, cz, w, d, h, roofColor, label) {
+ const wallT = 0.6;
+ // 뒤벽(+z), 좌우벽
+ addPart(cx, h/2, cz + d/2, w, h, wallT, WALL); // 뒤벽
+ addPart(cx - w/2, h/2, cz, wallT, h, d, WALL); // 좌벽
+ addPart(cx + w/2, h/2, cz, wallT, h, d, WALL); // 우벽
+ // 앞벽(-z): 문 구멍 남기고 좌우 기둥 + 상단 인방
+ const doorW = 3, sideW = (w - doorW) / 2;
+ addPart(cx - (doorW/2 + sideW/2), h/2, cz - d/2, sideW, h, wallT, WALL); // 앞벽 좌
+ addPart(cx + (doorW/2 + sideW/2), h/2, cz - d/2, sideW, h, wallT, WALL); // 앞벽 우
+ addPart(cx, h - 1, cz - d/2, doorW, 2, wallT, WALL); // 문 위 인방
+ // 지붕(살짝 큰 판)
+ addPart(cx, h + 0.3, cz, w + 1.5, 0.6, d + 1.5, roofColor);
+ // 간판(문 위, 색으로 구분) — label 색 블록
+ addPart(cx, h - 2.2, cz - d/2 - 0.4, doorW, 1, 0.3, label);
  }
 
- // 6층마다 체크포인트(받침 포함) — 나선 위치에
- if (i > 0 && i % 6 === 0) {
- addPart(cxp, fy - 0.5, czp, 3.5, 0.5, 3.5, 0x88c0d0);
- addPart(cxp, fy, czp, 2.5, 0.5, 2.5, 0xffffff, 0, 'checkpoint');
- }
- }
+ // 상점 5채 (광장 둘레에 배치, 문은 광장 쪽=-z 또는 안쪽 향하게 간단히 -z 통일)
+ building(-24, -10, 10, 8, 5, ROOF, 0xe74c3c); // 무기점(빨강 간판)
+ building(-8, -14, 10, 8, 5, 0x2980b9,0x3498db); // 방어구점(파랑)
+ building( 8, -14, 10, 8, 5, 0x27ae60,0x2ecc71); // 물약점(초록)
+ building( 24, -10, 10, 8, 5, 0xf39c12,0xf1c40f); // 잡화점(노랑)
+ building( 0, 16, 12, 9, 6, 0x7f8c8d,0x95a5a6); // 대장간(회색, 광장 위쪽)
 
- // 회전 킬파트 바 2개 (중앙에서 도는 용암) — 나선 반지름보다 짧게 해 통로만 위협
- rotKill(bx, baseY + 8 * step, bz, R*1.3, 1.0, 0);
- rotKill(bx, baseY + 17 * step, bz, R*1.3, -1.0, 2);
+ // 스폰 표식(광장 중앙 분수 느낌)
+ addPart(0, 0.4, 0, 4, 0.8, 4, STONE);
+ addPart(0, 1.0, 0, 2, 0.6, 2, WATER, 0, 'water');
 
- // 2차 박스 꼭대기(=3차 시작대) + 체크포인트
- addPart(bx, topY, bz, 6, 0.5, 6, 0xffd700);
- addPart(bx, topY+0.5, bz, 3, 0.5, 3, 0xffffff, 0, 'checkpoint');
+ // 사냥터로 가는 길 (광장 오른쪽 -x? 여기선 +x 방향으로 길 + 문)
+ for (let i=0;i<6;i++) addPart(40 + i*10, 0.05, 0, 8, 0.3, 6, PATH); // 오른쪽으로 뻗는 길
+ // 마을 경계 울타리(길 입구만 빼고 느슨하게 몇 개)
+ addPart(0, 1, -22, 44, 2, 0.5, WOOD); // 남쪽 울타리
+ addPart(-22, 1, 0, 0.5, 2, 44, WOOD); // 서쪽 울타리
+ addPart(0, 1, 22, 44, 2, 0.5, WOOD); // 북쪽 울타리(대장간 뒤)
 
- // ===== 3차: 초고난도 타워 (좁은 발판 + 긴 점프 + 빽빽 킬파트 + 중앙 가로지르는 킬) =====
- let ty = topY;
- let tz3 = bz + 8;
- const C3=[0xe74c3c,0x9b59b6,0xe67e22,0xc0392b];
+ // 사냥터 표지(길 끝, 다음 단계에서 몬스터 배치될 곳)
+ addPart(100, 0.05, 0, 40, 0.3, 40, 0x4a7c3a); // 사냥터 풀밭
+ addPart(100, 2, 0, 6, 4, 0.5, 0x8d6e4a); // 사냥터 표지판 기둥
 
- // 2차 꼭대기 → 3차 시작 전이 다리 (간격 12.6칸 메우기, 모두 도달 가능하게)
- addPart(bx, topY, bz + 4, 4, 0.5, 4, 0xf1c40f); // 전이1 (Δz4, 같은 높이)
- addPart(bx, topY + 0.3, bz + 4, 1.8, 0.5, 1.8, 0x00e5ff, 0, 'jump'); // 점프패드(보조)
- addPart(bx, topY + 1.2, bz + 8, 4, 0.5, 4, 0xf1c40f); // 전이2 (Δz4, Δy1.2)
- addPart(bx, topY + 2.3, bz + 11, 3, 0.5, 3, 0xf1c40f); // 전이3 (Δz3, Δy1.1) → 3차 첫 발판 바로 앞
-
- // 구간A: 아주 좁은 징검다리(폭 0.9) 긴 간격 8개 — 정밀 점프
- for (let i=0;i<8;i++){
-  ty += 2.3; tz3 += 4.6; // 수직2.3·수평4.6(강화점프 한계 근처)
-  const x = (i%2? 2.6 : -2.6);
-  addPart(x, ty, tz3, 0.9, 0.5, 0.9, C3[i%C3.length]); // 아주 좁은 발판
-  // 발판 사이 좌우에 킬파트(조금만 빗나가면 죽음)
-  addPart(x*-1, ty, tz3, 2.0, 0.5, 2.0, 0x5a1000, 0, 'lava');
- }
- // 구간A 끝 체크포인트(받침 포함)
- addPart(0, ty, tz3+3, 3, 0.5, 3, 0x88c0d0); addPart(0, ty+0.5, tz3+3, 2.2, 0.5, 2.2, 0xffffff,0,'checkpoint'); tz3+=6;
-
- // 구간B: 좁은 외줄 위로, 중앙을 가로지르는 킬파트가 좌우 왕복(타이밍 통과)
- addPart(0, ty+2, tz3+8, 1.0, 0.5, 18, 0xecf0f1); ty+=2; // 길고 좁은 외줄
- // 외줄을 가로질러 좌우로 빠르게 오가는 킬파트 3개(타이밍 맞춰 지나가기)
- for (let k=0;k<3;k++){
-  const cz = tz3 + 3 + k*6;
-  moveKill(-6, ty+0.6, cz, 6, ty+0.6, cz, 3.0, 1.2, 3.2, k*1.2); // 좌우 왕복 킬(빠름)
- }
- tz3 += 18;
- addPart(0, ty, tz3+3, 3, 0.5, 3, 0x88c0d0); addPart(0, ty+0.5, tz3+3, 2.2,0.5,2.2,0xffffff,0,'checkpoint'); tz3+=6;
-
- // 구간C: 빠른 회전 킬바 사이로 좁은 발판 통과 (킬바는 발판 위에서 돌아 밟을 땐 안전, 지나갈 때 위협)
- const cStartY = ty;
- for (let i=0;i<5;i++){ ty+=2.3; tz3+=4.5; addPart(0, ty, tz3, 1.6,0.5,1.6, C3[i%C3.length]); }
- // 킬바 높이 = 각 구간 발판 표면보다 2.6 위(플레이어 머리 위) — 서 있으면 안 닿음
- rotKill(-4, cStartY + 2.3*2 + 2.6, tz3 - 9, 11, 2.2, 0);
- rotKill(-4, cStartY + 2.3*4 + 2.6, tz3 - 2, 11, -2.2, 1.5);
-
- // 최종 정상(진짜 완주대) + 체크포인트 — 마지막 발판과 비슷한 높이로 도달 가능하게
- ty+=1.2; addPart(0, ty, tz3+5, 6,1,6, 0xffd700); addPart(0, ty+0.5, tz3+5, 3,0.5,3, 0xffffff,0,'checkpoint');
- // 포인트 받기 발판 (완주대 위, 밟으면 포인트+1 & 처음 스폰 복귀)
- addPart(0, ty+0.5, tz3+8, 2.5, 0.5, 2.5, 0xffcc00, 0, 'point');
-
- // 바닥 킬파트(전체 아래) — 떨어지면 죽음 (범위를 3차까지 확장)
- addPart(0, -3, (z+tz3)/2, 300, 1, (tz3) + 220, 0x5a1000, 0, 'lava');
  rebuildColliders();
- // 무버를 해당 콜라이더에 연결(이후 매 프레임 그 콜라이더를 갱신)
- for (const mv of movers) { const idx = parts.indexOf(mv.part); if (idx >= 0) mv.col = colliders[idx]; }
 }
 
 // ---------- Cameras ----------
@@ -1227,8 +1094,7 @@ makeScaleArrow('d', 0x4488ff, g => g.rotation.x = -Math.PI/2, new THREE.Vector3(
 let mode = 'play';
 const respawnPoint = new THREE.Vector3(0, EYE_HEIGHT, 0);
 function setMode(m) {
- if (mpActive && m === 'edit') return; // 메인 서버에서는 편집모드 금지
- if (mpActive && m === 'edit') leaveMultiplayer(); // 멀티 중 편집(ESC/뒤로) 진입 시 싱글 복원
+ if (mpActive && m === 'edit') return; // 메인 서버(RPG)에서는 편집모드 금지
  mode = m;
  const editing = m === 'edit';
  modeBadge.textContent = editing ? 'EDIT' : 'PLAY';
@@ -2310,7 +2176,7 @@ function physics(dt) {
  else vertVel = -SINK_SPEED; // 천천히 가라앉음
  pos.y += vertVel * dt;
  } else {
- if (onGround && keys['Space']) { vertVel = (mpActive ? JUMP_SPEED * 1.5 : JUMP_SPEED); onGround = false; }
+ if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
  vertVel -= GRAVITY * dt;
  pos.y += vertVel * dt;
  }
@@ -2356,11 +2222,6 @@ function physics(dt) {
  break;
  }
  }
- }
- // 아레나에선 초록 그라운드 평면(EYE_HEIGHT 기본 바닥)을 밟으면 죽음
- if (mpActive && onGround && Math.abs(groundY - EYE_HEIGHT) < 0.001
- && Math.abs(pos.x) <= half && Math.abs(pos.z) <= half) {
- respawn(); return;
  }
  // 점프패드: 윗면에 착지하는 순간 크게 튕김
  if (onGround) {
