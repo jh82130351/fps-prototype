@@ -434,6 +434,7 @@ const ARENA_SPAWN = { x: 0, y: 1.7 + 0.5, z: -6 }; // 마을 광장(분수 앞)�
 const parts = [];
 let colliders = [];
 let movers = []; // 움직이는/회전하는 파트들
+let npcs = []; // 상인 NPC들 {type, x, z, fig}
 
 function applyAppearance(p) {
  const mats = Array.isArray(p.mesh.material) ? p.mesh.material : [p.mesh.material];
@@ -937,9 +938,21 @@ function rebuildColliders() {
  });
 }
 
+function spawnMerchant(type, x, z, rotY, colors) {
+ const fig = makeCharacter(colors);
+ fig.position.set(x, 0.3, z); // 바닥(풀밭 0.1) 위에 서게
+ fig.rotation.y = rotY;
+ const tag = makeNameTag(type);
+ fig.add(tag);
+ scene.add(fig);
+ npcs.push({ type, x, z, fig });
+}
+
 function buildDefaultWorld() {
  if (typeof ground !== 'undefined' && ground) ground.visible = true;
  if (typeof grid !== 'undefined' && grid) grid.visible = true;
+ for (const n of npcs) { if (n.fig) scene.remove(n.fig); }
+ npcs = [];
  while (parts.length) removePart(parts[0]);
  for (let i = 0; i < 5; i++) { const h = 0.8*(i+1); addPart(-14+i*5, h/2, 20, 4, h, 4, boxMat[i%5]); }
  addPart(20, 1.5, -18, 10, 3, 10, 0x2ecc71);
@@ -966,6 +979,8 @@ function buildArenaWorld() {
  if (typeof grid !== 'undefined' && grid) grid.visible = false;
  while (parts.length) removePart(parts[0]);
  movers = [];
+ for (const n of npcs) { if (n.fig) scene.remove(n.fig); }
+ npcs = [];
 
  // 색
  const GROUND=0x6ab04c, PLAZA=0xd9c8a0, PATH=0xb8956a, WOOD=0x8d6e4a, ROOF=0xc0392b,
@@ -1074,6 +1089,15 @@ function buildArenaWorld() {
  addPart(20,0.6,-4,1.2,1.2,1.2,WOOD); addPart(21.3,0.6,-4,1.2,1.2,1.2,WOOD); addPart(20.6,1.8,-4,1.2,1.2,1.2,WOOD);
  // 사냥터 입구 문(돌기둥 두 개)
  addPart(138,2,-5,1.5,4,1.5,STONE); addPart(138,2,5,1.5,4,1.5,STONE); addPart(138,4.3,0,12,0.8,1.5,STONE);
+
+ // 상점 상인 배치 (각 상점 문 앞, 광장을 바라보게)
+ // 아래쪽 상점(광장이 +z쪽) → 상인은 +z를 보도록 rotation.y = Math.PI
+ spawnMerchant('무기 상인', -40, -11, Math.PI, { skin:0xe8b88a, shirt:0xc0392b, pants:0x2c3e50 });
+ spawnMerchant('방어구 상인',-14, -17, Math.PI, { skin:0xf1c27d, shirt:0x2980b9, pants:0x1b2631 });
+ spawnMerchant('물약 상인', 14, -17, Math.PI, { skin:0xffdbac, shirt:0x27ae60, pants:0x145a32 });
+ spawnMerchant('잡화 상인', 40, -11, Math.PI, { skin:0xc68642, shirt:0xf39c12, pants:0x784212 });
+ // 대장간(광장이 -z쪽) → 상인은 -z를 보도록 rotation.y = 0
+ spawnMerchant('대장장이', 0, 20, 0, { skin:0x8d5524, shirt:0x7f8c8d, pants:0x2c3e50 });
 
  rebuildColliders();
 }
@@ -2119,6 +2143,8 @@ function enterMultiplayerGame() {
 // 멀티 종료 시 싱글 월드 복원
 function leaveMultiplayer() {
  mpActive = false; mpSyncOn = false;
+ for (const n of npcs) { if (n.fig) scene.remove(n.fig); }
+ npcs = [];
  if (modeToggleBtn && isTouch) modeToggleBtn.style.display = 'block';
  if (fbPlayersRef) { try { fbPlayersRef.off(); } catch(e){} fbPlayersRef = null; }
  if (fbMeRef) { try { fbMeRef.remove(); } catch(e){} fbMeRef = null; }
