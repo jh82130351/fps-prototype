@@ -968,49 +968,74 @@ function buildArenaWorld() {
  WALL=0xe8dcc0, DOOR=0x5a3d2b, WATER=0x2e8fd8, STONE=0x95a5a6;
 
  // 바닥(넓은 풀밭)
- addPart(0, -0.5, 0, 200, 1, 200, GROUND);
- // 중앙 광장(돌바닥)
- addPart(0, 0.05, 0, 40, 0.3, 40, PLAZA);
+ addPart(0, -0.5, 0, 320, 1, 320, GROUND);
+ // 중앙 광장(돌바닥) — 더 넓게
+ addPart(0, 0.05, 0, 64, 0.3, 64, PLAZA);
+ // 광장 테두리 장식(밝은 돌)
+ addPart(0, 0.12, 32, 64, 0.4, 2, 0xcfc0a0);
+ addPart(0, 0.12, -32, 64, 0.4, 2, 0xcfc0a0);
+ addPart(32, 0.12, 0, 2, 0.4, 64, 0xcfc0a0);
+ addPart(-32, 0.12, 0, 2, 0.4, 64, 0xcfc0a0);
 
  // 건물 헬퍼: 벽 4면 + 지붕, 앞면 가운데 문 구멍. (cx,cz)중심, w×d, 높이 h, 문은 -z쪽
  function building(cx, cz, w, d, h, roofColor, label) {
  const wallT = 0.6;
- // 뒤벽(+z), 좌우벽
  addPart(cx, h/2, cz + d/2, w, h, wallT, WALL); // 뒤벽
  addPart(cx - w/2, h/2, cz, wallT, h, d, WALL); // 좌벽
  addPart(cx + w/2, h/2, cz, wallT, h, d, WALL); // 우벽
- // 앞벽(-z): 문 구멍 남기고 좌우 기둥 + 상단 인방
- const doorW = 3, sideW = (w - doorW) / 2;
+ // 앞벽: 문 구멍 + 좌우 창문
+ const doorW = 3.2, sideW = (w - doorW) / 2;
  addPart(cx - (doorW/2 + sideW/2), h/2, cz - d/2, sideW, h, wallT, WALL); // 앞벽 좌
  addPart(cx + (doorW/2 + sideW/2), h/2, cz - d/2, sideW, h, wallT, WALL); // 앞벽 우
  addPart(cx, h - 1, cz - d/2, doorW, 2, wallT, WALL); // 문 위 인방
- // 지붕(살짝 큰 판)
- addPart(cx, h + 0.3, cz, w + 1.5, 0.6, d + 1.5, roofColor);
- // 간판(문 위, 색으로 구분) — label 색 블록
- addPart(cx, h - 2.2, cz - d/2 - 0.4, doorW, 1, 0.3, label);
+ // 문틀(어두운 색)
+ addPart(cx - doorW/2, (h-2)/2, cz - d/2 - 0.05, 0.3, h-2, 0.4, DOOR);
+ addPart(cx + doorW/2, (h-2)/2, cz - d/2 - 0.05, 0.3, h-2, 0.4, DOOR);
+ // 창문 2개(앞벽 좌우, 하늘색 유리 + 틀)
+ const winY = h*0.6;
+ addPart(cx - (doorW/2 + sideW/2), winY, cz - d/2 - 0.06, 1.6, 1.6, 0.15, 0x2c3e50); // 창틀
+ addPart(cx - (doorW/2 + sideW/2), winY, cz - d/2 - 0.14, 1.2, 1.2, 0.1, 0xafe0ff); // 유리
+ addPart(cx + (doorW/2 + sideW/2), winY, cz - d/2 - 0.06, 1.6, 1.6, 0.15, 0x2c3e50);
+ addPart(cx + (doorW/2 + sideW/2), winY, cz - d/2 - 0.14, 1.2, 1.2, 0.1, 0xafe0ff);
+ // 차양(문 위로 튀어나온 줄무늬 천막)
+ addPart(cx, h - 2.6, cz - d/2 - 1.0, w, 0.3, 2.0, label);
+ addPart(cx, h - 2.9, cz - d/2 - 1.9, w, 0.5, 0.3, 0xffffff); // 차양 앞단
+ // 차양 지지 기둥
+ addPart(cx - w/2 + 0.4, h-3.6, cz - d/2 - 1.9, 0.2, 1.4, 0.2, DOOR);
+ addPart(cx + w/2 - 0.4, h-3.6, cz - d/2 - 1.9, 0.2, 1.4, 0.2, DOOR);
+ // 지붕(경사 느낌: 큰 판 + 위에 작은 판)
+ addPart(cx, h + 0.3, cz, w + 1.6, 0.6, d + 1.6, roofColor);
+ addPart(cx, h + 0.9, cz, w*0.6, 0.6, d*0.6, roofColor);
+ // 간판(문 위, 색으로 구분)
+ addPart(cx, h - 0.2, cz - d/2 - 0.35, doorW + 0.6, 1.0, 0.3, label);
+ // 진열대(문 앞 좌우, 상품 느낌의 작은 색 블록)
+ addPart(cx - 2.4, 0.7, cz - d/2 - 2.4, 1.4, 0.5, 1.0, WOOD);
+ addPart(cx - 2.4, 1.2, cz - d/2 - 2.4, 0.5, 0.5, 0.5, label);
+ addPart(cx + 2.4, 0.7, cz - d/2 - 2.4, 1.4, 0.5, 1.0, WOOD);
+ addPart(cx + 2.4, 1.2, cz - d/2 - 2.4, 0.5, 0.5, 0.5, label);
  }
 
  // 상점 5채 (광장 둘레에 배치, 문은 광장 쪽=-z 또는 안쪽 향하게 간단히 -z 통일)
- building(-24, -10, 10, 8, 5, ROOF, 0xe74c3c); // 무기점(빨강 간판)
- building(-8, -14, 10, 8, 5, 0x2980b9,0x3498db); // 방어구점(파랑)
- building( 8, -14, 10, 8, 5, 0x27ae60,0x2ecc71); // 물약점(초록)
- building( 24, -10, 10, 8, 5, 0xf39c12,0xf1c40f); // 잡화점(노랑)
- building( 0, 16, 12, 9, 6, 0x7f8c8d,0x95a5a6); // 대장간(회색, 광장 위쪽)
+ building(-40, -18, 12, 9, 5.5, ROOF, 0xe74c3c); // 무기점(빨강)
+ building(-14, -24, 12, 9, 5.5, 0x2980b9, 0x3498db); // 방어구점(파랑)
+ building( 14, -24, 12, 9, 5.5, 0x27ae60, 0x2ecc71); // 물약점(초록)
+ building( 40, -18, 12, 9, 5.5, 0xf39c12, 0xf1c40f); // 잡화점(노랑)
+ building( 0, 26, 14, 10, 6.5, 0x7f8c8d, 0x95a5a6); // 대장간(회색, 광장 위쪽)
 
  // 스폰 표식(광장 중앙 분수 느낌)
  addPart(0, 0.4, 0, 4, 0.8, 4, STONE);
  addPart(0, 1.0, 0, 2, 0.6, 2, WATER, 0, 'water');
 
  // 사냥터로 가는 길 (광장 오른쪽 -x? 여기선 +x 방향으로 길 + 문)
- for (let i=0;i<6;i++) addPart(40 + i*10, 0.05, 0, 8, 0.3, 6, PATH); // 오른쪽으로 뻗는 길
+ for (let i=0;i<8;i++) addPart(64 + i*12, 0.05, 0, 10, 0.3, 8, PATH); // 오른쪽 사냥터 길(더 길게)
  // 마을 경계 울타리(길 입구만 빼고 느슨하게 몇 개)
- addPart(0, 1, -22, 44, 2, 0.5, WOOD); // 남쪽 울타리
- addPart(-22, 1, 0, 0.5, 2, 44, WOOD); // 서쪽 울타리
- addPart(0, 1, 22, 44, 2, 0.5, WOOD); // 북쪽 울타리(대장간 뒤)
+ addPart(0, 1, -36, 68, 2, 0.5, WOOD); // 남쪽 울타리
+ addPart(-36, 1, 0, 0.5, 2, 68, WOOD); // 서쪽 울타리
+ addPart(0, 1, 36, 68, 2, 0.5, WOOD); // 북쪽 울타리
 
  // 사냥터 표지(길 끝, 다음 단계에서 몬스터 배치될 곳)
- addPart(100, 0.05, 0, 40, 0.3, 40, 0x4a7c3a); // 사냥터 풀밭
- addPart(100, 2, 0, 6, 4, 0.5, 0x8d6e4a); // 사냥터 표지판 기둥
+ addPart(150, 0.05, 0, 40, 0.3, 40, 0x4a7c3a); // 사냥터 풀밭
+ addPart(140, 2, 0, 6, 4, 0.5, 0x8d6e4a); // 사냥터 표지판 기둥
 
  // ===== 마을 장식 =====
  const TRUNK=0x6b4423, LEAF=0x2e7d32, LAMP=0x2c3e50, LIGHT=0xfff3b0, BENCH=0x8d6e4a, FLOWER1=0xe74c3c, FLOWER2=0xf1c40f, FLOWER3=0xff69b4;
@@ -1027,7 +1052,7 @@ function buildArenaWorld() {
  tree(-16,6); tree(16,6); tree(-16,-2); tree(16,-2); tree(-30,4); tree(30,4);
  // 가로등(광장 네 귀퉁이 + 길가)
  lamp(-14,-6); lamp(14,-6); lamp(-14,10); lamp(14,10);
- lamp(48,6); lamp(64,-6); lamp(84,6); // 사냥터 가는 길가
+ lamp(78,6); lamp(104,-6); lamp(130,6); // 사냥터 가는 길가
  // 벤치(광장)
  bench(-6,8); bench(6,8);
  // 꽃밭(광장 가장자리)
@@ -1039,7 +1064,7 @@ function buildArenaWorld() {
  // 나무 상자(잡화점 앞 분위기)
  addPart(20,0.6,-4,1.2,1.2,1.2,WOOD); addPart(21.3,0.6,-4,1.2,1.2,1.2,WOOD); addPart(20.6,1.8,-4,1.2,1.2,1.2,WOOD);
  // 사냥터 입구 문(돌기둥 두 개)
- addPart(92,2,-5,1.5,4,1.5,STONE); addPart(92,2,5,1.5,4,1.5,STONE); addPart(92,4.3,0,12,0.8,1.5,STONE);
+ addPart(138,2,-5,1.5,4,1.5,STONE); addPart(138,2,5,1.5,4,1.5,STONE); addPart(138,4.3,0,12,0.8,1.5,STONE);
 
  rebuildColliders();
 }
