@@ -183,6 +183,15 @@
 <div id="hud"></div>
 <div id="mode" class="play">PLAY</div>
 
+<!-- 상점 창 -->
+<div id="shopModal" style="position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);">
+ <div style="background:#1b2430;border-radius:16px;padding:20px;width:min(360px,90vw);color:#e6edf3;">
+ <div id="shopTitle" style="font-size:20px;font-weight:bold;margin-bottom:12px;">상점</div>
+ <div id="shopBody" style="font-size:14px;line-height:1.6;min-height:80px;">준비 중 — 곧 물건을 사고팔 수 있어요.</div>
+ <button id="shopClose" style="margin-top:16px;width:100%;padding:10px;border:none;border-radius:10px;background:#e74c3c;color:#fff;font-size:15px;cursor:pointer;">닫기</button>
+ </div>
+</div>
+
 <!-- 멀티플레이 채팅 UI -->
 <button id="chatBtn" style="position:fixed;left:12px;bottom:12px;z-index:50;width:52px;height:52px;border:none;border-radius:14px;background:#2ecc71;color:#fff;font-size:15px;line-height:1.1;cursor:pointer;display:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;">💬<br>😀</button>
 <button id="emoteBtn" style="position:fixed;right:12px;bottom:150px;z-index:50;width:52px;height:52px;border:none;border-radius:14px;background:#9b59b6;color:#fff;font-size:24px;cursor:pointer;display:none;">😀</button>
@@ -435,6 +444,8 @@ const parts = [];
 let colliders = [];
 let movers = []; // 움직이는/회전하는 파트들
 let npcs = []; // 상인 NPC들 {type, x, z, fig}
+let hitboxOn = false;
+let hitboxHelpers = [];
 
 function applyAppearance(p) {
  const mats = Array.isArray(p.mesh.material) ? p.mesh.material : [p.mesh.material];
@@ -1323,6 +1334,7 @@ window.addEventListener('keydown', (e) => {
  // 채팅 입력 중에는 게임 조작 키 처리를 하지 않음(타이핑 우선)
  const ae = document.activeElement;
  if (ae && (ae.id === 'chatInput' || ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
+ if (e.code === 'F3') { e.preventDefault(); } // 브라우저 검색 방지 + keys에 기록되게
  if (e.code === 'Space') e.preventDefault();
  if (e.code === 'Tab') { e.preventDefault(); if (mpActive) return; setMode(mode === 'play' ? 'edit' : 'play'); return; }
  if (mode === 'edit') {
@@ -1349,6 +1361,9 @@ window.addEventListener('keydown', (e) => {
  try { document.exitPointerLock && document.exitPointerLock(); } catch(_){}
  }
  keys[e.code] = true;
+ // F3+G 동시 입력 → 히트박스 토글 (keys[e.code]=true보다 위에서 F3가 기록되므로 여기서 감지)
+ if (keys['F3'] && e.code === 'KeyG') { e.preventDefault(); toggleHitbox(); return; }
+ if (e.code === 'KeyG' && keys['F3']) { e.preventDefault(); toggleHitbox(); return; }
 });
 window.addEventListener('keyup', (e) => keys[e.code] = false);
 
@@ -1774,7 +1789,54 @@ canvas.addEventListener('wheel', (e) => {
  }
  updateEditCam();
 }, { passive: false });
-canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit') e.preventDefault(); });
+canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit' || mpActive) e.preventDefault(); });
+
+// ---------- 상점(상인 우클릭) ----------
+function openShop(type) {
+ const modal = document.getElementById('shopModal');
+ document.getElementById('shopTitle').textContent = type;
+ modal.style.display = 'flex';
+ document.exitPointerLock && document.exitPointerLock(); // 마우스 풀어 클릭 가능하게
+}
+const shopCloseBtn = document.getElementById('shopClose');
+if (shopCloseBtn) shopCloseBtn.addEventListener('click', () => { document.getElementById('shopModal').style.display = 'none'; });
+
+canvas.addEventListener('mousedown', (e) => {
+ if (e.button !== 2) return; // 우클릭만
+ if (mode !== 'play' || !mpActive) return; // 마을(멀티)에서만
+ e.preventDefault();
+ // 화면 중앙 방향 레이캐스트
+ ray.setFromCamera({ x: 0, y: 0 }, playCam);
+ const meshes = [];
+ for (const n of npcs) { n.fig.traverse(o => { if (o.isMesh) { o.userData.npcType = n.type; meshes.push(o); } }); }
+ const hits = ray.intersectObjects(meshes, true);
+ if (hits.length && hits[0].distance < 8) { // 8m 이내
+  let o = hits[0].object; while (o && !o.userData.npcType) o = o.parent;
+  if (o && o.userData.npcType) openShop(o.userData.npcType);
+ }
+});
+
+// ---------- 히트박스(F3+G) ----------
+function clearHitboxes() { for (const h of hitboxHelpers) scene.remove(h); hitboxHelpers = []; }
+function buildHitboxes() {
+ clearHitboxes();
+ // 콜라이더(파트) 박스
+ for (const c of colliders) {
+  const w = c.hw*2, d = c.hd*2, h = (c.y1 - c.y0);
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true }));
+  mesh.position.set(c.cx, (c.y0 + c.y1)/2, c.cz);
+  if (c.a) mesh.rotation.y = -c.a; // 콜라이더 각도 규약(-a)
+  scene.add(mesh); hitboxHelpers.push(mesh);
+ }
+ // 상인 NPC 박스(대략)
+ for (const n of npcs) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.6, 1.2), new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true }));
+  mesh.position.set(n.x, 1.3, n.z);
+  scene.add(mesh); hitboxHelpers.push(mesh);
+ }
+}
+function toggleHitbox() { hitboxOn = !hitboxOn; if (hitboxOn) buildHitboxes(); else clearHitboxes(); }
 
 // ---------- Properties ----------
 function renderProps() {
