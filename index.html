@@ -938,6 +938,8 @@ function rebuildColliders() {
 }
 
 function buildDefaultWorld() {
+ if (typeof ground !== 'undefined' && ground) ground.visible = true;
+ if (typeof grid !== 'undefined' && grid) grid.visible = true;
  while (parts.length) removePart(parts[0]);
  for (let i = 0; i < 5; i++) { const h = 0.8*(i+1); addPart(-14+i*5, h/2, 20, 4, h, 4, boxMat[i%5]); }
  addPart(20, 1.5, -18, 10, 3, 10, 0x2ecc71);
@@ -960,6 +962,8 @@ function buildDefaultWorld() {
 
 // 멀티 전용 아레나 월드 빌더 (싱글과 완전 분리, 항상 동일한 고정 배치)
 function buildArenaWorld() {
+ if (typeof ground !== 'undefined' && ground) ground.visible = false;
+ if (typeof grid !== 'undefined' && grid) grid.visible = false;
  while (parts.length) removePart(parts[0]);
  movers = [];
 
@@ -968,14 +972,14 @@ function buildArenaWorld() {
  WALL=0xe8dcc0, DOOR=0x5a3d2b, WATER=0x2e8fd8, STONE=0x95a5a6;
 
  // 바닥(넓은 풀밭)
- addPart(0, -0.5, 0, 320, 1, 320, GROUND);
+ addPart(0, -0.4, 0, 320, 1, 320, GROUND); // 윗면 y=0.1 (기본 바닥과 분리해 z-fighting 방지)
  // 중앙 광장(돌바닥) — 더 넓게
- addPart(0, 0.05, 0, 64, 0.3, 64, PLAZA);
+ addPart(0, 0.28, 0, 64, 0.3, 64, PLAZA); // 윗면 0.43
  // 광장 테두리 장식(밝은 돌)
- addPart(0, 0.12, 32, 64, 0.4, 2, 0xcfc0a0);
- addPart(0, 0.12, -32, 64, 0.4, 2, 0xcfc0a0);
- addPart(32, 0.12, 0, 2, 0.4, 64, 0xcfc0a0);
- addPart(-32, 0.12, 0, 2, 0.4, 64, 0xcfc0a0);
+ addPart(0, 0.30, 32, 64, 0.4, 2, 0xcfc0a0);
+ addPart(0, 0.30, -32, 64, 0.4, 2, 0xcfc0a0);
+ addPart(32, 0.30, 0, 2, 0.4, 64, 0xcfc0a0);
+ addPart(-32, 0.30, 0, 2, 0.4, 64, 0xcfc0a0);
 
  // 건물 헬퍼: 벽 4면 + 지붕, 앞면 가운데 문 구멍. (cx,cz)중심, w×d, 높이 h, 문은 -z쪽
  function building(cx, cz, w, d, h, roofColor, label, dir) {
@@ -1032,14 +1036,14 @@ function buildArenaWorld() {
  addPart(0, 1.0, 0, 2, 0.6, 2, WATER, 0, 'water');
 
  // 사냥터로 가는 길 (광장 오른쪽 -x? 여기선 +x 방향으로 길 + 문)
- for (let i=0;i<8;i++) addPart(64 + i*12, 0.05, 0, 10, 0.3, 8, PATH); // 오른쪽 사냥터 길(더 길게)
+ for (let i=0;i<8;i++) addPart(64 + i*12, 0.20, 0, 10, 0.3, 8, PATH); // 오른쪽 사냥터 길(더 길게)
  // 마을 경계 울타리(길 입구만 빼고 느슨하게 몇 개)
  addPart(0, 1, -36, 68, 2, 0.5, WOOD); // 남쪽 울타리
  addPart(-36, 1, 0, 0.5, 2, 68, WOOD); // 서쪽 울타리
  addPart(0, 1, 36, 68, 2, 0.5, WOOD); // 북쪽 울타리
 
  // 사냥터 표지(길 끝, 다음 단계에서 몬스터 배치될 곳)
- addPart(150, 0.05, 0, 40, 0.3, 40, 0x4a7c3a); // 사냥터 풀밭
+ addPart(150, 0.15, 0, 40, 0.3, 40, 0x4a7c3a); // 사냥터 풀밭
  addPart(140, 2, 0, 6, 4, 0.5, 0x8d6e4a); // 사냥터 표지판 기둥
 
  // ===== 마을 장식 =====
