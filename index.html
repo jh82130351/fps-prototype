@@ -2680,10 +2680,10 @@ function drawFaceCanvas(idx, skinHex) {
  const tex = new THREE.CanvasTexture(cv); tex.needsUpdate = true; return tex;
 }
 function headMaterials(faceIdx, skinHex) {
- // BoxGeometry 면 순서: +x,-x,+y,-y,+z,-z → +z(4번)가 앞면
+ // BoxGeometry 면 순서: +x,-x,+y,-y,+z,-z. 캐릭터 정면은 -z이므로 5번(-z)에 표정.
  const plain = () => new THREE.MeshStandardMaterial({ color: skinHex });
  const face = new THREE.MeshStandardMaterial({ map: drawFaceCanvas(faceIdx, skinHex) });
- return [plain(),plain(),plain(),plain(),face,plain()];
+ return [plain(),plain(),plain(),plain(),plain(),face];
 }
 function makeCharacter(colors) {
  const g = new THREE.Group();
