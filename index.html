@@ -978,49 +978,54 @@ function buildArenaWorld() {
  addPart(-32, 0.12, 0, 2, 0.4, 64, 0xcfc0a0);
 
  // 건물 헬퍼: 벽 4면 + 지붕, 앞면 가운데 문 구멍. (cx,cz)중심, w×d, 높이 h, 문은 -z쪽
- function building(cx, cz, w, d, h, roofColor, label) {
+ function building(cx, cz, w, d, h, roofColor, label, dir) {
+ dir = dir || 1; // 1: 문이 -z면 / -1: 문이 +z면
  const wallT = 0.6;
- addPart(cx, h/2, cz + d/2, w, h, wallT, WALL); // 뒤벽
- addPart(cx - w/2, h/2, cz, wallT, h, d, WALL); // 좌벽
- addPart(cx + w/2, h/2, cz, wallT, h, d, WALL); // 우벽
- // 앞벽: 문 구멍 + 좌우 창문
+ const fz = cz - dir * (d/2); // 문이 있는 앞면 z
+ const bz = cz + dir * (d/2); // 뒷면 z
+ const out = -dir; // 앞면 바깥쪽(장식이 튀어나가는 방향) 부호
+ // 뒷벽, 좌우벽
+ addPart(cx, h/2, bz, w, h, wallT, WALL);
+ addPart(cx - w/2, h/2, cz, wallT, h, d, WALL);
+ addPart(cx + w/2, h/2, cz, wallT, h, d, WALL);
+ // 앞벽: 문 구멍 + 좌우
  const doorW = 3.2, sideW = (w - doorW) / 2;
- addPart(cx - (doorW/2 + sideW/2), h/2, cz - d/2, sideW, h, wallT, WALL); // 앞벽 좌
- addPart(cx + (doorW/2 + sideW/2), h/2, cz - d/2, sideW, h, wallT, WALL); // 앞벽 우
- addPart(cx, h - 1, cz - d/2, doorW, 2, wallT, WALL); // 문 위 인방
- // 문틀(어두운 색)
- addPart(cx - doorW/2, (h-2)/2, cz - d/2 - 0.05, 0.3, h-2, 0.4, DOOR);
- addPart(cx + doorW/2, (h-2)/2, cz - d/2 - 0.05, 0.3, h-2, 0.4, DOOR);
- // 창문 2개(앞벽 좌우, 하늘색 유리 + 틀)
+ addPart(cx - (doorW/2 + sideW/2), h/2, fz, sideW, h, wallT, WALL);
+ addPart(cx + (doorW/2 + sideW/2), h/2, fz, sideW, h, wallT, WALL);
+ addPart(cx, h - 1, fz, doorW, 2, wallT, WALL);
+ // 문틀
+ addPart(cx - doorW/2, (h-2)/2, fz + out*0.05, 0.3, h-2, 0.4, DOOR);
+ addPart(cx + doorW/2, (h-2)/2, fz + out*0.05, 0.3, h-2, 0.4, DOOR);
+ // 창문 2개
  const winY = h*0.6;
- addPart(cx - (doorW/2 + sideW/2), winY, cz - d/2 - 0.06, 1.6, 1.6, 0.15, 0x2c3e50); // 창틀
- addPart(cx - (doorW/2 + sideW/2), winY, cz - d/2 - 0.14, 1.2, 1.2, 0.1, 0xafe0ff); // 유리
- addPart(cx + (doorW/2 + sideW/2), winY, cz - d/2 - 0.06, 1.6, 1.6, 0.15, 0x2c3e50);
- addPart(cx + (doorW/2 + sideW/2), winY, cz - d/2 - 0.14, 1.2, 1.2, 0.1, 0xafe0ff);
- // 차양(문 위로 튀어나온 줄무늬 천막)
- addPart(cx, h - 2.6, cz - d/2 - 1.0, w, 0.3, 2.0, label);
- addPart(cx, h - 2.9, cz - d/2 - 1.9, w, 0.5, 0.3, 0xffffff); // 차양 앞단
- // 차양 지지 기둥
- addPart(cx - w/2 + 0.4, h-3.6, cz - d/2 - 1.9, 0.2, 1.4, 0.2, DOOR);
- addPart(cx + w/2 - 0.4, h-3.6, cz - d/2 - 1.9, 0.2, 1.4, 0.2, DOOR);
- // 지붕(경사 느낌: 큰 판 + 위에 작은 판)
+ addPart(cx - (doorW/2 + sideW/2), winY, fz + out*0.06, 1.6, 1.6, 0.15, 0x2c3e50);
+ addPart(cx - (doorW/2 + sideW/2), winY, fz + out*0.14, 1.2, 1.2, 0.1, 0xafe0ff);
+ addPart(cx + (doorW/2 + sideW/2), winY, fz + out*0.06, 1.6, 1.6, 0.15, 0x2c3e50);
+ addPart(cx + (doorW/2 + sideW/2), winY, fz + out*0.14, 1.2, 1.2, 0.1, 0xafe0ff);
+ // 차양
+ addPart(cx, h - 2.6, fz + out*1.0, w, 0.3, 2.0, label);
+ addPart(cx, h - 2.9, fz + out*1.9, w, 0.5, 0.3, 0xffffff);
+ addPart(cx - w/2 + 0.4, h-3.6, fz + out*1.9, 0.2, 1.4, 0.2, DOOR);
+ addPart(cx + w/2 - 0.4, h-3.6, fz + out*1.9, 0.2, 1.4, 0.2, DOOR);
+ // 지붕
  addPart(cx, h + 0.3, cz, w + 1.6, 0.6, d + 1.6, roofColor);
  addPart(cx, h + 0.9, cz, w*0.6, 0.6, d*0.6, roofColor);
- // 간판(문 위, 색으로 구분)
- addPart(cx, h - 0.2, cz - d/2 - 0.35, doorW + 0.6, 1.0, 0.3, label);
- // 진열대(문 앞 좌우, 상품 느낌의 작은 색 블록)
- addPart(cx - 2.4, 0.7, cz - d/2 - 2.4, 1.4, 0.5, 1.0, WOOD);
- addPart(cx - 2.4, 1.2, cz - d/2 - 2.4, 0.5, 0.5, 0.5, label);
- addPart(cx + 2.4, 0.7, cz - d/2 - 2.4, 1.4, 0.5, 1.0, WOOD);
- addPart(cx + 2.4, 1.2, cz - d/2 - 2.4, 0.5, 0.5, 0.5, label);
+ // 간판
+ addPart(cx, h - 0.2, fz + out*0.35, doorW + 0.6, 1.0, 0.3, label);
+ // 진열대
+ addPart(cx - 2.4, 0.7, fz + out*2.4, 1.4, 0.5, 1.0, WOOD);
+ addPart(cx - 2.4, 1.2, fz + out*2.4, 0.5, 0.5, 0.5, label);
+ addPart(cx + 2.4, 0.7, fz + out*2.4, 1.4, 0.5, 1.0, WOOD);
+ addPart(cx + 2.4, 1.2, fz + out*2.4, 0.5, 0.5, 0.5, label);
  }
 
- // 상점 5채 (광장 둘레에 배치, 문은 광장 쪽=-z 또는 안쪽 향하게 간단히 -z 통일)
- building(-40, -18, 12, 9, 5.5, ROOF, 0xe74c3c); // 무기점(빨강)
- building(-14, -24, 12, 9, 5.5, 0x2980b9, 0x3498db); // 방어구점(파랑)
- building( 14, -24, 12, 9, 5.5, 0x27ae60, 0x2ecc71); // 물약점(초록)
- building( 40, -18, 12, 9, 5.5, 0xf39c12, 0xf1c40f); // 잡화점(노랑)
- building( 0, 26, 14, 10, 6.5, 0x7f8c8d, 0x95a5a6); // 대장간(회색, 광장 위쪽)
+ // 광장 아래쪽(-z) 상점: 문이 +z(광장 쪽) → dir = -1
+ building(-40, -18, 12, 9, 5.5, ROOF, 0xe74c3c, -1); // 무기점(빨강)
+ building(-14, -24, 12, 9, 5.5, 0x2980b9, 0x3498db, -1); // 방어구점(파랑)
+ building( 14, -24, 12, 9, 5.5, 0x27ae60, 0x2ecc71, -1); // 물약점(초록)
+ building( 40, -18, 12, 9, 5.5, 0xf39c12, 0xf1c40f, -1); // 잡화점(노랑)
+ // 광장 위쪽(+z) 대장간: 문이 -z(광장 쪽) → dir = 1
+ building( 0, 26, 14, 10, 6.5, 0x7f8c8d, 0x95a5a6, 1); // 대장간(회색)
 
  // 스폰 표식(광장 중앙 분수 느낌)
  addPart(0, 0.4, 0, 4, 0.8, 4, STONE);
