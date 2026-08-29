@@ -1950,7 +1950,7 @@ function renderWeaponShop(body){
    '<span style="width:18px;height:18px;border-radius:4px;background:'+wc+';display:inline-block;"></span>'
    + '<span style="flex:1;">'+w.name
    + ' <span style="color:'+rc+';font-size:12px;">['+r.label+']</span><br>'
-   + '<span style="font-size:11px;color:#9fb;">데미지 '+w.dmg+' · 쿨 '+w.cd+'s · 범위 '+w.range+' · '+(w.aoe?'광역':'단일')+'</span></span>'
+   + '<span style="font-size:11px;color:#9fb;">데미지 '+w.dmg+' · 쿨 '+w.cd+'s · 사거리 '+w.range+' · '+(w.aoe?'범위공격':'단일')+'</span></span>'
    + '<span style="color:#ffd700;font-weight:bold;">'+w.price+'G</span>';
   const b = document.createElement('button');
   b.textContent = '구매';
