@@ -1919,7 +1919,21 @@ function doAttack() {
    if (fbHitsRef) { try { fbHitsRef.push({ target: id, dmg: ATTACK_DMG, t: Date.now() }); } catch(_){} break; }
   }
  }
- // TODO: 몬스터 배열과 교차 판정 → 데미지 (다음 단계)
+ // 좀비 타격: 4블록 이내 정면의 좀비에게 데미지(호스트가 HP 처리)
+ if (mpSyncOn && fbdb) {
+  const camPos2 = new THREE.Vector3(); playCam.getWorldPosition(camPos2);
+  const fwd2 = new THREE.Vector3(); playCam.getWorldDirection(fwd2);
+  const ff = new THREE.Vector3(fwd2.x,0,fwd2.z); if(ff.lengthSq()>0) ff.normalize();
+  for (const zid in zombieRender) {
+   const z = zombieRender[zid]; if (!z.fig) continue;
+   const to = new THREE.Vector3(z.fig.position.x-camPos2.x, 0, z.fig.position.z-camPos2.z);
+   const dist = to.length(); if (dist > ATTACK_RANGE) continue;
+   to.normalize(); if (ff.dot(to) < 0.5) continue;
+   // 데미지 이벤트 기록(호스트가 읽어 처리) + 타겟을 나로
+   const r = fbdb.ref('zombieHits').push({ zid, by: myPlayerId, dmg: PLAYER_ATK_DMG, t: Date.now() });
+   setTimeout(()=>{ try{r.remove();}catch(_){} }, 3000);
+  }
+ }
 }
 
 // ---------- 히트박스(F3+G) ----------
@@ -2273,6 +2287,11 @@ let zombieRender = {}; // 모두: {zid:{fig,tx,tz,hp}}
 let zombieHostAccum = 0, zombieSendAccum = 0, zombieSpawned = false;
 const ZOMBIE_HP = 50, ZOMBIE_RANGE = 2, ZOMBIE_AGGRO = 10, ZOMBIE_SPEED = 2.2, ZOMBIE_DMG = 5, ZOMBIE_COUNT = 10;
 const HUNT_CX = 170, HUNT_CZ = 0, HUNT_HALF = 60;
+// 좀비 처치·드롭 전역
+const PLAYER_ATK_DMG = 25; // 내 공격이 좀비에게 주는 데미지(50이면 2대)
+let fbDropsRef = null;
+let drops = {}; // {did:{fig, x, z, item}}
+const PICKUP_RANGE = 0.5; // 줍기 범위(칸)
 let fbPlayersRef = null; // players 전체 참조
 let fbMeRef = null; // 내 위치 참조
 let mpSyncOn = false; // Firebase 동기화 중?
@@ -2374,6 +2393,10 @@ function leaveMultiplayer() {
  if (fbZombiesRef) { try { fbZombiesRef.off(); } catch(e){} fbZombiesRef = null; }
  for (const id in zombieRender){ if(zombieRender[id].fig) scene.remove(zombieRender[id].fig); }
  zombieRender = {}; zombieSim = {}; zombieSpawned = false; isZombieHost = false;
+ // 드롭(좀비 고기) 정리
+ if (fbDropsRef) { try { fbDropsRef.off(); } catch(e){} fbDropsRef = null; }
+ for (const id in drops){ if(drops[id].fig) scene.remove(drops[id].fig); }
+ drops = {};
  for (const id in remotePlayers) { if (remotePlayers[id].fig) scene.remove(remotePlayers[id].fig); }
  for (const id in remotePlayers) delete remotePlayers[id];
  if (chatBtn) chatBtn.style.display = 'none';
@@ -2793,6 +2816,23 @@ function animate() {
    }
   }
  }
+ // 좀비 고기 줍기 판정 (0.5칸 이내 → 인벤 첫 빈칸)
+ if (mpSyncOn && fbdb) {
+  for (const id in drops) {
+   const d = drops[id];
+   const dx = d.x - yawObject.position.x, dz = d.z - yawObject.position.z;
+   if (Math.hypot(dx,dz) < PICKUP_RANGE) {
+    let slot = inventory.findIndex(x=>!x);
+    if (slot >= 0) {
+     inventory[slot] = { name:d.item.name, color:d.item.color, count:1 };
+     saveInv(); renderHotbar(); if (invOpen) renderInvGrid();
+     if (d.fig) scene.remove(d.fig); delete drops[id];
+     fbdb.ref('drops/'+id).remove(); // 주운 드롭 제거(공유)
+     if (typeof flash==='function') flash('좀비고기 획득');
+    }
+   }
+  }
+ }
  // 공격 쿨타임 & 주먹 뷰모델 스윙 애니
  if (invuln > 0) invuln -= dt; // 피격 무적 타이머 감소
  if (attackCooldown > 0) attackCooldown -= dt;
@@ -3182,6 +3222,28 @@ function startFirebaseSync() {
  fbZombiesRef.on('child_removed', (s) => {
   const z = zombieRender[s.key]; if (z && z.fig) scene.remove(z.fig); delete zombieRender[s.key];
  });
+ // 좀비 피격 구독 (처리는 호스트만)
+ fbdb.ref('zombieHits').on('child_added', (snap) => {
+  if (!isZombieHost) return;
+  const h = snap.val(); if (!h || !h.zid) return;
+  const s = zombieSim[h.zid]; if (!s) return;
+  s.hp -= (h.dmg || 10);
+  s.target = h.by; // 때린 사람을 쫓아감
+  if (s.hp <= 0) {
+   // 처치: 드롭 생성 + 좀비 제거
+   spawnDrop(s.x, s.z, { name:'좀비고기', color:0x8b3a3a });
+   delete zombieSim[h.zid];
+   if (fbdb) fbdb.ref('zombies/'+h.zid).remove();
+   // 잠시 후 새 좀비 리스폰(개체수 유지)
+   setTimeout(()=>{ if(!isZombieHost) return; respawnOneZombie(); }, 4000);
+  } else {
+   if (fbdb) fbdb.ref('zombies/'+h.zid).update({ hp:s.hp });
+  }
+ });
+ // 드롭(좀비 고기) 구독
+ fbDropsRef = fbdb.ref('drops');
+ fbDropsRef.on('child_added', onDropUpdate);
+ fbDropsRef.on('child_removed', (s)=>{ const d=drops[s.key]; if(d&&d.fig) scene.remove(d.fig); delete drops[s.key]; });
  // 채팅 구독 (최근 메시지)
  fbdb.ref('chat').limitToLast(1).on('child_added', (snap) => {
   const c = snap.val(); if (!c) return;
@@ -3189,6 +3251,26 @@ function startFirebaseSync() {
   if (c.t && Date.now() - c.t < 15000) addChatLine(c.nick, String(c.text||'').slice(0,120), false);
  });
  enterMultiplayerGame();
+}
+
+// ═══ 좀비 고기 드롭: 생성(호스트)·공유·줍기 ═══
+function spawnDrop(x, z, item){
+ if (!fbdb) return;
+ const did = 'd'+Date.now().toString(36)+Math.floor(Math.random()*100);
+ fbdb.ref('drops/'+did).set({ x, z, name:item.name, color:item.color, t:Date.now() });
+}
+function onDropUpdate(snap){
+ const id = snap.key, d = snap.val(); if (!d) return;
+ if (!drops[id]) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.4,0.4), new THREE.MeshStandardMaterial({color:d.color||0x8b3a3a}));
+  m.position.set(d.x, 0.4, d.z); scene.add(m);
+  drops[id] = { fig:m, x:d.x, z:d.z, item:{name:d.name,color:d.color} };
+ }
+}
+function respawnOneZombie(){
+ const zid = 'z'+Date.now().toString(36);
+ zombieSim[zid] = { x: HUNT_CX+(Math.random()*2-1)*HUNT_HALF, z: HUNT_CZ+(Math.random()*2-1)*HUNT_HALF, hp: ZOMBIE_HP, target:null, atkCd:0 };
+ if (fbdb) fbdb.ref('zombies/'+zid).set({ x:zombieSim[zid].x, z:zombieSim[zid].z, hp:ZOMBIE_HP, t:Date.now() });
 }
 
 function onPlayerUpdate(snap) {
