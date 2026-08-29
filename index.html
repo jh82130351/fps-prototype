@@ -181,6 +181,7 @@
 <div id="splash"></div>
 <div id="marquee"></div>
 <div id="hud"></div>
+<div id="goldHud" style="position:fixed;top:12px;right:12px;z-index:40;background:rgba(0,0,0,0.4);color:#ffd700;font-weight:bold;font-size:15px;padding:6px 12px;border-radius:10px;display:none;">💰 0 G</div>
 <div id="mode" class="play">PLAY</div>
 
 <!-- 상점 창 -->
@@ -452,6 +453,11 @@ grid.position.y = 0.01; scene.add(grid);
 const boxMat = [0xe74c3c, 0xf39c12, 0x3498db, 0x9b59b6, 0x1abc9c];
 const TYPES = ['solid', 'water', 'checkpoint', 'lava', 'jump', 'point'];
 let playerPoints = parseInt(localStorage.getItem('fpsPoints')|| '0', 10) ||0;
+// 골드 시스템
+let gold = parseInt(localStorage.getItem('fpsGold') || '0', 10) || 0;
+function saveGold(){ try{ localStorage.setItem('fpsGold', String(gold)); }catch(e){} }
+function addGold(n){ gold += n; saveGold(); updateGoldHud(); }
+function updateGoldHud(){ const el=document.getElementById('goldHud'); if(el) el.textContent='💰 '+gold+' G'; }
 const ARENA_SPAWN = { x: 0, y: 1.7 + 0.5, z: -6 }; // 마을 광장(분수 앞)에서 시작
 const parts = [];
 let colliders = [];
@@ -1901,9 +1907,53 @@ canvas.addEventListener('wheel', (e)=>{
 canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit' || mpActive) e.preventDefault(); });
 
 // ---------- 상점(상인 우클릭) ----------
+const SELL_PRICES = { '좀비고기': 5 }; // 아이템명: 판매가(G)
+function countItem(name){ let c=0; for(const it of inventory){ if(it&&it.name===name) c+=(it.count||1); } return c; }
+function sellOne(name){
+ const price = SELL_PRICES[name]; if(!price) return;
+ // 인벤에서 1개 제거
+ for(let i=0;i<inventory.length;i++){
+  const it=inventory[i];
+  if(it&&it.name===name){
+   if(it.count&&it.count>1) it.count-=1; else inventory[i]=null;
+   addGold(price); saveInv(); renderHotbar(); if(invOpen) renderInvGrid(); updateHeldItem();
+   break;
+  }
+ }
+ // 목록 갱신
+ const body=document.getElementById('shopBody'); if(body) renderSellList(body);
+}
+function renderSellList(body){
+ body.innerHTML = '<div style="margin-bottom:8px;color:#ffd700;">💰 '+gold+' G</div>';
+ let any=false;
+ for(const name in SELL_PRICES){
+  const n = countItem(name);
+  if(n<=0) continue; any=true;
+  const price=SELL_PRICES[name];
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0;';
+  row.innerHTML='<span>'+name+' x'+n+' <span style="color:#9fb">('+price+'G/개)</span></span>';
+  const btns=document.createElement('span');
+  const b1=document.createElement('button'); b1.textContent='1개 팔기';
+  b1.style.cssText='background:#27ae60;color:#fff;border:none;border-radius:8px;padding:6px 10px;margin-left:6px;cursor:pointer;';
+  b1.onclick=(e)=>{ e.stopPropagation(); sellOne(name); };
+  const b2=document.createElement('button'); b2.textContent='전부 팔기';
+  b2.style.cssText='background:#2980b9;color:#fff;border:none;border-radius:8px;padding:6px 10px;margin-left:6px;cursor:pointer;';
+  b2.onclick=(e)=>{ e.stopPropagation(); for(let k=0;k<countItem(name);k++) sellOne(name); };
+  btns.appendChild(b1); btns.appendChild(b2); row.appendChild(btns);
+  body.appendChild(row);
+ }
+ if(!any){ const p=document.createElement('div'); p.textContent='팔 수 있는 물건이 없어요.'; body.appendChild(p); }
+}
 function openShop(type) {
  const modal = document.getElementById('shopModal');
  document.getElementById('shopTitle').textContent = type;
+ const body = document.getElementById('shopBody');
+ if (type === '잡화 상인') {
+  renderSellList(body);
+ } else {
+  body.innerHTML = '준비 중 — 곧 물건을 사고팔 수 있어요.';
+ }
  modal.style.display = 'flex';
  document.exitPointerLock && document.exitPointerLock(); // 마우스 풀어 클릭 가능하게
 }
@@ -2438,6 +2488,8 @@ const PEER_OPTS = {
 // 멀티플레이 연결 성공 시 플레이 진입 공통 함수
 function enterMultiplayerGame() {
  if (mpPanel) mpPanel.style.display = 'none';
+ // 골드 HUD 표시
+ const gh=document.getElementById('goldHud'); if(gh){gh.style.display='block';} updateGoldHud();
  if (overlay) overlay.style.display = 'none';
  started = true;
  crosshair.style.display = 'block';
@@ -2461,6 +2513,8 @@ function enterMultiplayerGame() {
 // 멀티 종료 시 싱글 월드 복원
 function leaveMultiplayer() {
  mpActive = false; mpSyncOn = false;
+ // 골드 HUD 숨김
+ const gh=document.getElementById('goldHud'); if(gh) gh.style.display='none';
  const hb=document.getElementById('hotbar'); if(hb) hb.style.display='none'; if(invOpen) toggleInv();
  for (const n of npcs) { if (n.fig) scene.remove(n.fig); }
  npcs = [];
