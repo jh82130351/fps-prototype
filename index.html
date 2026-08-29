@@ -154,13 +154,13 @@
  #overlayHelp { margin-top:20px; }
 
  #touchControls { position:absolute; inset:0; z-index:7; pointer-events:none; }
- #joystick { position:absolute; left:24px; bottom:24px; width:120px; height:120px; border-radius:50%;
+ #joystick { position:absolute; left:5vmin; bottom:5vmin; width:32vmin; height:32vmin; max-width:150px; max-height:150px; min-width:90px; min-height:90px; border-radius:50%;
   background:rgba(255,255,255,0.12); border:2px solid rgba(255,255,255,0.3); pointer-events:auto; touch-action:none; }
  #joystick.run { background:rgba(46,204,113,0.28); border-color:#2ecc71; }
  #joystick.run #joyKnob { background:rgba(46,204,113,0.85); }
- #joyKnob { position:absolute; left:35px; top:35px; width:50px; height:50px; border-radius:50%;
+ #joyKnob { position:absolute; left:33%; top:33%; width:34%; height:34%; border-radius:50%;
   background:rgba(255,255,255,0.5); }
- #btnJump { position:absolute; right:24px; bottom:40px; width:88px; height:88px; border-radius:50%;
+ #btnJump { position:absolute; right:5vmin; bottom:8vmin; width:24vmin; height:24vmin; max-width:110px; max-height:110px; min-width:70px; min-height:70px; border-radius:50%;
   background:rgba(255,255,255,0.18); border:2px solid rgba(255,255,255,0.35); color:#fff; font-size:15px;
   font-weight:600; pointer-events:auto; touch-action:none; }
  /* 모바일 전용: 모드 전환 버튼 (touchControls 밖, 상태에 따라 위치 변경) */
@@ -1338,14 +1338,19 @@ function joyUpdate(t) {
  if (len > max) { dx = dx / len * max; dy = dy / len * max; }
  touchMove.x = dx / max;
  touchMove.y = dy / max;
- joyKnob.style.left = (35 + (dx / max) * 25) + 'px';
- joyKnob.style.top = (35 + (dy / max) * 25) + 'px';
+ // 노브 이동: 조이스틱 실제 크기 기준 (중앙 오프셋 = 크기의 25%, 최대 이동 = 크기의 20%)
+ const _off = r.width * 0.25;
+ const _mv = r.width * 0.2;
+ joyKnob.style.left = (_off + (dx / max) * _mv) + 'px';
+ joyKnob.style.top = (_off + (dy / max) * _mv) + 'px';
 }
 function joyReset() {
  touchMove.x = 0; touchMove.y = 0;
  touchRun = false;
  joyEl.classList.remove('run');
- joyKnob.style.left = '35px'; joyKnob.style.top = '35px';
+ const _r = joyEl.getBoundingClientRect();
+ const _off = _r.width * 0.25;
+ joyKnob.style.left = _off + 'px'; joyKnob.style.top = _off + 'px';
 }
 joyEl.addEventListener('touchstart', (e) => {
  e.preventDefault();
@@ -1998,7 +2003,8 @@ function slotHtml(item){
 }
 function renderHotbar(){
  const el=document.getElementById('hotbar'); if(!el) return; el.innerHTML='';
- const sz = isTouch ? 34 : 48; // 모바일은 작게
+ // 모바일은 화면 폭에 비례(8칸이 폭을 넘지 않게), PC는 고정
+ const sz = isTouch ? Math.max(28, Math.min(44, Math.floor(window.innerWidth / 12))) : 48;
  const num = isTouch ? 8 : 10;
  for(let i=0;i<8;i++){
   const d=document.createElement('div');
