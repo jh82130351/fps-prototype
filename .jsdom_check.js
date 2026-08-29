@@ -79,13 +79,20 @@ results.h_remote_held = has("d.held !== undefined && d.held !== rp.heldColor") &
 // ─── 골드 시스템 + 잡화 상인 판매 ───
 // ① 골드 상태
 results.g_gold_state = has("let gold = parseInt(localStorage.getItem('fpsGold')") && has("function saveGold()") && has("function addGold(n)") && has("function updateGoldHud()");
-// ② 골드 HUD
-results.g_gold_hud = has("id=\"goldHud\"") && has("gh.style.display='block';") && has("gh.style.display='none';") && has("el.textContent='💰 '+gold+' G'");
+// ② 골드 HUD (메인 HUD 텍스트에 통합됨 — 별도 goldHud div 제거)
+results.g_gold_hud = has("' 💰 ' + gold") && has("updateGoldHud(){ /* 골드는 메인 HUD 텍스트에 표시됨 */ }");
 // ③ 판매 가격표 + UI
-results.g_sell = has("const SELL_PRICES = { '좀비고기': 5 }") && has("function countItem") && has("function sellOne") && has("function renderSellList") && has("type === '잡화 상인'");
+results.g_sell = has("const SELL_PRICES = { '좀비고기': 1 }") && has("function countItem") && has("function sellOne") && has("function renderSellList") && has("type === '잡화 상인'");
 // 렌더렉: 3개 함수 미생성(sellAll/sellOneNoRefresh/addGoldRefreshAfterSellAll)
 results.g_no_fake = !has("function sellAll") && !has("function sellOneNoRefresh") && !has("function addGoldRefreshAfterSellAll");
-console.log('=== JSDOM LOAD CHECK (hunting + zombie + held + gold) ===');
+// ─── 무기점 구매 [1단계: 데이터 + 구매] ───
+// ① 무기 데이터
+results.w_data = has("const RARITY = { common") && has("const WEAPONS = [") && has("function weaponById") && has("battle_axe");
+// ② openShop 무기 상인 분기
+results.w_shop = has("type === '무기 상인'") && has("renderWeaponShop(body);");
+// ③ 구매 로직
+results.w_buy = has("function buyWeapon") && has("function renderWeaponShop") && has("weaponId:w.id") && has("gold < w.price");
+console.log('=== JSDOM LOAD CHECK (hunting + zombie + held + gold + weapons) ===');
 console.log('=== JSDOM LOAD CHECK (hunting ground + zombie A) ===');
 let allPass = true;
 for (const [k, v] of Object.entries(results)) { console.log('  ' + (v ? 'PASS  ' : 'FAIL  ') + k); if (!v) allPass = false; }

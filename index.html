@@ -1907,6 +1907,59 @@ canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit' || mpActive)
 
 // ---------- 상점(상인 우클릭) ----------
 const SELL_PRICES = { '좀비고기': 1 }; // 아이템명: 판매가(G)
+// ─── 무기 데이터 ───
+// 등급: common(흔한, 회색) / normal(일반, 초록)
+const RARITY = { common: { label:'흔한', color:0x9aa5b1 }, normal: { label:'일반', color:0x2ecc71 } };
+const WEAPONS = [
+ // 흔한 등급
+ { id:'wood_bat', name:'나무 방망이', rarity:'common', price:10, dmg:8, cd:0.5, range:4, aoe:false, color:0x8d6e4a },
+ { id:'old_dagger', name:'낡은 단검', rarity:'common', price:15, dmg:6, cd:0.3, range:3, aoe:false, color:0x95a5a6 },
+ { id:'stone_axe', name:'돌도끼', rarity:'common', price:25, dmg:12, cd:0.7, range:4, aoe:false, color:0x7f8c8d },
+ { id:'wood_spear', name:'나무창', rarity:'common', price:30, dmg:10, cd:0.5, range:6, aoe:false, color:0xa0522d },
+ { id:'stone_maul', name:'돌망치', rarity:'common', price:40, dmg:15, cd:0.9, range:4, aoe:true, color:0x808b96 },
+ // 일반 등급
+ { id:'wood_sword', name:'나무검', rarity:'normal', price:100, dmg:18, cd:0.5, range:4, aoe:false, color:0xc19a6b },
+ { id:'long_spear', name:'장창', rarity:'normal', price:180, dmg:20, cd:0.6, range:8, aoe:false, color:0xb8860b },
+ { id:'steel_sword',name:'강철검', rarity:'normal', price:200, dmg:25, cd:0.5, range:4, aoe:false, color:0xbdc3c7 },
+ { id:'rapier', name:'레이피어', rarity:'normal', price:220, dmg:16, cd:0.25, range:4, aoe:false, color:0xdfe6e9 },
+ { id:'battle_axe', name:'전투도끼', rarity:'normal', price:250, dmg:30, cd:0.8, range:4, aoe:true, color:0x636e72 }
+];
+function weaponById(id){ return WEAPONS.find(w=>w.id===id) || null; }
+// ─── 무기 구매 ───
+function buyWeapon(id){
+ const w = weaponById(id); if(!w) return;
+ if (gold < w.price) { if(typeof flash==='function') flash('골드가 부족해요'); return; }
+ let slot = inventory.findIndex(x=>!x);
+ if (slot < 0) { if(typeof flash==='function') flash('가방이 가득 찼어요'); return; }
+ gold -= w.price; saveGold(); updateGoldHud();
+ inventory[slot] = { name:w.name, color:w.color, count:1, weaponId:w.id }; // 무기는 weaponId로 식별
+ saveInv(); renderHotbar(); if(invOpen) renderInvGrid(); updateHeldItem();
+ if(typeof flash==='function') flash(w.name + ' 구매!');
+ const body=document.getElementById('shopBody'); if(body) renderWeaponShop(body); // 골드 갱신 반영
+}
+function renderWeaponShop(body){
+ body.innerHTML = '<div style="margin-bottom:8px;color:#ffd700;">💰 '+gold+' G</div>';
+ body.style.maxHeight = '360px'; body.style.overflowY = 'auto';
+ for (const w of WEAPONS){
+  const r = RARITY[w.rarity];
+  const rc = '#'+(r.color>>>0).toString(16).padStart(6,'0').slice(-6);
+  const wc = '#'+(w.color>>>0).toString(16).padStart(6,'0').slice(-6);
+  const row = document.createElement('div');
+  row.style.cssText='display:flex;align-items:center;gap:8px;margin:6px 0;padding:6px;border-radius:8px;background:rgba(255,255,255,0.05);';
+  row.innerHTML =
+   '<span style="width:18px;height:18px;border-radius:4px;background:'+wc+';display:inline-block;"></span>'
+   + '<span style="flex:1;">'+w.name
+   + ' <span style="color:'+rc+';font-size:12px;">['+r.label+']</span><br>'
+   + '<span style="font-size:11px;color:#9fb;">데미지 '+w.dmg+' · 쿨 '+w.cd+'s · 범위 '+w.range+' · '+(w.aoe?'광역':'단일')+'</span></span>'
+   + '<span style="color:#ffd700;font-weight:bold;">'+w.price+'G</span>';
+  const b = document.createElement('button');
+  b.textContent = '구매';
+  b.style.cssText='background:#e67e22;color:#fff;border:none;border-radius:8px;padding:6px 12px;margin-left:6px;cursor:pointer;';
+  b.onclick=(e)=>{ e.stopPropagation(); buyWeapon(w.id); };
+  row.appendChild(b);
+  body.appendChild(row);
+ }
+}
 function countItem(name){ let c=0; for(const it of inventory){ if(it&&it.name===name) c+=(it.count||1); } return c; }
 function sellOne(name){
  const price = SELL_PRICES[name]; if(!price) return;
@@ -1950,6 +2003,8 @@ function openShop(type) {
  const body = document.getElementById('shopBody');
  if (type === '잡화 상인') {
   renderSellList(body);
+ } else if (type === '무기 상인') {
+  renderWeaponShop(body);
  } else {
   body.innerHTML = '준비 중 — 곧 물건을 사고팔 수 있어요.';
  }
