@@ -1148,13 +1148,28 @@ scene.add(yawObject);
 // 1인칭 주먹 뷰모델: 카메라에 붙는 손 (좌클릭 공격 애니용)
 const fistView = new THREE.Group();
 const armMat = new THREE.MeshStandardMaterial({ color: 0xe8b88a });
-const forearm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.5), armMat);
+// 팔뚝(두껍게)
+const forearm = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.5), armMat);
 forearm.position.set(0, 0, -0.25);
-const fist = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), armMat);
-fist.position.set(0, 0, -0.55);
-fistView.add(forearm); fistView.add(fist);
-fistView.position.set(0.32, -0.42, -0.5); // 오른쪽 아래 구석
-fistView.rotation.set(0.25, -0.25, 0); // 안쪽으로 비스듬히
+fistView.add(forearm);
+// 손바닥
+const palm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.14, 0.24), armMat);
+palm.position.set(0, 0, -0.56);
+fistView.add(palm);
+// 손가락 4개 (손바닥 앞으로)
+const fingerGeo = new THREE.BoxGeometry(0.05, 0.05, 0.16);
+for (let i = 0; i < 4; i++) {
+ const f = new THREE.Mesh(fingerGeo, armMat);
+ f.position.set(-0.09 + i * 0.06, 0.02, -0.74);
+ fistView.add(f);
+}
+// 엄지 (옆으로)
+const thumb = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.12), armMat);
+thumb.position.set(0.15, 0, -0.55);
+thumb.rotation.y = 0.5;
+fistView.add(thumb);
+fistView.position.set(0.32, -0.42, -0.5);
+fistView.rotation.set(0.25, -0.25, 0);
 playCam.add(fistView);
 const FIST_REST = { px:0.32, py:-0.42, pz:-0.5, rx:0.25 };
 
