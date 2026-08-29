@@ -181,7 +181,6 @@
 <div id="splash"></div>
 <div id="marquee"></div>
 <div id="hud"></div>
-<div id="goldHud" style="position:fixed;top:12px;right:12px;z-index:40;background:rgba(0,0,0,0.4);color:#ffd700;font-weight:bold;font-size:15px;padding:6px 12px;border-radius:10px;display:none;">💰 0 G</div>
 <div id="mode" class="play">PLAY</div>
 
 <!-- 상점 창 -->
@@ -457,7 +456,7 @@ let playerPoints = parseInt(localStorage.getItem('fpsPoints')|| '0', 10) ||0;
 let gold = parseInt(localStorage.getItem('fpsGold') || '0', 10) || 0;
 function saveGold(){ try{ localStorage.setItem('fpsGold', String(gold)); }catch(e){} }
 function addGold(n){ gold += n; saveGold(); updateGoldHud(); }
-function updateGoldHud(){ const el=document.getElementById('goldHud'); if(el) el.textContent='💰 '+gold+' G'; }
+function updateGoldHud(){ /* 골드는 메인 HUD 텍스트에 표시됨 */ }
 const ARENA_SPAWN = { x: 0, y: 1.7 + 0.5, z: -6 }; // 마을 광장(분수 앞)에서 시작
 const parts = [];
 let colliders = [];
@@ -2488,8 +2487,7 @@ const PEER_OPTS = {
 // 멀티플레이 연결 성공 시 플레이 진입 공통 함수
 function enterMultiplayerGame() {
  if (mpPanel) mpPanel.style.display = 'none';
- // 골드 HUD 표시
- const gh=document.getElementById('goldHud'); if(gh){gh.style.display='block';} updateGoldHud();
+ updateGoldHud();
  if (overlay) overlay.style.display = 'none';
  started = true;
  crosshair.style.display = 'block';
@@ -2513,8 +2511,6 @@ function enterMultiplayerGame() {
 // 멀티 종료 시 싱글 월드 복원
 function leaveMultiplayer() {
  mpActive = false; mpSyncOn = false;
- // 골드 HUD 숨김
- const gh=document.getElementById('goldHud'); if(gh) gh.style.display='none';
  const hb=document.getElementById('hotbar'); if(hb) hb.style.display='none'; if(invOpen) toggleInv();
  for (const n of npcs) { if (n.fig) scene.remove(n.fig); }
  npcs = [];
@@ -2765,7 +2761,7 @@ function physics(dt) {
  inWater = nowInWater;
 
  const p = pos;
- hud.textContent = (playerNick ? playerNick + '\n' : '') + '🏆 ' + playerPoints + (mpActive ? ' 👥 ' + mpPlayerCount : '') + '\n' +
+ hud.textContent = (playerNick ? playerNick + '\n' : '') + '🏆 ' + playerPoints + ' 💰 ' + gold + (mpActive ? ' 👥 ' + mpPlayerCount : '') + '\n' +
   'x:'+p.x.toFixed(1)+' z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
   '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'')+(onCheckpoint?' · ✓체크포인트':'');
 
