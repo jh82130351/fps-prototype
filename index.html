@@ -1180,12 +1180,12 @@ fistView.rotation.set(0.25, -0.25, 0);
 playCam.add(fistView);
 // 손에 든 아이템 뷰모델 (주먹 앞)
 const heldItemView = new THREE.Mesh(
- new THREE.BoxGeometry(0.22, 0.22, 0.22),
+ new THREE.BoxGeometry(0.18, 0.18, 0.18),
  new THREE.MeshStandardMaterial({ color: 0x8b3a3a })
 );
-heldItemView.position.set(0.32, -0.36, -0.62); // 손 앞
+heldItemView.position.set(0, 0.02, -0.7); // 손(fistView) 기준 손가락 끝
 heldItemView.visible = false;
-playCam.add(heldItemView);
+fistView.add(heldItemView); // 손의 자식 → 손 따라 움직임·스윙
 const FIST_REST = { px:0.32, py:-0.42, pz:-0.5, rx:0.25 };
 
 const editCam = new THREE.PerspectiveCamera(60, aspect(), 0.1, 2000);
