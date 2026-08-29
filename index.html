@@ -1906,7 +1906,7 @@ canvas.addEventListener('wheel', (e)=>{
 canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit' || mpActive) e.preventDefault(); });
 
 // ---------- 상점(상인 우클릭) ----------
-const SELL_PRICES = { '좀비고기': 1 }; // 아이템명: 판매가(G)
+const SELL_PRICES = { '좀비고기': 1, '엘리트 좀비고기': 50 }; // 아이템명: 판매가(G)
 // ─── 무기 데이터 ───
 // 등급: common(흔한, 회색) / normal(일반, 초록)
 const RARITY = { common: { label:'흔한', color:0x9aa5b1 }, normal: { label:'일반', color:0x2ecc71 } };
@@ -2475,6 +2475,7 @@ let zombieSim = {}; // 호스트 전용: {zid:{x,z,hp,target,atkCd}}
 let zombieRender = {}; // 모두: {zid:{fig,tx,tz,hp}}
 let zombieHostAccum = 0, zombieSendAccum = 0, zombieSpawned = false;
 const ZOMBIE_HP = 50, ZOMBIE_RANGE = 2, ZOMBIE_AGGRO = 10, ZOMBIE_SPEED = 2.2, ZOMBIE_DMG = 5, ZOMBIE_COUNT = 10;
+const ELITE_HP = 200, ELITE_CHANCE = 1/80; // 스폰 시 1/80 확률로 엘리트
 const HUNT_CX = 170, HUNT_CZ = 0, HUNT_HALF = 60;
 // 좀비 처치·드롭 전역
 const PLAYER_ATK_DMG = 25; // 내 공격이 좀비에게 주는 데미지(50이면 2대)
@@ -2888,11 +2889,13 @@ function lerpAngle(a, b, t) {
 function onZombieUpdate(snap) {
  const id = snap.key, d = snap.val(); if (!d || typeof d.x !== 'number') return;
  if (!zombieRender[id]) {
-  const fig = makeCharacter({ skin:0x4a7c3a, shirt:0x2d5016, pants:0x1a3009, face:4 });
-  const tag = makeNameTag('좀비'); fig.add(tag);
+  const isElite = !!d.elite;
+  const fig = makeCharacter({ skin: isElite?0x2f5d2f:0x4a7c3a, shirt: isElite?0x1a3a0a:0x2d5016, pants:0x1a3009, face:4 });
+  if (isElite) fig.scale.set(1.6, 1.6, 1.6); // 엘리트는 크게
+  const tag = makeNameTag(isElite?'엘리트 좀비':'좀비'); fig.add(tag);
   scene.add(fig);
-  zombieRender[id] = { fig, tx:d.x, tz:d.z, hp:d.hp };
-  fig.position.set(d.x, 0.3, d.z);
+  zombieRender[id] = { fig, tx:d.x, tz:d.z, hp:d.hp, elite:isElite };
+  fig.position.set(d.x, isElite?0.5:0.3, d.z);
  }
  const z = zombieRender[id];
  z.tx = d.x; z.tz = d.z; z.hp = d.hp;
@@ -2918,14 +2921,15 @@ function spawnZombies() {
  zombieSim = {};
  for (let i=0;i<ZOMBIE_COUNT;i++){
   const zid = 'z'+i;
+  const elite = Math.random() < ELITE_CHANCE;
   zombieSim[zid] = {
    x: HUNT_CX + (Math.random()*2-1)*HUNT_HALF,
    z: HUNT_CZ + (Math.random()*2-1)*HUNT_HALF,
-   hp: ZOMBIE_HP, target: null, atkCd: 0
+   hp: elite ? ELITE_HP : ZOMBIE_HP, elite: elite, target: null, atkCd: 0
   };
  }
  const obj = {};
- for (const zid in zombieSim){ const s=zombieSim[zid]; obj[zid]={x:s.x,z:s.z,hp:s.hp,t:Date.now()}; }
+ for (const zid in zombieSim){ const s=zombieSim[zid]; obj[zid]={x:s.x,z:s.z,hp:s.hp,elite:!!s.elite,t:Date.now()}; }
  if (fbdb) fbdb.ref('zombies').set(obj);
 }
 function updateZombieSim(dt) {
@@ -3005,7 +3009,7 @@ function animate() {
    zombieSendAccum += dt;
    if (zombieSendAccum > 0.12 && fbdb) { // ~8회/초 위치 전송
     zombieSendAccum = 0;
-    for (const zid in zombieSim){ const s=zombieSim[zid]; fbdb.ref('zombies/'+zid).update({x:s.x, z:s.z, hp:s.hp, t:Date.now()}); }
+    for (const zid in zombieSim){ const s=zombieSim[zid]; fbdb.ref('zombies/'+zid).update({x:s.x, z:s.z, hp:s.hp, elite:!!s.elite, t:Date.now()}); }
    }
   }
  }
@@ -3425,7 +3429,8 @@ function startFirebaseSync() {
   s.target = h.by; // 때린 사람을 쫓아감
   if (s.hp <= 0) {
    // 처치: 드롭 생성 + 좀비 제거
-   spawnDrop(s.x, s.z, { name:'좀비고기', color:0x8b3a3a });
+   if (s.elite) spawnDrop(s.x, s.z, { name:'엘리트 좀비고기', color:0xffcc33 });
+   else spawnDrop(s.x, s.z, { name:'좀비고기', color:0x8b3a3a });
    delete zombieSim[h.zid];
    if (fbdb) fbdb.ref('zombies/'+h.zid).remove();
    // 잠시 후 새 좀비 리스폰(개체수 유지)
@@ -3466,8 +3471,9 @@ function onDropUpdate(snap){
 }
 function respawnOneZombie(){
  const zid = 'z'+Date.now().toString(36);
- zombieSim[zid] = { x: HUNT_CX+(Math.random()*2-1)*HUNT_HALF, z: HUNT_CZ+(Math.random()*2-1)*HUNT_HALF, hp: ZOMBIE_HP, target:null, atkCd:0 };
- if (fbdb) fbdb.ref('zombies/'+zid).set({ x:zombieSim[zid].x, z:zombieSim[zid].z, hp:ZOMBIE_HP, t:Date.now() });
+ const elite = Math.random() < ELITE_CHANCE;
+ zombieSim[zid] = { x: HUNT_CX+(Math.random()*2-1)*HUNT_HALF, z: HUNT_CZ+(Math.random()*2-1)*HUNT_HALF, hp: elite?ELITE_HP:ZOMBIE_HP, elite:elite, target:null, atkCd:0 };
+ if (fbdb) fbdb.ref('zombies/'+zid).set({ x:zombieSim[zid].x, z:zombieSim[zid].z, hp:zombieSim[zid].hp, elite:elite, t:Date.now() });
 }
 const DROP_TTL = 300000; // 5분(ms)
 function cleanOldDrops() {

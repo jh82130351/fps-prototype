@@ -58,7 +58,7 @@ results.zombie_attack = has("from:'zombie', dmg:ZOMBIE_DMG");
 // ① 전역 선언
 results.b_globals = has("const PLAYER_ATK_DMG = 25") && has("let fbDropsRef = null") && has("const PICKUP_RANGE = 0.5");
 // ② doAttack 좀비 타격
-results.b_doattack = has("fbdb.ref('zombieHits').push({ zid, by: myPlayerId, dmg: PLAYER_ATK_DMG") && has("if (ff.dot(to) < 0.5) continue;");
+results.b_doattack = has("fbdb.ref('zombieHits').push({ zid, by: myPlayerId, dmg: PLAYER_ATK_DMG") && has("fwd2.dot(dir3) < 0.3") && has("zc.z - camPos2.z");
 // ③ 호스트 피격 처리 + 헬퍼
 results.b_host_hit = has("fbdb.ref('zombieHits').on('child_added'") && has("s.target = h.by") && has("function respawnOneZombie") && has("spawnDrop(s.x, s.z, { name:'좀비고기'");
 // ④ 드롭 생성·공유·줍기
@@ -82,7 +82,7 @@ results.g_gold_state = has("let gold = parseInt(localStorage.getItem('fpsGold')"
 // ② 골드 HUD (메인 HUD 텍스트에 통합됨 — 별도 goldHud div 제거)
 results.g_gold_hud = has("' 💰 ' + gold") && has("updateGoldHud(){ /* 골드는 메인 HUD 텍스트에 표시됨 */ }");
 // ③ 판매 가격표 + UI
-results.g_sell = has("const SELL_PRICES = { '좀비고기': 1 }") && has("function countItem") && has("function sellOne") && has("function renderSellList") && has("type === '잡화 상인'");
+results.g_sell = has("const SELL_PRICES = { '좀비고기': 1, '엘리트 좀비고기': 50 }") && has("function countItem") && has("function sellOne") && has("function renderSellList") && has("type === '잡화 상인'");
 // 렌더렉: 3개 함수 미생성(sellAll/sellOneNoRefresh/addGoldRefreshAfterSellAll)
 results.g_no_fake = !has("function sellAll") && !has("function sellOneNoRefresh") && !has("function addGoldRefreshAfterSellAll");
 // ─── 무기점 구매 [1단계: 데이터 + 구매] ───
@@ -92,7 +92,13 @@ results.w_data = has("const RARITY = { common") && has("const WEAPONS = [") && h
 results.w_shop = has("type === '무기 상인'") && has("renderWeaponShop(body);");
 // ③ 구매 로직
 results.w_buy = has("function buyWeapon") && has("function renderWeaponShop") && has("weaponId:w.id") && has("gold < w.price");
-console.log('=== JSDOM LOAD CHECK (hunting + zombie + held + gold + weapons) ===');
+// ─── 엘리트 좀비 ───
+results.e_const = has("const ELITE_HP = 200, ELITE_CHANCE = 1/80");
+results.e_sell = has("'엘리트 좀비고기': 50");
+results.e_spawn = has("hp: elite ? ELITE_HP : ZOMBIE_HP") && has("hp: elite?ELITE_HP:ZOMBIE_HP");
+results.e_render = has("isElite?0x2f5d2f:0x4a7c3a") && has("fig.scale.set(1.6, 1.6, 1.6)") && has("'엘리트 좀비':'좀비'");
+results.e_drop = has("name:'엘리트 좀비고기', color:0xffcc33");
+console.log('=== JSDOM LOAD CHECK (hunting + zombie + held + gold + weapons + elite) ===');
 console.log('=== JSDOM LOAD CHECK (hunting ground + zombie A) ===');
 let allPass = true;
 for (const [k, v] of Object.entries(results)) { console.log('  ' + (v ? 'PASS  ' : 'FAIL  ') + k); if (!v) allPass = false; }
