@@ -1146,12 +1146,17 @@ yawObject.add(pitchObject); pitchObject.add(playCam);
 scene.add(yawObject);
 
 // 1인칭 주먹 뷰모델: 카메라에 붙는 손 (좌클릭 공격 애니용)
-const fistView = new THREE.Mesh(
- new THREE.BoxGeometry(0.35, 0.35, 0.6),
- new THREE.MeshStandardMaterial({ color: 0xe8b88a })
-);
-fistView.position.set(0.45, -0.4, -0.9); // 화면 오른쪽 아래
+const fistView = new THREE.Group();
+const armMat = new THREE.MeshStandardMaterial({ color: 0xe8b88a });
+const forearm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.5), armMat);
+forearm.position.set(0, 0, -0.25);
+const fist = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), armMat);
+fist.position.set(0, 0, -0.55);
+fistView.add(forearm); fistView.add(fist);
+fistView.position.set(0.32, -0.42, -0.5); // 오른쪽 아래 구석
+fistView.rotation.set(0.25, -0.25, 0); // 안쪽으로 비스듬히
 playCam.add(fistView);
+const FIST_REST = { px:0.32, py:-0.42, pz:-0.5, rx:0.25 };
 
 const editCam = new THREE.PerspectiveCamera(60, aspect(), 0.1, 2000);
 const orbit = { target: new THREE.Vector3(0, 2, 0), radius: 45, theta: 0.6, phi: 1.0 };
@@ -2661,9 +2666,9 @@ function animate() {
   attackAnim -= dt * 3.5; // 약 0.28초 스윙
   const t = Math.max(0, attackAnim);
   const s = Math.sin((1 - t) * Math.PI); // 0→1→0
-  fistView.position.set(0.45 - s*0.25, -0.4 + s*0.35, -0.9 - s*0.3);
-  fistView.rotation.x = -s * 1.2;
-  if (attackAnim <= 0) { fistView.position.set(0.45,-0.4,-0.9); fistView.rotation.x = 0; }
+  fistView.position.set(FIST_REST.px, FIST_REST.py + s*0.12, FIST_REST.pz - s*0.28);
+  fistView.rotation.x = FIST_REST.rx - s * 1.1; // 앞으로 내지르는 스윙
+  if (attackAnim <= 0) { fistView.position.set(FIST_REST.px, FIST_REST.py, FIST_REST.pz); fistView.rotation.x = FIST_REST.rx; }
  }
  physics(dt); renderer.render(scene, playCam); hud.style.display = 'block'; healthEl.style.display = 'block';
  } else {
