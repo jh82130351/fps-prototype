@@ -2475,7 +2475,7 @@ let zombieSim = {}; // 호스트 전용: {zid:{x,z,hp,target,atkCd}}
 let zombieRender = {}; // 모두: {zid:{fig,tx,tz,hp}}
 let zombieHostAccum = 0, zombieSendAccum = 0, zombieSpawned = false;
 const ZOMBIE_HP = 50, ZOMBIE_RANGE = 2, ZOMBIE_AGGRO = 10, ZOMBIE_SPEED = 2.2, ZOMBIE_DMG = 5, ZOMBIE_COUNT = 10;
-const ELITE_HP = 200, ELITE_CHANCE = 1/80; // 스폰 시 1/80 확률로 엘리트
+const ELITE_HP = 200, ELITE_CHANCE = 1/80, ELITE_DMG = 40; // 엘리트: 체력200, 데미지40
 const HUNT_CX = 170, HUNT_CZ = 0, HUNT_HALF = 60;
 // 좀비 처치·드롭 전역
 const PLAYER_ATK_DMG = 25; // 내 공격이 좀비에게 주는 데미지(50이면 2대)
@@ -2949,7 +2949,7 @@ function updateZombieSim(dt) {
     s.x += (dx/d)*ZOMBIE_SPEED*dt; s.z += (dz/d)*ZOMBIE_SPEED*dt;
    } else if (s.atkCd <= 0) {
     s.atkCd = 1.0;
-    if (fbdb) { const r=fbdb.ref('hits').push({target:tid, from:'zombie', dmg:ZOMBIE_DMG, t:Date.now()}); setTimeout(()=>{try{r.remove();}catch(_){}} ,3000); }
+    if (fbdb) { const r=fbdb.ref('hits').push({target:tid, from:'zombie', dmg:(s.elite?ELITE_DMG:ZOMBIE_DMG), t:Date.now()}); setTimeout(()=>{try{r.remove();}catch(_){}} ,3000); }
    }
   }
  }
