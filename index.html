@@ -461,6 +461,7 @@ let hitboxHelpers = [];
 let inventory = new Array(32).fill(null); // 0~7: 빠른슬롯, 8~31: 보조인벤 (총 32칸)
 try { const s = JSON.parse(localStorage.getItem('fpsInv')||'null'); if (Array.isArray(s)) inventory = s.concat(new Array(32).fill(null)).slice(0,32); } catch(e){}
 let invOpen = false;
+let selectedSlot = 0; // 현재 선택된 빠른슬롯 (0~7)
 function saveInv(){ try{ localStorage.setItem('fpsInv', JSON.stringify(inventory)); }catch(e){} }
 
 function applyAppearance(p) {
@@ -1353,6 +1354,10 @@ window.addEventListener('keydown', (e) => {
  if (e.code === 'F3') { e.preventDefault(); } // 브라우저 검색 방지 + keys에 기록되게
  if (e.code === 'Space') e.preventDefault();
  if (e.code === 'Tab') { e.preventDefault(); if (mpActive) return; setMode(mode === 'play' ? 'edit' : 'play'); return; }
+ if (mode === 'play' && e.code && e.code.indexOf('Digit') === 0) {
+ const n = parseInt(e.code.slice(5), 10); // Digit1→1 ... Digit8→8
+ if (n >= 1 && n <= 8) { selectedSlot = n - 1; renderHotbar(); e.preventDefault(); return; }
+ }
  if (mode === 'edit') {
  if (e.code === 'Digit1') { setTool('move'); return; }
  if (e.code === 'Digit2') { setTool('rotate'); return; }
@@ -1806,6 +1811,12 @@ canvas.addEventListener('wheel', (e) => {
  }
  updateEditCam();
 }, { passive: false });
+// 플레이 중 마우스 휠로 빠른슬롯 넘기기
+canvas.addEventListener('wheel', (e)=>{
+ if (mode !== 'play') return;
+ selectedSlot = (selectedSlot + (e.deltaY>0?1:7)) % 8;
+ renderHotbar();
+}, { passive: true });
 canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit' || mpActive) e.preventDefault(); });
 
 // ---------- 상점(상인 우클릭) ----------
@@ -1865,7 +1876,10 @@ function renderHotbar(){
  const el=document.getElementById('hotbar'); if(!el) return; el.innerHTML='';
  for(let i=0;i<8;i++){
   const d=document.createElement('div');
-  d.style.cssText='width:48px;height:48px;border-radius:8px;background:rgba(255,255,255,0.08);border:1px solid #ffffff22;position:relative;color:#fff;';
+  const sel = (i===selectedSlot);
+  d.style.cssText='width:48px;height:48px;border-radius:8px;background:rgba(255,255,255,0.08);border:'
+  +(sel?'3px solid #ffffff':'1px solid #ffffff22')
+  +';box-shadow:'+(sel?'0 0 8px #ffffffaa':'none')+';position:relative;color:#fff;box-sizing:border-box;';
   d.innerHTML='<div style="position:absolute;top:1px;left:3px;font-size:10px;color:#9fb;">'+(i+1)+'</div>'+slotHtml(inventory[i]);
   el.appendChild(d);
  }
