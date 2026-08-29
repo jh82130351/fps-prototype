@@ -2813,6 +2813,7 @@ function animate() {
  // ─── 좀비: 렌더 + 호스트 시뮬 + 전송 ───
  if (mpSyncOn) {
   updateZombieRender(dt);
+  if (hitboxOn) buildHitboxes(); // 히트박스 켜져 있으면 매 프레임 위치 갱신
   if (isZombieHost) {
    if (!zombieSpawned) { spawnZombies(); zombieSpawned = true; }
    updateZombieSim(dt);
