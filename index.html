@@ -2073,9 +2073,12 @@ function doAttack() {
   for (const zid in zombieRender) {
    const z = zombieRender[zid]; if (!z.fig) continue;
    const to = new THREE.Vector3(z.fig.position.x-camPos2.x, 0, z.fig.position.z-camPos2.z);
-   const dist = to.length(); if (dist > ATTACK_RANGE) continue;
-   to.normalize(); if (ff.dot(to) < 0.5) continue;
-   // 데미지 이벤트 기록(호스트가 읽어 처리) + 타겟을 나로
+   const dist = to.length();
+   if (dist > ATTACK_RANGE + 1) continue; // 사거리에 여유 +1
+   if (dist > 1.6) { // 아주 가까우면(1.6칸 이내) 각도 무시하고 명중
+    to.normalize();
+    if (ff.dot(to) < 0.3) continue; // 각도 완화(약 72°)
+   }
    const r = fbdb.ref('zombieHits').push({ zid, by: myPlayerId, dmg: PLAYER_ATK_DMG, t: Date.now() });
    setTimeout(()=>{ try{r.remove();}catch(_){} }, 3000);
   }
