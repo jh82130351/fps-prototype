@@ -69,7 +69,7 @@ results.b_pickup = has("Math.hypot(dx,dz) < PICKUP_RANGE") && has("inventory[slo
 results.b_cleanup = has("if (fbDropsRef) { try { fbDropsRef.off(); }") && has("for (const id in drops){ if(drops[id].fig) scene.remove(drops[id].fig); }");
 // ─── 손에 든 아이템 (1인칭 + 멀티 전파) ───
 // ① 1인칭 뷰모델
-results.h_held_view = has("const heldItemView = new THREE.Mesh") && has("heldItemView.position.set(0.32, -0.36, -0.62)") && has("playCam.add(heldItemView)");
+results.h_held_view = has("const heldItemView = new THREE.Mesh") && has("heldItemView.position.set(0, 0.02, -0.7)") && has("fistView.add(heldItemView)");
 // ② 선택슬롯 갱신
 results.h_update_held = has("function updateHeldItem()") && has("updateHeldItem();");
 // ③ 멀티 전파 (mpSend held)

@@ -463,6 +463,7 @@ let inventory = new Array(32).fill(null); // 0~7: 빠른슬롯, 8~31: 보조인�
 try { const s = JSON.parse(localStorage.getItem('fpsInv')||'null'); if (Array.isArray(s)) inventory = s.concat(new Array(32).fill(null)).slice(0,32); } catch(e){}
 let invOpen = false;
 let selectedSlot = 0; // 현재 선택된 빠른슬롯 (0~7)
+let invPick = -1; // 보조인벤 탭-이동: 집은 칸 (-1이면 아무것도 안 집음)
 let attackCooldown = 0; // 남은 쿨타임(초)
 let attackAnim = 0; // 내 주먹 뷰모델 애니 진행(0=쉼)
 const ATTACK_RANGE = 4; // 4블록
@@ -1405,6 +1406,21 @@ window.addEventListener('keydown', (e) => {
  const n = parseInt(e.code.slice(5), 10); // Digit1→1 ... Digit8→8
  if (n >= 1 && n <= 8) { selectedSlot = n - 1; renderHotbar(); e.preventDefault(); return; }
  }
+ // V: 선택 아이템 버리기(내 앞 1.5칸 바닥)
+ if (e.code === 'KeyV' && mode === 'play') {
+  e.preventDefault();
+  const it = inventory[selectedSlot];
+  if (it && it.name) {
+   const fwd = new THREE.Vector3(); playCam.getWorldDirection(fwd);
+   const dx = yawObject.position.x + fwd.x * 1.5;
+   const dz = yawObject.position.z + fwd.z * 1.5;
+   if (mpSyncOn && typeof spawnDrop === 'function') spawnDrop(dx, dz, { name: it.name, color: it.color });
+   if (it.count && it.count > 1) it.count -= 1; else inventory[selectedSlot] = null;
+   saveInv(); renderHotbar(); if (invOpen) renderInvGrid(); updateHeldItem();
+   if (typeof flash === 'function') flash('아이템 버림');
+  }
+  return;
+ }
  if (mode === 'edit') {
  if (e.code === 'Digit1') { setTool('move'); return; }
  if (e.code === 'Digit2') { setTool('rotate'); return; }
@@ -2012,8 +2028,27 @@ function renderInvGrid(){
  const el=document.getElementById('invGrid'); if(!el) return; el.innerHTML='';
  for(let i=0;i<32;i++){
   const d=document.createElement('div');
-  d.style.cssText='aspect-ratio:1;border-radius:8px;background:'+(i<8?'rgba(46,204,113,0.12)':'rgba(255,255,255,0.06)')+';border:1px solid #ffffff22;color:#fff;';
+  d.style.cssText='aspect-ratio:1;border-radius:8px;background:'+(i<8?'rgba(46,204,113,0.12)':'rgba(255,255,255,0.06)')+';border:1px solid #ffffff22;color:#fff;'+(i===invPick?';outline:2px solid #fff;':'');
   d.innerHTML=slotHtml(inventory[i]);
+  // 드래그 앤 드롭(PC) — 칸 위치 교환
+  d.setAttribute('draggable', 'true');
+  d.dataset.slot = i;
+  d.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', String(i)); });
+  d.addEventListener('dragover', (e)=>{ e.preventDefault(); });
+  d.addEventListener('drop', (e)=>{
+   e.preventDefault();
+   const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+   const to = i;
+   if (isNaN(from) || from === to) return;
+   const tmp = inventory[to]; inventory[to] = inventory[from]; inventory[from] = tmp; // 자리 교환
+   saveInv(); renderInvGrid(); renderHotbar(); updateHeldItem();
+  });
+  // 모바일/터치 탭-이동: 칸 탭(집기)→다른 칸 탭(놓기·교환)
+  d.addEventListener('click', (e)=>{
+   e.stopPropagation();
+   if (invPick < 0) { if (inventory[i]) invPick = i; renderInvGrid(); } // 첫 탭: 집기
+   else { const t=inventory[i]; inventory[i]=inventory[invPick]; inventory[invPick]=t; invPick=-1; saveInv(); renderInvGrid(); renderHotbar(); updateHeldItem(); } // 둘째 탭: 놓기(교환)
+  });
   el.appendChild(d);
  }
 }
