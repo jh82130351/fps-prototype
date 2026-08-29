@@ -1805,15 +1805,20 @@ canvas.addEventListener('mousedown', (e) => {
  if (e.button !== 2) return; // 우클릭만
  if (mode !== 'play' || !mpActive) return; // 마을(멀티)에서만
  e.preventDefault();
- // 화면 중앙 방향 레이캐스트
- ray.setFromCamera({ x: 0, y: 0 }, playCam);
- const meshes = [];
- for (const n of npcs) { n.fig.traverse(o => { if (o.isMesh) { o.userData.npcType = n.type; meshes.push(o); } }); }
- const hits = ray.intersectObjects(meshes, true);
- if (hits.length && hits[0].distance < 8) { // 8m 이내
-  let o = hits[0].object; while (o && !o.userData.npcType) o = o.parent;
-  if (o && o.userData.npcType) openShop(o.userData.npcType);
+ // 근접 + 바라보는 방향 판정: 7m 이내에서 가장 정면에 있는 상인
+ const camPos = new THREE.Vector3(); playCam.getWorldPosition(camPos);
+ const fwd = new THREE.Vector3(); playCam.getWorldDirection(fwd);
+ const fwdFlat = new THREE.Vector3(fwd.x, 0, fwd.z); if (fwdFlat.lengthSq() > 0) fwdFlat.normalize();
+ let best = null, bestDot = 0.4; // dot>0.4 ≈ 약 66° 이내 정면
+ for (const n of npcs) {
+  const to = new THREE.Vector3(n.x - camPos.x, 0, n.z - camPos.z);
+  const dist = to.length();
+  if (dist > 7) continue; // 7m 이내
+  to.normalize();
+  const dot = fwdFlat.dot(to);
+  if (dot > bestDot) { bestDot = dot; best = n; }
  }
+ if (best) openShop(best.type);
 });
 
 // ---------- 히트박스(F3+G) ----------
