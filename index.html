@@ -1097,7 +1097,7 @@ function buildArenaWorld() {
  addPart(0, 1, 36, 68, 2, 0.5, WOOD); // 북쪽 울타리
 
  // 사냥터 표지(길 끝, 다음 단계에서 몬스터 배치될 곳)
- addPart(150, 0.15, 0, 40, 0.3, 40, 0x4a7c3a); // 사냥터 풀밭
+ addPart(170, 0.15, 0, 130, 0.3, 130, 0x4a7c3a); // 사냥터 풀밭(5배 확장)
  addPart(140, 2, 0, 6, 4, 0.5, 0x8d6e4a); // 사냥터 표지판 기둥
 
  // ===== 마을 장식 =====
@@ -2265,6 +2265,14 @@ try { const f = parseInt(localStorage.getItem('fpsFace')||'0',10); if(!isNaN(f))
 // 멀티플레이 전역 상태 (모두 상단 선언부에 몰아 선언 - TDZ 방지)
 // ⓛ 내 고유 ID + Firebase 동기화 상태 (P2P 제거, Firebase RDB 위치 동기화로 전환)
 const myPlayerId = 'p_' + Math.random().toString(36).slice(2, 10);
+// 좀비 전역 상태 (모두 상단 선언 - TDZ 방지)
+let isZombieHost = false; // 내가 좀비 시뮬 담당인가
+let fbZombiesRef = null;
+let zombieSim = {}; // 호스트 전용: {zid:{x,z,hp,target,atkCd}}
+let zombieRender = {}; // 모두: {zid:{fig,tx,tz,hp}}
+let zombieHostAccum = 0, zombieSendAccum = 0, zombieSpawned = false;
+const ZOMBIE_HP = 50, ZOMBIE_RANGE = 2, ZOMBIE_AGGRO = 10, ZOMBIE_SPEED = 2.2, ZOMBIE_DMG = 5, ZOMBIE_COUNT = 10;
+const HUNT_CX = 170, HUNT_CZ = 0, HUNT_HALF = 60;
 let fbPlayersRef = null; // players 전체 참조
 let fbMeRef = null; // 내 위치 참조
 let mpSyncOn = false; // Firebase 동기화 중?
@@ -2362,6 +2370,10 @@ function leaveMultiplayer() {
  if (fbPlayersRef) { try { fbPlayersRef.off(); } catch(e){} fbPlayersRef = null; }
  if (fbMeRef) { try { fbMeRef.remove(); } catch(e){} fbMeRef = null; }
  if (fbdb) { try { fbdb.ref('chat').off(); } catch(e){} }
+ // 좀비 정리
+ if (fbZombiesRef) { try { fbZombiesRef.off(); } catch(e){} fbZombiesRef = null; }
+ for (const id in zombieRender){ if(zombieRender[id].fig) scene.remove(zombieRender[id].fig); }
+ zombieRender = {}; zombieSim = {}; zombieSpawned = false; isZombieHost = false;
  for (const id in remotePlayers) { if (remotePlayers[id].fig) scene.remove(remotePlayers[id].fig); }
  for (const id in remotePlayers) delete remotePlayers[id];
  if (chatBtn) chatBtn.style.display = 'none';
@@ -2657,6 +2669,72 @@ function lerpAngle(a, b, t) {
  while (diff < -Math.PI) diff += Math.PI * 2;
  return a + diff * t;
 }
+// ─── 좀비 렌더 (모든 클라이언트) ───
+function onZombieUpdate(snap) {
+ const id = snap.key, d = snap.val(); if (!d || typeof d.x !== 'number') return;
+ if (!zombieRender[id]) {
+  const fig = makeCharacter({ skin:0x4a7c3a, shirt:0x2d5016, pants:0x1a3009, face:4 });
+  const tag = makeNameTag('좀비'); fig.add(tag);
+  scene.add(fig);
+  zombieRender[id] = { fig, tx:d.x, tz:d.z, hp:d.hp };
+  fig.position.set(d.x, 0.3, d.z);
+ }
+ const z = zombieRender[id];
+ z.tx = d.x; z.tz = d.z; z.hp = d.hp;
+}
+function updateZombieRender(dt) {
+ const k = Math.min(1, dt * 10);
+ for (const id in zombieRender) {
+  const z = zombieRender[id]; if (!z.fig) continue;
+  const p = z.fig.position;
+  p.x += (z.tx - p.x) * k; p.z += (z.tz - p.z) * k;
+  const dx = z.tx - p.x, dz = z.tz - p.z;
+  if (dx*dx+dz*dz > 0.0001) z.fig.rotation.y = Math.atan2(dx, dz);
+ }
+}
+// ─── 좀비 호스트 시뮬 (대표만 실행) ───
+function playerPositions() {
+ const out = {};
+ out[myPlayerId] = { x: yawObject.position.x, z: yawObject.position.z };
+ for (const id in remotePlayers) { const f = remotePlayers[id].fig; if (f) out[id] = { x:f.position.x, z:f.position.z }; }
+ return out;
+}
+function spawnZombies() {
+ zombieSim = {};
+ for (let i=0;i<ZOMBIE_COUNT;i++){
+  const zid = 'z'+i;
+  zombieSim[zid] = {
+   x: HUNT_CX + (Math.random()*2-1)*HUNT_HALF,
+   z: HUNT_CZ + (Math.random()*2-1)*HUNT_HALF,
+   hp: ZOMBIE_HP, target: null, atkCd: 0
+  };
+ }
+ const obj = {};
+ for (const zid in zombieSim){ const s=zombieSim[zid]; obj[zid]={x:s.x,z:s.z,hp:s.hp,t:Date.now()}; }
+ if (fbdb) fbdb.ref('zombies').set(obj);
+}
+function updateZombieSim(dt) {
+ const players = playerPositions();
+ for (const zid in zombieSim) {
+  const s = zombieSim[zid];
+  if (s.atkCd > 0) s.atkCd -= dt;
+  let tid = (s.target && players[s.target]) ? s.target : null;
+  if (!tid) {
+   let best=null, bd=ZOMBIE_AGGRO;
+   for (const pid in players){ const dx=players[pid].x-s.x, dz=players[pid].z-s.z; const d=Math.hypot(dx,dz); if(d<bd){bd=d;best=pid;} }
+   tid = best;
+  }
+  if (tid) {
+   const t = players[tid]; const dx=t.x-s.x, dz=t.z-s.z; const d=Math.hypot(dx,dz);
+   if (d > ZOMBIE_RANGE) {
+    s.x += (dx/d)*ZOMBIE_SPEED*dt; s.z += (dz/d)*ZOMBIE_SPEED*dt;
+   } else if (s.atkCd <= 0) {
+    s.atkCd = 1.0;
+    if (fbdb) { const r=fbdb.ref('hits').push({target:tid, from:'zombie', dmg:ZOMBIE_DMG, t:Date.now()}); setTimeout(()=>{try{r.remove();}catch(_){}} ,3000); }
+   }
+  }
+ }
+}
 function updateRemotePlayers(dt) {
  const k = Math.min(1, dt * 12); // 따라가는 속도(클수록 빠르게 스냅)
  for (const id in remotePlayers) {
@@ -2702,6 +2780,19 @@ function animate() {
  scaleGizmo.visible = false;
  if (movers.length) updateMovers(clock.getElapsedTime());
  updateRemotePlayers(dt);
+ // ─── 좀비: 렌더 + 호스트 시뮬 + 전송 ───
+ if (mpSyncOn) {
+  updateZombieRender(dt);
+  if (isZombieHost) {
+   if (!zombieSpawned) { spawnZombies(); zombieSpawned = true; }
+   updateZombieSim(dt);
+   zombieSendAccum += dt;
+   if (zombieSendAccum > 0.12 && fbdb) { // ~8회/초 위치 전송
+    zombieSendAccum = 0;
+    for (const zid in zombieSim){ const s=zombieSim[zid]; fbdb.ref('zombies/'+zid).update({x:s.x, z:s.z, hp:s.hp, t:Date.now()}); }
+   }
+  }
+ }
  // 공격 쿨타임 & 주먹 뷰모델 스윙 애니
  if (invuln > 0) invuln -= dt; // 피격 무적 타이머 감소
  if (attackCooldown > 0) attackCooldown -= dt;
@@ -3073,10 +3164,23 @@ function startFirebaseSync() {
   mpPlayerCount = snap.numChildren();
   const el = document.getElementById('mpMainInfo');
   if (el) el.textContent = '현재 ' + mpPlayerCount + '명 접속 중';
+  // 좀비 호스트 선출: 접속자 중 ID 최소값
+  let minId = myPlayerId;
+  snap.forEach((c) => { if (c.key < minId) minId = c.key; });
+  const wasHost = isZombieHost;
+  isZombieHost = (minId === myPlayerId);
+  if (isZombieHost && !wasHost) { zombieSpawned = false; } // 새로 호스트가 되면 스폰 재시도
  });
  fbPlayersRef.on('child_removed', (snap) => {
   const id = snap.key;
   if (remotePlayers[id]) { if (remotePlayers[id].fig) scene.remove(remotePlayers[id].fig); delete remotePlayers[id]; }
+ });
+ // 좀비 구독
+ fbZombiesRef = fbdb.ref('zombies');
+ fbZombiesRef.on('child_added', onZombieUpdate);
+ fbZombiesRef.on('child_changed', onZombieUpdate);
+ fbZombiesRef.on('child_removed', (s) => {
+  const z = zombieRender[s.key]; if (z && z.fig) scene.remove(z.fig); delete zombieRender[s.key];
  });
  // 채팅 구독 (최근 메시지)
  fbdb.ref('chat').limitToLast(1).on('child_added', (snap) => {
