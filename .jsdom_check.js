@@ -67,7 +67,16 @@ results.b_drop = has("function spawnDrop") && has("function onDropUpdate") && ha
 results.b_pickup = has("Math.hypot(dx,dz) < PICKUP_RANGE") && has("inventory[slot] = { name:d.item.name") && has("flash('좀비고기 획득')");
 // ⑥ 퇴장 정리
 results.b_cleanup = has("if (fbDropsRef) { try { fbDropsRef.off(); }") && has("for (const id in drops){ if(drops[id].fig) scene.remove(drops[id].fig); }");
-console.log('=== JSDOM LOAD CHECK (hunting + zombie A/B) ===');
+// ─── 손에 든 아이템 (1인칭 + 멀티 전파) ───
+// ① 1인칭 뷰모델
+results.h_held_view = has("const heldItemView = new THREE.Mesh") && has("heldItemView.position.set(0.32, -0.36, -0.62)") && has("playCam.add(heldItemView)");
+// ② 선택슬롯 갱신
+results.h_update_held = has("function updateHeldItem()") && has("updateHeldItem();");
+// ③ 멀티 전파 (mpSend held)
+results.h_mpsend = has("held: (inventory[selectedSlot] && inventory[selectedSlot].color !== undefined) ? inventory[selectedSlot].color : -1");
+// ④ 원격 플레이어 손 아이템
+results.h_remote_held = has("d.held !== undefined && d.held !== rp.heldColor") && has("rp.heldMesh") && has("hm.position.set(0.65, 1.1, -0.35)");
+console.log('=== JSDOM LOAD CHECK (hunting + zombie A/B + held item) ===');
 console.log('=== JSDOM LOAD CHECK (hunting ground + zombie A) ===');
 let allPass = true;
 for (const [k, v] of Object.entries(results)) { console.log('  ' + (v ? 'PASS  ' : 'FAIL  ') + k); if (!v) allPass = false; }
