@@ -2630,7 +2630,7 @@ function updateRemotePlayers(dt) {
    rp.atkAnim -= dt * 3.5;
    const s = Math.sin((1 - Math.max(0, rp.atkAnim)) * Math.PI);
    const arm = rp.fig.getObjectByName('rArm');
-   if (arm) arm.rotation.x = -s * 1.6;
+   if (arm) arm.rotation.x = -s * 1.9;
    if (rp.atkAnim <= 0) { const a2 = rp.fig.getObjectByName('rArm'); if (a2) a2.rotation.x = 0; }
   }
  }
@@ -2916,9 +2916,14 @@ function makeCharacter(colors) {
  const skin=c.skin!==undefined?c.skin:0xe8b88a, shirt=c.shirt!==undefined?c.shirt:0x3498db, pants=c.pants!==undefined?c.pants:0x2c3e50;
  const add=(w,h,d,c,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:c}));m.position.set(x,y,z);g.add(m);};
  add(0.8,0.8,0.8,skin,0,2.1,0); add(1.0,1.2,0.5,shirt,0,1.2,0);
- add(0.3,1.1,0.3,skin,-0.65,1.2,0);
- const rArm=new THREE.Mesh(new THREE.BoxGeometry(0.3,1.1,0.3),new THREE.MeshStandardMaterial({color:skin}));
- rArm.position.set(0.65,1.2,0); rArm.name='rArm'; g.add(rArm); // 오른팔(공격 애니용)
+ add(0.3,1.1,0.3,skin,-0.65,1.2,0); // 왼팔(고정)
+ // 오른팔: 어깨(위쪽 끝)에 피벗 그룹을 두고 팔 메시를 아래로 매닮 → 어깨 축 회전
+ const rArm=new THREE.Group();
+ rArm.position.set(0.65, 1.75, 0); // 어깨 위치(팔 위쪽 끝)
+ rArm.name='rArm';
+ const rArmMesh=new THREE.Mesh(new THREE.BoxGeometry(0.3,1.1,0.3),new THREE.MeshStandardMaterial({color:skin}));
+ rArmMesh.position.set(0, -0.55, 0); // 피벗 아래로 팔 길이 절반만큼 내려 매닮
+ rArm.add(rArmMesh); g.add(rArm);
  add(0.35,1.1,0.35,pants,-0.25,0.35,0); add(0.35,1.1,0.35,pants,0.25,0.35,0);
  // 머리: 표정 텍스처 6면(앞면 +z) 적용
  const headMat = new THREE.Mesh(new THREE.BoxGeometry(0.8,0.8,0.8), headMaterials(c.face!==undefined?c.face:0, skin));
