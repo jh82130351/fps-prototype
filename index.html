@@ -2645,7 +2645,7 @@ function updateRemotePlayers(dt) {
    rp.atkAnim -= dt * 3.5;
    const s = Math.sin((1 - Math.max(0, rp.atkAnim)) * Math.PI);
    const arm = rp.fig.getObjectByName('rArm');
-   if (arm) arm.rotation.x = -s * 1.9;
+   if (arm) arm.rotation.x = s * 1.9; // 정면(-z)으로 내지르는 스윙
    if (rp.atkAnim <= 0) { const a2 = rp.fig.getObjectByName('rArm'); if (a2) a2.rotation.x = 0; }
   }
  }
