@@ -326,6 +326,7 @@
  </div>
  <div id="mpStatus" style="color:#7dd3fc;font-size:13px;min-height:18px"></div>
  <button id="mpRooms">방 확인</button>
+ <button id="mpReset" style="background:#c0392b;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer">🛑 서버 리셋(관리자)</button>
  <button id="mpClose">닫기</button>
 </div>
 
@@ -470,6 +471,7 @@ let fbHitsRef = null;
 let myJoinTime = 0;
 const hitSeen = {};
 let invuln = 0; // 무적 시간(초)
+let lastResetT = 0; // 마지막 서버 리셋 신호 시각
 let lastAtkStamp = 0; // 마지막 공격 타임스탬프(멀티 전파용)
 function saveInv(){ try{ localStorage.setItem('fpsInv', JSON.stringify(inventory)); }catch(e){} }
 
@@ -3054,6 +3056,16 @@ function startFirebaseSync() {
   const sp = document.getElementById('splash'); if (sp) { sp.style.opacity = '0.5'; setTimeout(()=>{ sp.style.opacity='0'; }, 120); }
   if (health <= 0) { respawn(); }
  });
+ // 서버 리셋 신호 구독: 새 리셋 t가 오면 나도 리스폰
+ fbdb.ref('serverReset').on('value', (snap) => {
+  const d = snap.val();
+  if (!d || !d.t) return;
+  if (d.t <= myJoinTime) return; // 접속 전 신호 무시
+  if (lastResetT && d.t <= lastResetT) return;
+  lastResetT = d.t;
+  respawn(); // HP·위치 초기화 (월드·포인트 유지)
+  if (typeof flash === 'function') flash('서버가 리셋되었습니다');
+ });
  // 접속 인원 실시간 표시
  fbPlayersRef.on('value', (snap) => {
   mpPlayerCount = snap.numChildren();
@@ -3118,6 +3130,16 @@ if (emoteBar) emoteBar.addEventListener('click',(e)=>e.stopPropagation());
 if (mpJoin) mpJoin.addEventListener('click', (e) => { e.stopPropagation(); if (!fbdb) { mpLog('DB 연결 안 됨'); return; } startFirebaseSync(); });
 if (mpBtn) mpBtn.addEventListener('click', (e) => { e.stopPropagation(); mpPanel.style.display = 'flex'; });
 if (mpClose) mpClose.addEventListener('click', (e) => { e.stopPropagation(); if (mpActive) leaveMultiplayer(); mpPanel.style.display = 'none'; });
+const mpResetBtn = document.getElementById('mpReset');
+if (mpResetBtn) mpResetBtn.addEventListener('click', (e) => {
+ e.stopPropagation();
+ const pw = prompt('관리자 비밀번호를 입력하세요');
+ if (pw === null) return;
+ if (pw !== '12345678') { if (typeof flash === 'function') flash('비밀번호가 틀렸습니다'); else alert('비밀번호가 틀렸습니다'); return; }
+ if (!fbdb) { alert('DB 연결 안 됨'); return; }
+ fbdb.ref('serverReset').set({ t: Date.now(), by: playerNick || 'admin' });
+ if (typeof flash === 'function') flash('서버 리셋 실행');
+});
 if (mpCodeInput) { ['pointerdown','touchstart','mousedown','click'].forEach(ev => mpCodeInput.addEventListener(ev, (e) => e.stopPropagation())); }
 const mpRooms = document.getElementById('mpRooms');
 const roomAdmin = document.getElementById('roomAdmin');
