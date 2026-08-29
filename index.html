@@ -1906,7 +1906,7 @@ canvas.addEventListener('wheel', (e)=>{
 canvas.addEventListener('contextmenu', (e) => { if (mode === 'edit' || mpActive) e.preventDefault(); });
 
 // ---------- 상점(상인 우클릭) ----------
-const SELL_PRICES = { '좀비고기': 5 }; // 아이템명: 판매가(G)
+const SELL_PRICES = { '좀비고기': 1 }; // 아이템명: 판매가(G)
 function countItem(name){ let c=0; for(const it of inventory){ if(it&&it.name===name) c+=(it.count||1); } return c; }
 function sellOne(name){
  const price = SELL_PRICES[name]; if(!price) return;
