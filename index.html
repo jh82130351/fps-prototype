@@ -1953,6 +1953,13 @@ function buildHitboxes() {
   mesh.position.set(rp.fig.position.x, rp.fig.position.y + 1.3, rp.fig.position.z);
   scene.add(mesh); hitboxHelpers.push(mesh);
  }
+ // 좀비 히트박스(빨강)
+ for (const zid in zombieRender) {
+  const z = zombieRender[zid]; if (!z.fig) continue;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.6, 1.0), new THREE.MeshBasicMaterial({ color: 0xff3333, wireframe: true }));
+  mesh.position.set(z.fig.position.x, z.fig.position.y + 1.3, z.fig.position.z);
+  scene.add(mesh); hitboxHelpers.push(mesh);
+ }
 }
 function toggleHitbox() { hitboxOn = !hitboxOn; if (hitboxOn) buildHitboxes(); else clearHitboxes(); }
 
@@ -2712,7 +2719,7 @@ function updateZombieRender(dt) {
   const p = z.fig.position;
   p.x += (z.tx - p.x) * k; p.z += (z.tz - p.z) * k;
   const dx = z.tx - p.x, dz = z.tz - p.z;
-  if (dx*dx+dz*dz > 0.0001) z.fig.rotation.y = Math.atan2(dx, dz);
+  if (dx*dx+dz*dz > 0.0001) z.fig.rotation.y = Math.atan2(dx, dz) + Math.PI; // 캐릭터 정면(-z) 보정
  }
 }
 // ─── 좀비 호스트 시뮬 (대표만 실행) ───
