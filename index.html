@@ -27,7 +27,7 @@
 
  #health { position: absolute; top: 12px; left: 12px; z-index: 6; font-size: 18px;
  letter-spacing: 2px; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: none; }
- #hud { position: absolute; top: 40px; left: 12px; z-index: 5; color: #7dd3fc; font-size: 12px;
+ #hud { position: absolute; top: 58px; left: 12px; z-index: 5; color: #7dd3fc; font-size: 12px;
  font-family: monospace; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px;
  line-height: 1.6; pointer-events: none; white-space: pre; }
 
@@ -181,6 +181,7 @@
 <div id="splash"></div>
 <div id="marquee"></div>
 <div id="hud"></div>
+<div id="levelBar" style="position:absolute;top:38px;left:12px;z-index:6;display:none;align-items:center;gap:6px;width:180px;"></div>
 <div id="mode" class="play">PLAY</div>
 
 <!-- 상점 창 -->
@@ -454,6 +455,33 @@ const TYPES = ['solid', 'water', 'checkpoint', 'lava', 'jump', 'point'];
 let playerPoints = parseInt(localStorage.getItem('fpsPoints')|| '0', 10) ||0;
 // 골드 시스템
 let gold = parseInt(localStorage.getItem('fpsGold') || '0', 10) || 0;
+// 레벨 시스템 [1단계]
+let playerLevel = parseInt(localStorage.getItem('fpsLevel')||'1',10) || 1;
+let killProgress = parseInt(localStorage.getItem('fpsKillProg')||'0',10) || 0;
+const killSeen = {};
+function saveLevel(){ try{ localStorage.setItem('fpsLevel',String(playerLevel)); localStorage.setItem('fpsKillProg',String(killProgress)); }catch(e){} }
+function killsForNext(){ return playerLevel >= 10 ? 0 : (playerLevel+1)*5; }
+function gainKill(){
+ if (playerLevel >= 10) return;
+ killProgress++;
+ let need = killsForNext();
+ while (playerLevel < 10 && killProgress >= need) {
+  killProgress -= need; playerLevel++;
+  if (typeof flash === 'function') flash('레벨 업! Lv.' + playerLevel + (playerLevel>=10?' (만렙)':''));
+  need = killsForNext();
+ }
+ if (playerLevel >= 10) killProgress = 0;
+ saveLevel(); updateLevelBar();
+}
+function updateLevelBar(){
+ const el = document.getElementById('levelBar'); if(!el) return;
+ const need = killsForNext();
+ const pct = need>0 ? Math.min(100, Math.floor(killProgress/need*100)) : 100;
+ el.innerHTML = '<span style="color:#ffd700;font-weight:bold;font-size:12px;">Lv.'+playerLevel+'</span>'
+  + '<div style="flex:1;height:10px;background:#0006;border-radius:6px;overflow:hidden;">'
+  + '<div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,#2ecc71,#7CFC98);"></div></div>'
+  + '<span style="font-size:10px;color:#cde;">'+(need>0?(killProgress+'/'+need):'MAX')+'</span>';
+}
 function saveGold(){ try{ localStorage.setItem('fpsGold', String(gold)); }catch(e){} }
 function addGold(n){ gold += n; saveGold(); updateGoldHud(); }
 function updateGoldHud(){ /* 골드는 메인 HUD 텍스트에 표시됨 */ }
@@ -2557,6 +2585,7 @@ const PEER_OPTS = {
 function enterMultiplayerGame() {
  if (mpPanel) mpPanel.style.display = 'none';
  updateGoldHud();
+ const lb=document.getElementById('levelBar'); if(lb) lb.style.display='flex'; updateLevelBar();
  if (overlay) overlay.style.display = 'none';
  started = true;
  crosshair.style.display = 'block';
@@ -2580,6 +2609,7 @@ function enterMultiplayerGame() {
 // 멀티 종료 시 싱글 월드 복원
 function leaveMultiplayer() {
  mpActive = false; mpSyncOn = false;
+ const lb=document.getElementById('levelBar'); if(lb) lb.style.display='none';
  const hb=document.getElementById('hotbar'); if(hb) hb.style.display='none'; if(invOpen) toggleInv();
  for (const n of npcs) { if (n.fig) scene.remove(n.fig); }
  npcs = [];
@@ -3438,6 +3468,8 @@ function startFirebaseSync() {
    // 처치: 드롭 생성 + 좀비 제거
    if (s.elite) spawnDrop(s.x, s.z, { name:'엘리트 좀비고기', color:0xffcc33 });
    else spawnDrop(s.x, s.z, { name:'좀비고기', color:0x8b3a3a });
+   // 처치자에게 킬 크레딧 전송(각자 자기 킬 카운트)
+   if (fbdb && h.by) { const kr = fbdb.ref('killCredit').push({ who:h.by, t:Date.now() }); setTimeout(()=>{try{kr.remove();}catch(_){}} ,3000); }
    delete zombieSim[h.zid];
    if (fbdb) fbdb.ref('zombies/'+h.zid).remove();
    // 잠시 후 새 좀비 리스폰(개체수 유지)
@@ -3455,6 +3487,14 @@ function startFirebaseSync() {
   const c = snap.val(); if (!c) return;
   if (c.nick === playerNick) return; // 내 메시지 스킵 (로컬 addChatLine으로 이미 표시)
   if (c.t && Date.now() - c.t < 15000) addChatLine(c.nick, String(c.text||'').slice(0,120), false);
+ });
+ // 킬 크레딧 구독(처치자에게만 킬 카운트)
+ fbdb.ref('killCredit').limitToLast(20).on('child_added', (snap) => {
+  const c = snap.val(); if (!c) return;
+  if (c.who !== myPlayerId) return;
+  if (!c.t || c.t < myJoinTime) return;
+  if (killSeen[snap.key]) return; killSeen[snap.key] = true;
+  gainKill();
  });
  // 오래된 바닥 드롭 정리 타이머(10초마다, 호스트가 처리)
  if (window._dropTimer) clearInterval(window._dropTimer);

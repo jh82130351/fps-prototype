@@ -102,7 +102,12 @@ results.e_drop = has("name:'엘리트 좀비고기', color:0xffcc33");
 results.wa_stats = has("const atkDmg = w ? w.dmg : 6") && has("const atkCd = w ? w.cd : 0.4") && has("const atkReach = w ? w.range : 4") && has("const atkAoe = w ? w.aoe : false");
 results.wa_player = has("dmg: atkDmg") && has("if(!atkAoe) break;") && has("if (dist > atkReach) continue;");
 results.wa_zombie = has("if (horiz > atkReach + 1) continue;") && has("zombieHits').push({ zid, by: myPlayerId, dmg: atkDmg") && has("if (!atkAoe) break;");
-console.log('=== JSDOM LOAD CHECK (hunting + zombie + held + gold + weapons + elite + combat) ===');
+// ─── 레벨 시스템 + 경험치 막대 [1단계] ───
+results.l_state = has("let playerLevel = parseInt(localStorage.getItem('fpsLevel')") && has("let killProgress") && has("function gainKill") && has("function updateLevelBar") && has("function killsForNext");
+results.l_bar = has("id=\"levelBar\"") && has("top: 58px") && has("background:linear-gradient(90deg,#2ecc71,#7CFC98)");
+results.l_enter = has("lb.style.display='flex';") && has("lb.style.display='none';");
+results.l_credit = has("killCredit').push({ who:h.by") && has("fbdb.ref('killCredit').limitToLast(20).on('child_added'") && has("gainKill();");
+console.log('=== JSDOM LOAD CHECK (full) ===');
 console.log('=== JSDOM LOAD CHECK (hunting ground + zombie A) ===');
 let allPass = true;
 for (const [k, v] of Object.entries(results)) { console.log('  ' + (v ? 'PASS  ' : 'FAIL  ') + k); if (!v) allPass = false; }
