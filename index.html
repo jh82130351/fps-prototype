@@ -1317,6 +1317,7 @@ let touchMove = { x: 0, y: 0 }; // 조이스틱 방향 (-1~1)
 let joyTouchId = null; // 조이스틱을 잡은 손가락 id
 let touchRun = false;
 let touchLookId = null, touchLookLastX = 0, touchLookLastY = 0;
+let touchLookStartX = 0, touchLookStartY = 0, touchLookStartT = 0, touchLookMoved = false;
 
 const joyEl = document.getElementById('joystick');
 const joyKnob = document.getElementById('joyKnob');
@@ -1380,6 +1381,9 @@ document.addEventListener('touchstart', (e) => {
    if (chatBtn && chatBtn.contains(t.target)) continue; // 채팅 버튼도 제외
    touchLookId = t.identifier;
    touchLookLastX = t.clientX; touchLookLastY = t.clientY;
+   touchLookStartX = t.clientX; touchLookStartY = t.clientY;
+   touchLookStartT = performance.now();
+   touchLookMoved = false;
   }
  }
 }, { passive: true });
@@ -1389,6 +1393,8 @@ document.addEventListener('touchmove', (e) => {
   if (t.identifier === touchLookId) {
    e.preventDefault();
    const dx = t.clientX - touchLookLastX, dy = t.clientY - touchLookLastY;
+   const movedDist = Math.hypot(t.clientX - touchLookStartX, t.clientY - touchLookStartY);
+   if (movedDist > 10) touchLookMoved = true; // 10px 넘게 움직이면 드래그(회전)
    yawObject.rotation.y -= dx * 0.005;
    pitchObject.rotation.x = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitchObject.rotation.x - dy * 0.005));
    touchLookLastX = t.clientX; touchLookLastY = t.clientY;
@@ -1397,7 +1403,14 @@ document.addEventListener('touchmove', (e) => {
 }, { passive: false });
 document.addEventListener('touchend', (e) => {
  for (const t of e.changedTouches) {
-  if (t.identifier === touchLookId) touchLookId = null;
+  if (t.identifier === touchLookId) {
+   const dur = performance.now() - touchLookStartT;
+   // 거의 안 움직이고(탭) 짧게 눌렀다 떼면 공격
+   if (!touchLookMoved && dur < 300 && mode === 'play' && !invOpen) {
+    doAttack();
+   }
+   touchLookId = null;
+  }
  }
 });
 window.addEventListener('keydown', (e) => {
