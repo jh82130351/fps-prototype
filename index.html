@@ -2044,7 +2044,14 @@ canvas.addEventListener('mousedown', (e) => {
 });
 function doAttack() {
  if (attackCooldown > 0) return;
- attackCooldown = 0.4; // 쿨타임
+ // 손에 든 무기 스탯(없으면 주먹 기본값)
+ const heldIt = inventory[selectedSlot];
+ const w = (heldIt && heldIt.weaponId) ? weaponById(heldIt.weaponId) : null;
+ const atkDmg = w ? w.dmg : 6; // 주먹 데미지 6
+ const atkCd = w ? w.cd : 0.4; // 주먹 쿨 0.4
+ const atkReach = w ? w.range : 4; // 주먹 사거리 4
+ const atkAoe = w ? w.aoe : false; // 주먹 단일
+ attackCooldown = atkCd;
  attackAnim = 1; // 뷰모델 스윙 시작
  lastAtkStamp = Date.now(); // 멀티 전파용 타임스탬프
  // 멀티 전파(B): 공격 타임스탬프를 다음 전송에 실어보냄 (mpSend가 atk 필드 포함)
@@ -2057,12 +2064,11 @@ function doAttack() {
   const rp = remotePlayers[id]; if (!rp || !rp.fig) continue;
   const p = rp.fig.position;
   const dist = camPos.distanceTo(p);
-  if (dist > ATTACK_RANGE) continue; // 4블록 밖은 안 맞음
-  // 정면 판정: 내 시선 방향과 상대 위치 벡터의 각도(코사인)
+  if (dist > atkReach) continue;
   const to = new THREE.Vector3().subVectors(p, camPos).normalize();
   const dot = fwd.dot(to);
-  if (dot > 0.3) { // 정면 대략 72° 이내 (85% 근접)
-   if (fbHitsRef) { try { fbHitsRef.push({ target: id, dmg: ATTACK_DMG, t: Date.now() }); } catch(_){} break; }
+  if (dot > 0.3) {
+   if (fbHitsRef) { try { fbHitsRef.push({ target: id, dmg: atkDmg, t: Date.now() }); } catch(_){} if(!atkAoe) break; }
   }
  }
  // 좀비 타격: 4블록 이내 정면의 좀비에게 데미지(호스트가 HP 처리)
@@ -2076,14 +2082,15 @@ function doAttack() {
    const zc = new THREE.Vector3(z.fig.position.x, z.fig.position.y + 1.2, z.fig.position.z);
    // 사거리: 수평 거리 기준(점프해도 사거리 안 깎임)
    const horiz = Math.hypot(zc.x - camPos2.x, zc.z - camPos2.z);
-   if (horiz > ATTACK_RANGE + 1) continue;
+   if (horiz > atkReach + 1) continue;
    // 각도: 실제 3D 시선 기준(공중에서 내려다봐도 맞음)
    if (horiz > 1.6) {
     const dir3 = new THREE.Vector3().subVectors(zc, camPos2).normalize();
     if (fwd2.dot(dir3) < 0.3) continue;
    }
-   const r = fbdb.ref('zombieHits').push({ zid, by: myPlayerId, dmg: PLAYER_ATK_DMG, t: Date.now() });
+   const r = fbdb.ref('zombieHits').push({ zid, by: myPlayerId, dmg: atkDmg, t: Date.now() });
    setTimeout(()=>{ try{r.remove();}catch(_){} }, 3000);
+   if (!atkAoe) break; // 단일 무기는 한 마리만, 범위공격은 계속 반복
   }
  }
 }

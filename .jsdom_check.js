@@ -53,12 +53,12 @@ results.animate_hook = has("updateZombieRender(dt);") && has("if (!zombieSpawned
 // ⑧ 정리
 results.cleanup = has("if (fbZombiesRef) { try { fbZombiesRef.off(); }") && has("zombieRender = {}; zombieSim = {}; zombieSpawned = false; isZombieHost = false;");
 // zombie attack → hits
-results.zombie_attack = has("from:'zombie', dmg:ZOMBIE_DMG");
+results.zombie_attack = has("from:'zombie', dmg:(s.elite?ELITE_DMG:ZOMBIE_DMG)");
 // ─── B단계: 좀비 처치 + 고기 드롭 + 줍기 ───
 // ① 전역 선언
 results.b_globals = has("const PLAYER_ATK_DMG = 25") && has("let fbDropsRef = null") && has("const PICKUP_RANGE = 0.5");
 // ② doAttack 좀비 타격
-results.b_doattack = has("fbdb.ref('zombieHits').push({ zid, by: myPlayerId, dmg: PLAYER_ATK_DMG") && has("fwd2.dot(dir3) < 0.3") && has("zc.z - camPos2.z");
+results.b_doattack = has("fbdb.ref('zombieHits').push({ zid, by: myPlayerId, dmg: atkDmg") && has("fwd2.dot(dir3) < 0.3") && has("zc.z - camPos2.z");
 // ③ 호스트 피격 처리 + 헬퍼
 results.b_host_hit = has("fbdb.ref('zombieHits').on('child_added'") && has("s.target = h.by") && has("function respawnOneZombie") && has("spawnDrop(s.x, s.z, { name:'좀비고기'");
 // ④ 드롭 생성·공유·줍기
@@ -98,7 +98,11 @@ results.e_sell = has("'엘리트 좀비고기': 50");
 results.e_spawn = has("hp: elite ? ELITE_HP : ZOMBIE_HP") && has("hp: elite?ELITE_HP:ZOMBIE_HP");
 results.e_render = has("isElite?0x2f5d2f:0x4a7c3a") && has("fig.scale.set(1.6, 1.6, 1.6)") && has("'엘리트 좀비':'좀비'");
 results.e_drop = has("name:'엘리트 좀비고기', color:0xffcc33");
-console.log('=== JSDOM LOAD CHECK (hunting + zombie + held + gold + weapons + elite) ===');
+// ─── 무기 전투 적용 [2단계: 스탯 반영] ───
+results.wa_stats = has("const atkDmg = w ? w.dmg : 6") && has("const atkCd = w ? w.cd : 0.4") && has("const atkReach = w ? w.range : 4") && has("const atkAoe = w ? w.aoe : false");
+results.wa_player = has("dmg: atkDmg") && has("if(!atkAoe) break;") && has("if (dist > atkReach) continue;");
+results.wa_zombie = has("if (horiz > atkReach + 1) continue;") && has("zombieHits').push({ zid, by: myPlayerId, dmg: atkDmg") && has("if (!atkAoe) break;");
+console.log('=== JSDOM LOAD CHECK (hunting + zombie + held + gold + weapons + elite + combat) ===');
 console.log('=== JSDOM LOAD CHECK (hunting ground + zombie A) ===');
 let allPass = true;
 for (const [k, v] of Object.entries(results)) { console.log('  ' + (v ? 'PASS  ' : 'FAIL  ') + k); if (!v) allPass = false; }
