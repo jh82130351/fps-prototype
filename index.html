@@ -3063,7 +3063,9 @@ function startFirebaseSync() {
   if (d.t <= myJoinTime) return; // 접속 전 신호 무시
   if (lastResetT && d.t <= lastResetT) return;
   lastResetT = d.t;
-  respawn(); // HP·위치 초기화 (월드·포인트 유지)
+  // 화면의 원격 플레이어 모두 제거(유령 포함) — 살아있는 사람은 다음 업데이트에 다시 생성됨
+  for (const rid in remotePlayers) { if (remotePlayers[rid].fig) scene.remove(remotePlayers[rid].fig); delete remotePlayers[rid]; }
+  respawn(); // 내 HP·위치 초기화 (월드·포인트 유지)
   if (typeof flash === 'function') flash('서버가 리셋되었습니다');
  });
  // 접속 인원 실시간 표시
@@ -3138,6 +3140,7 @@ if (mpResetBtn) mpResetBtn.addEventListener('click', (e) => {
  if (pw !== '12345678') { if (typeof flash === 'function') flash('비밀번호가 틀렸습니다'); else alert('비밀번호가 틀렸습니다'); return; }
  if (!fbdb) { alert('DB 연결 안 됨'); return; }
  fbdb.ref('serverReset').set({ t: Date.now(), by: playerNick || 'admin' });
+ try { fbdb.ref('players').remove(); } catch(_){} // 유령 포함 전체 목록 비움(살아있는 사람은 곧 재등록)
  if (typeof flash === 'function') flash('서버 리셋 실행');
 });
 if (mpCodeInput) { ['pointerdown','touchstart','mousedown','click'].forEach(ev => mpCodeInput.addEventListener(ev, (e) => e.stopPropagation())); }
