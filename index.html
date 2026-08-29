@@ -462,6 +462,10 @@ let inventory = new Array(32).fill(null); // 0~7: 빠른슬롯, 8~31: 보조인�
 try { const s = JSON.parse(localStorage.getItem('fpsInv')||'null'); if (Array.isArray(s)) inventory = s.concat(new Array(32).fill(null)).slice(0,32); } catch(e){}
 let invOpen = false;
 let selectedSlot = 0; // 현재 선택된 빠른슬롯 (0~7)
+let attackCooldown = 0; // 남은 쿨타임(초)
+let attackAnim = 0; // 내 주먹 뷰모델 애니 진행(0=쉼)
+const ATTACK_RANGE = 4; // 4블록
+let lastAtkStamp = 0; // 마지막 공격 타임스탬프(멀티 전파용)
 function saveInv(){ try{ localStorage.setItem('fpsInv', JSON.stringify(inventory)); }catch(e){} }
 
 function applyAppearance(p) {
@@ -1140,6 +1144,14 @@ const pitchObject = new THREE.Object3D();
 yawObject.position.set(0, EYE_HEIGHT, 0);
 yawObject.add(pitchObject); pitchObject.add(playCam);
 scene.add(yawObject);
+
+// 1인칭 주먹 뷰모델: 카메라에 붙는 손 (좌클릭 공격 애니용)
+const fistView = new THREE.Mesh(
+ new THREE.BoxGeometry(0.35, 0.35, 0.6),
+ new THREE.MeshStandardMaterial({ color: 0xe8b88a })
+);
+fistView.position.set(0.45, -0.4, -0.9); // 화면 오른쪽 아래
+playCam.add(fistView);
 
 const editCam = new THREE.PerspectiveCamera(60, aspect(), 0.1, 2000);
 const orbit = { target: new THREE.Vector3(0, 2, 0), radius: 45, theta: 0.6, phi: 1.0 };
@@ -1849,6 +1861,27 @@ canvas.addEventListener('mousedown', (e) => {
  }
  if (best) openShop(best.type);
 });
+
+// 좌클릭 → 공격 실행 (주먹 공격)
+canvas.addEventListener('mousedown', (e) => {
+ if (e.button !== 0) return; // 좌클릭만
+ if (mode !== 'play') return;
+ if (invOpen) return; // 가방 열려있으면 무시
+ doAttack();
+});
+function doAttack() {
+ if (attackCooldown > 0) return;
+ attackCooldown = 0.4; // 쿨타임
+ attackAnim = 1; // 뷰모델 스윙 시작
+ lastAtkStamp = Date.now(); // 멀티 전파용 타임스탬프
+ // 멀티 전파(B): 공격 타임스탬프를 다음 전송에 실어보냄 (mpSend가 atk 필드 포함)
+ // 4블록 사거리 판정(대상은 다음 단계 — 지금은 준비만)
+ const camPos = new THREE.Vector3(); playCam.getWorldPosition(camPos);
+ const fwd = new THREE.Vector3(); playCam.getWorldDirection(fwd);
+ ray.set(camPos, fwd);
+ // TODO: 몬스터 배열과 교차 판정 → 데미지 (다음 단계)
+ // 예: for (const m of monsters) { if (레이 or 거리<ATTACK_RANGE && 정면) damage(m); }
+}
 
 // ---------- 히트박스(F3+G) ----------
 function clearHitboxes() { for (const h of hitboxHelpers) scene.remove(h); hitboxHelpers = []; }
@@ -2587,6 +2620,14 @@ function updateRemotePlayers(dt) {
   p.y += (rp.ty - p.y) * k;
   p.z += (rp.tz - p.z) * k;
   rp.fig.rotation.y = lerpAngle(rp.fig.rotation.y, rp.tr, k);
+  // 상대 공격 팔 스윙 애니
+  if (rp.atkAnim > 0) {
+   rp.atkAnim -= dt * 3.5;
+   const s = Math.sin((1 - Math.max(0, rp.atkAnim)) * Math.PI);
+   const arm = rp.fig.getObjectByName('rArm');
+   if (arm) arm.rotation.x = -s * 1.6;
+   if (rp.atkAnim <= 0) { const a2 = rp.fig.getObjectByName('rArm'); if (a2) a2.rotation.x = 0; }
+  }
  }
 }
 
@@ -2614,6 +2655,16 @@ function animate() {
  scaleGizmo.visible = false;
  if (movers.length) updateMovers(clock.getElapsedTime());
  updateRemotePlayers(dt);
+ // 공격 쿨타임 & 주먹 뷰모델 스윙 애니
+ if (attackCooldown > 0) attackCooldown -= dt;
+ if (attackAnim > 0) {
+  attackAnim -= dt * 3.5; // 약 0.28초 스윙
+  const t = Math.max(0, attackAnim);
+  const s = Math.sin((1 - t) * Math.PI); // 0→1→0
+  fistView.position.set(0.45 - s*0.25, -0.4 + s*0.35, -0.9 - s*0.3);
+  fistView.rotation.x = -s * 1.2;
+  if (attackAnim <= 0) { fistView.position.set(0.45,-0.4,-0.9); fistView.rotation.x = 0; }
+ }
  physics(dt); renderer.render(scene, playCam); hud.style.display = 'block'; healthEl.style.display = 'block';
  } else {
  if (selected && activeTool === 'move') {
@@ -2860,7 +2911,9 @@ function makeCharacter(colors) {
  const skin=c.skin!==undefined?c.skin:0xe8b88a, shirt=c.shirt!==undefined?c.shirt:0x3498db, pants=c.pants!==undefined?c.pants:0x2c3e50;
  const add=(w,h,d,c,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:c}));m.position.set(x,y,z);g.add(m);};
  add(0.8,0.8,0.8,skin,0,2.1,0); add(1.0,1.2,0.5,shirt,0,1.2,0);
- add(0.3,1.1,0.3,skin,-0.65,1.2,0); add(0.3,1.1,0.3,skin,0.65,1.2,0);
+ add(0.3,1.1,0.3,skin,-0.65,1.2,0);
+ const rArm=new THREE.Mesh(new THREE.BoxGeometry(0.3,1.1,0.3),new THREE.MeshStandardMaterial({color:skin}));
+ rArm.position.set(0.65,1.2,0); rArm.name='rArm'; g.add(rArm); // 오른팔(공격 애니용)
  add(0.35,1.1,0.35,pants,-0.25,0.35,0); add(0.35,1.1,0.35,pants,0.25,0.35,0);
  // 머리: 표정 텍스처 6면(앞면 +z) 적용
  const headMat = new THREE.Mesh(new THREE.BoxGeometry(0.8,0.8,0.8), headMaterials(c.face!==undefined?c.face:0, skin));
@@ -2902,7 +2955,7 @@ function mpSend() {
  if (now - lastFbSend < 80) return; // 초당 ~12회 스로틀
  lastFbSend = now;
  fbMeRef.set({ x: yawObject.position.x, y: yawObject.position.y, z: yawObject.position.z,
-  ry: yawObject.rotation.y, nick: playerNick, skin: myColors.skin, shirt: myColors.shirt, pants: myColors.pants, face: myFace, t: Date.now() });
+  ry: yawObject.rotation.y, nick: playerNick, skin: myColors.skin, shirt: myColors.shirt, pants: myColors.pants, face: myFace, t: Date.now(), atk: lastAtkStamp });
 }
 // P2P '방 만들기' 제거 — 모두 Firebase 동기화로 전환
 if (mpHost) mpHost.addEventListener('click', (e) => { e.stopPropagation(); if (!fbdb) { mpLog('DB 연결 안 됨'); return; } startFirebaseSync(); });
@@ -2963,6 +3016,8 @@ function onPlayerUpdate(snap) {
   const head = rp.fig.children.find(ch => ch.geometry && ch.geometry.parameters && ch.geometry.parameters.width===0.8 && ch.geometry.parameters.height===0.8);
   if (head) head.material = headMaterials(d.face, d.skin!==undefined?d.skin:0xe8b88a);
  }
+ // 상대 공격(atk 타임스탬프) 감지 → 팔 스윙 시작
+ if (d.atk && d.atk !== rp.lastAtk) { rp.lastAtk = d.atk; rp.atkAnim = 1; }
 }
 
 const emoteBtn = document.getElementById('emoteBtn');
