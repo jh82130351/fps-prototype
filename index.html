@@ -481,11 +481,32 @@ const THROW_CD = 10, SHURIKEN_DMG = 30, SHURIKEN_MAX_DUR = 200;
 let projectiles = [];
 let shurikenInFlight = false;
 function heldWeapon(){ const it = inventory[selectedSlot]; return (it && it.weaponId) ? it : null; }
+function makeShurikenMesh(){
+ const g = new THREE.Group();
+ const steel = new THREE.MeshStandardMaterial({ color: 0xb8c0c8, metalness: 0.6, roughness: 0.35 });
+ const dark = new THREE.MeshStandardMaterial({ color: 0x2b2f36 });
+ const disk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.04, 12), steel);
+ disk.rotation.x = Math.PI/2; g.add(disk);
+ for (let k=0;k<4;k++){
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.03, 0.12), steel);
+  blade.rotation.y = k * Math.PI/2;
+  const tip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.028, 0.02), steel);
+  tip.position.set(0.22, 0, 0); tip.rotation.y = k*Math.PI/2;
+  g.add(blade); g.add(tip);
+ }
+ const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.05,8), dark);
+ hole.rotation.x = Math.PI/2; g.add(hole);
+ return g;
+}
 function spawnProjectile(kind, dmg, pierce, maxDist, speed, color){
  const camPos = new THREE.Vector3(); playCam.getWorldPosition(camPos);
  const fwd = new THREE.Vector3(); playCam.getWorldDirection(fwd);
- const geo = (kind==='shuriken') ? new THREE.BoxGeometry(0.32,0.32,0.06) : new THREE.BoxGeometry(0.18,0.18,0.6);
- const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: color!==undefined?color:0xc0392b }));
+ let mesh;
+ if (kind==='shuriken'){
+  mesh = makeShurikenMesh();
+ } else {
+  mesh = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.18,0.6), new THREE.MeshStandardMaterial({ color: color!==undefined?color:0xc0392b }));
+ }
  const pos = camPos.clone().addScaledVector(fwd, 1.0);
  mesh.position.copy(pos); scene.add(mesh);
  projectiles.push({ mesh, pos, vel: fwd.clone().multiplyScalar(speed), phase:'out', traveled:0, maxDist, kind, dmg, pierce, speed, hitSet:new Set(), life:0 });
@@ -3329,7 +3350,7 @@ function animate() {
     d.normalize(); p.pos.addScaledVector(d, p.speed * dt);
    }
    p.mesh.position.copy(p.pos);
-   p.mesh.rotation.z += dt * 22; p.mesh.rotation.y += dt * 12;
+   if (p.kind==='shuriken') { p.mesh.rotation.y += dt * 26; } else { p.mesh.rotation.z += dt * 22; p.mesh.rotation.x += dt * 10; }
   }
  }
  if (throwCd > 0) { throwCd -= dt; if (throwCd < 0) throwCd = 0; renderSkillBar(); }
