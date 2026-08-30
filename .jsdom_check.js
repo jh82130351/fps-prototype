@@ -107,6 +107,11 @@ results.l_state = has("let playerLevel = parseInt(localStorage.getItem('fpsLevel
 results.l_bar = has("id=\"levelBar\"") && has("top: 58px") && has("background:linear-gradient(90deg,#2ecc71,#7CFC98)");
 results.l_enter = has("lb.style.display='flex';") && has("lb.style.display='none';");
 results.l_credit = has("killCredit').push({ who:h.by") && has("fbdb.ref('killCredit').limitToLast(20).on('child_added'") && has("gainKill();");
+// ─── 닌자 전직 NPC + 레벨 10 전직 ───
+results.n_job_state = has("let playerJob = localStorage.getItem('fpsJob') || 'none'") && has("function saveJob()");
+results.n_npc = has("spawnMerchant('닌자 사범', -40, -30, 0, { skin:0x2c2c2c, shirt:0x1a1a1a, pants:0x0d0d0d })");
+results.n_open = has("type === '닌자 사범'") && has("renderNinjaShop(body);");
+results.n_render = has("function renderNinjaShop(body)") && has("if (playerJob === 'ninja')") && has("이미 <b style=\"color:#7CFC98;\">닌자</b>") && has("const canJob = (playerLevel >= 10)") && has("playerJob = 'ninja'; saveJob();");
 console.log('=== JSDOM LOAD CHECK (full) ===');
 console.log('=== JSDOM LOAD CHECK (hunting ground + zombie A) ===');
 let allPass = true;
