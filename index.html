@@ -2039,16 +2039,16 @@ function renderNinjaShop(body){
  wrap.style.lineHeight = '1.6';
  wrap.innerHTML = '<div style="margin-bottom:10px;">🥷 <b>닌자</b>로 전직하시겠습니까?<br>'
   + '<span style="font-size:12px;color:#9fb;">벽에 매달려 타고 오르는 능력을 얻습니다.</span><br>'
-  + '<span style="font-size:12px;color:#ffd700;">필요 조건: 레벨 10</span></div>';
+  + '<span style="font-size:12px;color:#ffd700;">필요 조건: 레벨 5</span></div>';
  const btn = document.createElement('button');
- const canJob = (playerLevel >= 10);
- btn.textContent = canJob ? '닌자로 전직' : ('레벨 10 필요 (현재 Lv.' + playerLevel + ')');
+ const canJob = (playerLevel >= 5);
+ btn.textContent = canJob ? '닌자로 전직' : ('레벨 5 필요 (현재 Lv.' + playerLevel + ')');
  btn.disabled = !canJob;
  btn.style.cssText = 'width:100%;padding:10px;border:none;border-radius:10px;font-size:15px;cursor:'
   + (canJob?'pointer':'not-allowed') + ';background:' + (canJob?'#2c3e50':'#555') + ';color:#fff;';
  btn.onclick = (e) => {
   e.stopPropagation();
-  if (playerLevel < 10) { if(typeof flash==='function') flash('레벨 10이 필요합니다'); return; }
+  if (playerLevel < 5) { if(typeof flash==='function') flash('레벨 5가 필요합니다'); return; }
   playerJob = 'ninja'; saveJob();
   if (typeof flash === 'function') flash('🥷 닌자로 전직했습니다!');
   renderNinjaShop(body);
