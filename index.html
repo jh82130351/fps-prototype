@@ -478,6 +478,34 @@ let skillThrow = (localStorage.getItem('fpsSkillThrow') === '1');
 let shurikenDur = parseInt(localStorage.getItem('fpsShuriken') || '0', 10) || 0;
 let throwCd = 0;
 const THROW_CD = 10, SHURIKEN_DMG = 30, SHURIKEN_MAX_DUR = 200;
+let projectiles = [];
+let shurikenInFlight = false;
+function heldWeapon(){ const it = inventory[selectedSlot]; return (it && it.weaponId) ? it : null; }
+function spawnProjectile(kind, dmg, pierce, maxDist, speed, color){
+ const camPos = new THREE.Vector3(); playCam.getWorldPosition(camPos);
+ const fwd = new THREE.Vector3(); playCam.getWorldDirection(fwd);
+ const geo = (kind==='shuriken') ? new THREE.BoxGeometry(0.32,0.32,0.06) : new THREE.BoxGeometry(0.18,0.18,0.6);
+ const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: color!==undefined?color:0xc0392b }));
+ const pos = camPos.clone().addScaledVector(fwd, 1.0);
+ mesh.position.copy(pos); scene.add(mesh);
+ projectiles.push({ mesh, pos, vel: fwd.clone().multiplyScalar(speed), phase:'out', traveled:0, maxDist, kind, dmg, pierce, speed, hitSet:new Set(), life:0 });
+}
+function throwShuriken(dmg, isSkill){
+ if (playerJob!=='ninja') return;
+ if (shurikenDur <= 0) { if(typeof flash==='function') flash('수리검이 없다 (원거리 상점에서 구매)'); return; }
+ if (shurikenInFlight) return;
+ if (isSkill && throwCd > 0) return;
+ shurikenInFlight = true;
+ if (isSkill) throwCd = THROW_CD;
+ shurikenDur = Math.max(0, shurikenDur - 1); saveThrow(); renderSkillBar();
+ spawnProjectile('shuriken', dmg, false, 42, 34, 0xc0392b);
+ attackAnim = 1;
+}
+function throwWeapon(dmg){
+ const it = heldWeapon(); if(!it) return;
+ spawnProjectile('weapon', dmg, true, 200, 40, it.color);
+ attackAnim = 1;
+}
 function saveThrow(){ try{ localStorage.setItem('fpsSkillThrow', skillThrow?'1':'0'); localStorage.setItem('fpsShuriken', String(shurikenDur)); }catch(e){} }
 // 벽타기 상태
 let wallGrab = false; // 현재 벽에 매달려 있나
@@ -1511,6 +1539,15 @@ window.addEventListener('keydown', (e) => {
  if (e.code === 'F3') { e.preventDefault(); } // 브라우저 검색 방지 + keys에 기록되게
  if (e.code === 'Space') e.preventDefault();
  if (e.code === 'Tab') { e.preventDefault(); if (mpActive) return; setMode(mode === 'play' ? 'edit' : 'play'); return; }
+ // C: 던지기 스킬(닌자) — 근접무기 들면 무기 던지기(5), 아니면 수리검 스킬(40, 쿨10s)
+ if (e.code === 'KeyC' && mode === 'play' && !invOpen) {
+  e.preventDefault();
+  if (playerJob === 'ninja') {
+   if (heldWeapon()) throwWeapon(5);
+   else if (shurikenDur > 0) throwShuriken(40, true);
+  }
+  return;
+ }
  if (mode === 'play' && e.code && e.code.indexOf('Digit') === 0) {
  const n = parseInt(e.code.slice(5), 10); // Digit1→1 ... Digit8→8
  if (n >= 1 && n <= 8) { selectedSlot = n - 1; renderHotbar(); e.preventDefault(); return; }
@@ -2225,6 +2262,8 @@ canvas.addEventListener('mousedown', (e) => {
  if (dialogOpen) return;
  if (mode !== 'play') return;
  if (invOpen) return; // 가방 열려있으면 무시
+ // 닌자 수리검: 근접무기 안 들었으면 좌클릭=수리검 던지기(10)
+ if (playerJob==='ninja' && shurikenDur>0 && !heldWeapon()) { throwShuriken(10, false); return; }
  doAttack();
 });
 function doAttack() {
@@ -3264,6 +3303,36 @@ function animate() {
  if (movers.length) updateMovers(clock.getElapsedTime());
  updateRemotePlayers(dt);
  // ─── 좀비: 렌더 + 호스트 시뮬 + 전송 ───
+ // ── 투사체(부메랑) 업데이트 ──
+ if (projectiles.length) {
+  const camP = new THREE.Vector3(); playCam.getWorldPosition(camP);
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+   const p = projectiles[i]; p.life += dt;
+   if (p.phase === 'out') {
+    p.pos.addScaledVector(p.vel, dt); p.traveled += p.speed * dt;
+    if (mpSyncOn && fbdb) {
+     for (const zid in zombieRender) {
+      const z = zombieRender[zid]; if (!z.fig) continue;
+      const zc = z.fig.position;
+      if (!p.hitSet.has(zid) && Math.hypot(zc.x - p.pos.x, (zc.y + 1.2) - p.pos.y, zc.z - p.pos.z) < 1.4) {
+       p.hitSet.add(zid);
+       const r = fbdb.ref('zombieHits').push({ zid, by: myPlayerId, dmg: p.dmg, t: Date.now() });
+       setTimeout(()=>{ try{r.remove();}catch(_){} }, 3000);
+       if (!p.pierce) { p.phase = 'back'; break; }
+      }
+     }
+    }
+    if (p.traveled >= p.maxDist || p.life > 2.5) p.phase = 'back';
+   } else {
+    const d = new THREE.Vector3().subVectors(camP, p.pos); const dist = d.length();
+    if (dist < 1.2 || p.life > 5) { scene.remove(p.mesh); projectiles.splice(i,1); if (p.kind==='shuriken') shurikenInFlight = false; continue; }
+    d.normalize(); p.pos.addScaledVector(d, p.speed * dt);
+   }
+   p.mesh.position.copy(p.pos);
+   p.mesh.rotation.z += dt * 22; p.mesh.rotation.y += dt * 12;
+  }
+ }
+ if (throwCd > 0) { throwCd -= dt; if (throwCd < 0) throwCd = 0; renderSkillBar(); }
  if (mpSyncOn) {
   updateZombieRender(dt);
   if (hitboxOn) buildHitboxes(); // 히트박스 켜져 있으면 매 프레임 위치 갱신
