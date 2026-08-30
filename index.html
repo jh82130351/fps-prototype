@@ -2122,6 +2122,8 @@ function ninjaDialogNode(){
 }
 
 function openShop(type) {
+ const modal = document.getElementById('shopModal');
+ if (!modal) return;
  document.getElementById('shopTitle').textContent = type;
  const body = document.getElementById('shopBody');
  if (type === '잡화 상인') {
