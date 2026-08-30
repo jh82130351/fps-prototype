@@ -606,13 +606,13 @@ let npcs = []; // 상인 NPC들 {type, x, z, fig}
 let hitboxOn = false;
 let hitboxHelpers = [];
 let inventory = new Array(32).fill(null); // 0~7: 빠른슬롯, 8~31: 보조인벤 (총 32칸)
-// 기존(스킬자원) 수리검을 인벤 아이템으로 1회 이관 (inventory 선언 뒤에서 실행)
+try { const s = JSON.parse(localStorage.getItem('fpsInv')||'null'); if (Array.isArray(s)) inventory = s.concat(new Array(32).fill(null)).slice(0,32); } catch(e){}
+// 기존(스킬자원) 수리검을 인벤 아이템으로 1회 이관 (인벤 로드 '뒤'에서 실행 — 순서 중요!)
 if (skillThrow && shurikenDur > 0 && !(function(){ for(const it of inventory){ if(it&&it.throw==='shuriken') return true; } return false; })()) {
  let _s = inventory.findIndex(x=>!x); if(_s<0)_s=0;
  inventory[_s] = { name:'수리검', color:0xb8c0c8, count:1, throw:'shuriken', dur:shurikenDur };
  shurikenDur = 0; saveInv(); saveThrow();
 }
-try { const s = JSON.parse(localStorage.getItem('fpsInv')||'null'); if (Array.isArray(s)) inventory = s.concat(new Array(32).fill(null)).slice(0,32); } catch(e){}
 let invOpen = false;
 let selectedSlot = 0; // 현재 선택된 빠른슬롯 (0~7)
 let invPick = -1; // 보조인벤 탭-이동: 집은 칸 (-1이면 아무것도 안 집음)
@@ -3360,6 +3360,18 @@ function animate() {
        const r = fbdb.ref('zombieHits').push({ zid, by: myPlayerId, dmg: p.dmg, t: Date.now() });
        setTimeout(()=>{ try{r.remove();}catch(_){} }, 3000);
        if (!p.pierce) { p.phase = 'back'; break; }
+      }
+     }
+     // 원격 플레이어 타격(PvP)
+     if (p.phase === 'out') {
+      for (const id in remotePlayers) {
+       const rp = remotePlayers[id]; if (!rp || !rp.fig) continue;
+       const pp = rp.fig.position;
+       if (!p.hitSet.has('P'+id) && Math.hypot(pp.x - p.pos.x, (pp.y + 1.2) - p.pos.y, pp.z - p.pos.z) < 1.4) {
+        p.hitSet.add('P'+id);
+        if (fbHitsRef) { try { fbHitsRef.push({ target: id, dmg: p.dmg, t: Date.now() }); } catch(_){} }
+        if (!p.pierce) { p.phase = 'back'; break; }
+       }
       }
      }
     }
