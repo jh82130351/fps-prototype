@@ -479,8 +479,12 @@ let wallGrabHoldT = 0; // 우클릭 홀드 시간
 let wallGrabTouching = false; // 벽에 닿아 있나 (물리에서 갱신)
 let touchJump = false; // 모바일 점프홀드(벽타기 도약용)
 // ── 백플립(닌자) ──
-let jumpChargeT = 0; let flipSpin = 0; let flipAirborne = false;
+let jumpChargeT = 0; let flipAirborne = false;
+let prevPitch = 0, pitchVel = 0;
+let flipActive = false, flipAngle = 0, flipSpinVel = 0;
 const BACKFLIP_MAX_CHARGE = 2.0, BACKFLIP_MAX_VUP = 69, BACKFLIP_MAX_BACK = 42;
+const FLICK_THRESHOLD = 6.0;
+const CLIMB_SPEED = 4;
 // (rmbDown은 기존 편집 모드 전역 선언을 공유)
 function killsForNext(){ return playerLevel >= 10 ? 0 : (playerLevel+1)*5; }
 function gainKill(){
@@ -2814,6 +2818,7 @@ function physics(dt) {
  const canWallClimb = (playerJob==='ninja' && skillWallClimb);
  // 벽에 닿아있는지 감지 (수평 충돌 발생 여부)
  wallGrabTouching = false;
+ pitchVel = (pitchObject.rotation.x - prevPitch) / Math.max(dt, 0.0001); // 시점 각속도
  const shift = keys['ShiftLeft'] || keys['ShiftRight'] || touchRun;
  const speed = inWater ? (shift ? WALK : WALK * WATER_FACTOR) : (shift ? RUN : WALK);
  const y = yawObject.rotation.y;
@@ -2829,6 +2834,7 @@ function physics(dt) {
   move.addScaledVector(forward, -touchMove.y);
   move.addScaledVector(right, touchMove.x);
  }
+ if (wallGrab) move.set(0,0,0);
  const mag = Math.min(1, move.length());
  if (move.lengthSq() > 0) move.normalize().multiplyScalar(speed * mag);
 
@@ -2874,26 +2880,42 @@ function physics(dt) {
   wallGrabHoldT = 0;
   if (!rmbDown) wallGrab = false; // 우클릭 떼면 매달림 해제
  }
- // ── 백플립: 닌자 + 우클릭 홀드 + (지상 or 벽)에서 점프 키 홀드→떼면 발사 ──
+ // ── 구르기(닌자): 우클릭 홀드 중 시점 빠른 플릭 → 백플립(위)/앞구르기(아래) ──
  const jumpDown = keys['Space'] || touchJump;
- const flipReady = canWallClimb && rmbDown && !dialogOpen && (onGround || wallGrab);
- if (flipReady) {
-  if (jumpDown) { jumpChargeT = Math.min(BACKFLIP_MAX_CHARGE, jumpChargeT + dt); }
-  else if (jumpChargeT > 0) {
+ const flipReady = canWallClimb && rmbDown && !dialogOpen;
+ if (flipReady && jumpDown && (onGround || wallGrab)) {
+  jumpChargeT = Math.min(BACKFLIP_MAX_CHARGE, jumpChargeT + dt);
+ } else if (!jumpDown) {
+  jumpChargeT = 0;
+ }
+ if (flipReady && !flipActive && Math.abs(pitchVel) > FLICK_THRESHOLD) {
+  flipActive = true; flipAngle = 0;
+  const spd = Math.min(Math.max(Math.abs(pitchVel) * 1.5, 8), 25);
+  const up = pitchVel > 0;
+  flipSpinVel = up ? spd : -spd;
+  if (jumpChargeT > 0) {
    const charge = jumpChargeT / BACKFLIP_MAX_CHARGE;
-   const pitch = pitchObject.rotation.x;
-   const upFrac = Math.max(0, Math.min(1, pitch / PITCH_LIMIT));
-   const back = new THREE.Vector3(Math.sin(y), 0, Math.cos(y));
-   const hSpeed = BACKFLIP_MAX_BACK * charge * (1 - upFrac*0.7);
-   velocity.set(back.x*hSpeed, 0, back.z*hSpeed);
-   vertVel = BACKFLIP_MAX_VUP * charge * (0.35 + 0.65*upFrac);
-   onGround = false; wallGrab = false; flipAirborne = true; flipSpin = 1; jumpChargeT = 0;
+   const dir = new THREE.Vector3(Math.sin(y), 0, Math.cos(y));
+   if (!up) dir.multiplyScalar(-1);
+   const hSpeed = BACKFLIP_MAX_BACK * charge;
+   velocity.set(dir.x*hSpeed, 0, dir.z*hSpeed);
+   vertVel = BACKFLIP_MAX_VUP * charge;
+   onGround = false; wallGrab = false; flipAirborne = true;
   }
- } else { jumpChargeT = 0; }
- // 매달린 상태: 중력 정지
+  jumpChargeT = 0;
+ }
+ // ── 벽타기: 매달린 상태에서 WASD로 기어오르기(중력 정지) ──
  if (wallGrab) {
-  vertVel = 0; pos.y += 0;
-  if (jumpDown && !flipReady) { vertVel = JUMP_SPEED * 1.2; wallGrab = false; wallGrabHoldT = 0; }
+  vertVel = 0;
+  let cw = 0, cs = 0;
+  if (keys['KeyW']) cw += 1;
+  if (keys['KeyS']) cw -= 1;
+  if (keys['KeyD']) cs += 1;
+  if (keys['KeyA']) cs -= 1;
+  if (isTouch && (touchMove.x || touchMove.y)) { cw += -touchMove.y; cs += touchMove.x; }
+  pos.y += cw * CLIMB_SPEED * dt;
+  pos.x += right.x * cs * CLIMB_SPEED * dt;
+  pos.z += right.z * cs * CLIMB_SPEED * dt;
  } else {
   if (onGround && keys['Space'] && !flipReady) { vertVel = JUMP_SPEED; onGround = false; }
   vertVel -= GRAVITY * dt;
@@ -3017,6 +3039,7 @@ function physics(dt) {
   'x:'+p.x.toFixed(1)+' z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
   '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'')+(wallGrab?' · 🧗벽타기':'')+(onCheckpoint?' · ✓체크포인트':'');
 
+ prevPitch = pitchObject.rotation.x;
  // 멀티플레이 위치 전송 (Firebase 동기화 중이면)
  if (mpActive && mpSyncOn) {
   mpSendT += dt;
@@ -3187,12 +3210,11 @@ function animate() {
  if (mode === 'play') {
  gizmo.visible = false;
  scaleGizmo.visible = false;
- // ── 백플립 회전 연출: 카메라를 뒤로 한 바퀴(0.8초) ──
- if (flipSpin > 0) {
-  flipSpin -= dt / 0.8;
-  const _t = Math.max(0, flipSpin);
-  playCam.rotation.x = 2 * Math.PI * (1 - _t); // 뒤로 한 바퀴(백플립)
-  if (flipSpin <= 0) { flipSpin = 0; playCam.rotation.x = 0; }
+ // ── 구르기 회전 연출: 플릭 속도에 비례한 각속도로 한 바퀴 ──
+ if (flipActive) {
+  flipAngle += flipSpinVel * dt;
+  playCam.rotation.x = flipAngle;
+  if (Math.abs(flipAngle) >= Math.PI * 2) { flipActive = false; flipAngle = 0; playCam.rotation.x = 0; }
  }
  if (movers.length) updateMovers(clock.getElapsedTime());
  updateRemotePlayers(dt);
