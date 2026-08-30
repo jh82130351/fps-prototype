@@ -27,7 +27,7 @@
 
  #health { position: absolute; top: 12px; left: 12px; z-index: 6; font-size: 18px;
  letter-spacing: 2px; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: none; }
- #hud { position: absolute; top: 58px; left: 12px; z-index: 5; color: #7dd3fc; font-size: 12px;
+ #hud { position: absolute; top: 100px; left: 12px; z-index: 5; color: #7dd3fc; font-size: 12px;
  font-family: monospace; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px;
  line-height: 1.6; pointer-events: none; white-space: pre; }
 
@@ -182,6 +182,7 @@
 <div id="marquee"></div>
 <div id="hud"></div>
 <div id="levelBar" style="position:absolute;top:38px;left:12px;z-index:6;display:none;align-items:center;gap:6px;width:180px;"></div>
+<div id="skillBar" style="position:absolute;top:58px;left:12px;z-index:6;display:none;gap:5px;"></div>
 <div id="mode" class="play">PLAY</div>
 
 <!-- 상점 창 -->
@@ -473,6 +474,11 @@ function saveJob(){ try{ localStorage.setItem('fpsJob', playerJob); }catch(e){} 
 // 대화 시스템 상태
 let dialogOpen = false;
 let skillWallClimb = (localStorage.getItem('fpsSkillWall') === '1');
+let skillThrow = (localStorage.getItem('fpsSkillThrow') === '1');
+let shurikenDur = parseInt(localStorage.getItem('fpsShuriken') || '0', 10) || 0;
+let throwCd = 0;
+const THROW_CD = 10, SHURIKEN_DMG = 30, SHURIKEN_MAX_DUR = 200;
+function saveThrow(){ try{ localStorage.setItem('fpsSkillThrow', skillThrow?'1':'0'); localStorage.setItem('fpsShuriken', String(shurikenDur)); }catch(e){} }
 // 벽타기 상태
 let wallGrab = false; // 현재 벽에 매달려 있나
 let wallGrabHoldT = 0; // 우클릭 홀드 시간
@@ -499,6 +505,23 @@ function gainKill(){
  }
  if (playerLevel >= 10) killProgress = 0;
  saveLevel(); updateLevelBar();
+}
+function renderSkillBar(){
+ const el = document.getElementById('skillBar'); if(!el) return; el.innerHTML='';
+ for (let i=0;i<6;i++){
+  const b=document.createElement('div');
+  b.style.cssText='position:relative;width:34px;height:34px;border-radius:7px;background:rgba(255,255,255,0.07);border:1px solid #ffffff22;box-sizing:border-box;';
+  if (i===0 && skillThrow){
+   b.style.background='rgba(200,60,60,0.18)';
+   b.innerHTML='<div style="position:absolute;top:1px;left:3px;font-size:9px;color:#9fb;font-weight:bold;">C</div>'
+   +'<div style="position:absolute;top:9px;left:9px;width:16px;height:16px;background:#c0392b;transform:rotate(45deg);border-radius:3px;"></div>'
+   +'<div style="position:absolute;bottom:1px;right:3px;font-size:8px;color:#fdd;">'+shurikenDur+'</div>';
+   if (throwCd>0){
+    b.innerHTML+='<div style="position:absolute;inset:0;background:rgba(0,0,0,0.55);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:bold;">'+Math.ceil(throwCd)+'</div>';
+   }
+  }
+  el.appendChild(b);
+ }
 }
 function updateLevelBar(){
  const el = document.getElementById('levelBar'); if(!el) return;
@@ -2132,6 +2155,18 @@ function ninjaDialogNode(){
     {label:'배운다', act:()=>{ skillWallClimb=true; try{localStorage.setItem('fpsSkillWall','1');}catch(e){} showDialog('벽타기를 익혔네! 벽에 붙어 우클릭을 길게 누르게나.', [{label:'나가기', act:endDialog}]); }},
     {label:'나가기', act:endDialog}
    ]);
+  } else if (!skillThrow) {
+   if (playerLevel < 6) {
+    showDialog('6레벨이 되면 던지기 스킬을 알려주겠네.', [{label:'나가기', act:endDialog}]);
+   } else {
+    showDialog('던지기 스킬을 배우게나.', [
+     {label:'배운다', act:()=>{
+      skillThrow = true; shurikenDur = SHURIKEN_MAX_DUR; saveThrow(); renderSkillBar();
+      showDialog('그러면 이 수리검을 받게나. C키로 던지게나(쿨타임 10초).', [{label:'받는다', act:endDialog}]);
+     }},
+     {label:'나가기', act:endDialog}
+    ]);
+   }
   } else {
    showDialog('15레벨이 되면 새로운 스킬을 알려주겠네.', [{label:'나가기', act:endDialog}]);
   }
@@ -2708,6 +2743,7 @@ function enterMultiplayerGame() {
  if (mpPanel) mpPanel.style.display = 'none';
  updateGoldHud();
  const lb=document.getElementById('levelBar'); if(lb) lb.style.display='flex'; updateLevelBar();
+ const sb=document.getElementById('skillBar'); if(sb) sb.style.display='flex'; renderSkillBar();
  if (overlay) overlay.style.display = 'none';
  started = true;
  crosshair.style.display = 'block';
@@ -2732,6 +2768,7 @@ function enterMultiplayerGame() {
 function leaveMultiplayer() {
  mpActive = false; mpSyncOn = false;
  const lb=document.getElementById('levelBar'); if(lb) lb.style.display='none';
+ const sb2=document.getElementById('skillBar'); if(sb2) sb2.style.display='none';
  const hb=document.getElementById('hotbar'); if(hb) hb.style.display='none'; if(invOpen) toggleInv();
  for (const n of npcs) { if (n.fig) scene.remove(n.fig); }
  npcs = [];
