@@ -485,6 +485,7 @@ let flipActive = false, flipAngle = 0, flipSpinVel = 0;
 const BACKFLIP_MAX_CHARGE = 2.0, BACKFLIP_MAX_VUP = 69, BACKFLIP_MAX_BACK = 42;
 const FLICK_THRESHOLD = 50.0; // 아주 강한 플릭에만 발동
 const CLIMB_SPEED = 4;
+let wallLostT = 0; // 벽에서 떨어진 지속 시간
 // (rmbDown은 기존 편집 모드 전역 선언을 공유)
 function killsForNext(){ return playerLevel >= 10 ? 0 : (playerLevel+1)*5; }
 function gainKill(){
@@ -2879,6 +2880,13 @@ function physics(dt) {
  } else if (!rmbDown || !wallGrabTouching) {
   wallGrabHoldT = 0;
   if (!rmbDown) wallGrab = false; // 우클릭 떼면 매달림 해제
+ }
+ // 벽에서 떨어지면(안 닿음) 잠깐 유예 후 벽타기 해제 (꼭대기 넘기는 허용)
+ if (wallGrab && !wallGrabTouching) {
+  wallLostT += dt;
+  if (wallLostT > 0.15) { wallGrab = false; wallLostT = 0; }
+ } else {
+  wallLostT = 0;
  }
  // ── 구르기(닌자): 우클릭 홀드 중 시점 빠른 플릭 → 백플립(위)/앞구르기(아래) ──
  const jumpDown = keys['Space'] || touchJump;
