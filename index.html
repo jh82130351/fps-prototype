@@ -478,6 +478,26 @@ let wallGrab = false; // 현재 벽에 매달려 있나
 let wallGrabHoldT = 0; // 우클릭 홀드 시간
 let wallGrabTouching = false; // 벽에 닿아 있나 (물리에서 갱신)
 let touchJump = false; // 모바일 점프홀드(벽타기 도약용)
+
+// ═══ [신규] 벽 점프(Wall Jump) + 착지 구르기(Landing Roll) 상태 변수 ═══
+let wallGrabSide = 0;   // 현재 매달린 벽의 방향: +1=오른쪽 벽 / -1=왼쪽 벽 / 0=없음
+let wallJumpBoostT = 0; // 벽 차기 직후 수평 가속이 유지되는 시간(초)
+let wallJumpSide = 0;   // 벽 차기로 튕겨 나가는 방향(+1=우측 / -1=좌측) — 벽의 반대쪽
+let camTilt = 0;        // 벽 차기로 인한 카메라 롤(Roll) 기울기(라디안) — 원상복구 대상
+let wallJumpTiltT = 0;  // 카메라 기울기 유지 후 원상복구까지 걸리는 시간(초)
+
+let wasOnGround = true; // 이전 프레임 착지 상태(onGround 엣지 감지용)
+let airTime = 0;        // 현재 공중 체공 시간(초)
+let landDip = 0;        // 착지 딥: 카메라가 내려간 높이(0=원위치)
+let landingDipT = 0;    // 착지 딥 복구 소요 시간(초)
+let vertVelPrev = 0;    // 이전 프레임의 수직 낙하 속도(착지 딥 판정용)
+const WALL_JUMP_POWER = 9;   // 벽 차기 수평 속도
+const WALL_JUMP_VERT = 11;   // 벽 차기 수직 속도 (JUMP_SPEED 8보다 크게)
+const WALL_JUMP_TILT = 0.45; // 벽 차기 카메라 기울기(라디안, 약 26°)
+const DIP_DEPTH = 0.28;      // 착지 시 카메라가 내려가는 Y 높이
+const LAND_FALL_THRESHOLD = 9; // 이 낙하 속도(-9)를 넘으면 착지 딥 발동
+const LAND_AIR_TIME = 0.35;    // 이 체공 시간(초)을 넘어도 착지 딥 발동
+const LAND_DIP_TIME = 0.28;    // 착지 딥이 완전히 복구되는 시간(초)
 // (rmbDown은 기존 편집 모드 전역 선언을 공유)
 function killsForNext(){ return playerLevel >= 10 ? 0 : (playerLevel+1)*5; }
 function gainKill(){
@@ -1220,10 +1240,12 @@ palm.position.set(0, 0, -0.56);
 fistView.add(palm);
 // 손가락 4개 (손바닥 앞으로)
 const fingerGeo = new THREE.BoxGeometry(0.05, 0.05, 0.16);
+const fingers = [];
 for (let i = 0; i < 4; i++) {
  const f = new THREE.Mesh(fingerGeo, armMat);
  f.position.set(-0.09 + i * 0.06, 0.02, -0.74);
  fistView.add(f);
+ fingers.push(f);
 }
 // 엄지 (옆으로)
 const thumb = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.12), armMat);
@@ -2807,6 +2829,8 @@ function respawn() {
 }
 
 function physics(dt) {
+ // ─── [신규] 착지 딥 판정용: 이전 프레임의 낙하 속도 기록(착지 시 0으로 초기화되기 전 값) ───
+ vertVelPrev = vertVel;
  // 벽타기 조건: 닌자 + 스킬 습득
  const canWallClimb = (playerJob==='ninja' && skillWallClimb);
  // 벽에 닿아있는지 감지 (수평 충돌 발생 여부)
@@ -2851,6 +2875,9 @@ function physics(dt) {
  pos.x = c.cx + (lx*ca - lz*sa);
  pos.z = c.cz + (lx*sa + lz*ca);
  wallGrabTouching = true; // 벽에 닿음
+ // ─── [신규] 벽이 왼쪽인지 오른쪽인지 판정 (캐릭터 right 벡터 기준) ───
+ //  충돌면에서 튕겨나온 방향(pos-벽면)과 캐릭터의 'right' 벡터가 같은 방향이면 오른쪽 벽
+ wallGrabSide = (right.x*lx + right.z*lz >= 0) ? 1 : -1;
  }
  }
 
@@ -2874,16 +2901,38 @@ function physics(dt) {
  if (wallGrab) {
   vertVel = 0; // 중력 정지
   pos.y += 0; // 고정
-  if (keys['Space'] || touchJump) { // 점프로 도약
-   vertVel = JUMP_SPEED * 1.2; // 살짝 높이 도약
-   wallGrab = false;
-   wallGrabHoldT = 0;
+  if (keys['Space'] || touchJump) { // ─── [신규] 벽 차고 도약(Wall Jump) ───
+   // 벽 방향이 잡혔다면 벽의 반대편으로 강하게 튕겨나감
+   if (wallGrabSide !== 0) {
+    wallJumpSide = -wallGrabSide;        // 벽 반대쪽이 튕겨 나가는 방향(왼벽→우측, 오른벽→좌측)
+    wallJumpBoostT = 0.35;               // 0.35초 동안 수평 가속 유지
+    wallJumpTiltT = 0.4;                 // 카메라 롤 유지 후 복구 시간
+    camTilt = -wallJumpSide * WALL_JUMP_TILT; // 벽 반대 방향으로 카메라 기울임
+   } else { // 벽 방향 미확정 시: 기본 수직 도약(롤 없음)
+    wallJumpSide = 0; wallJumpBoostT = 0; wallJumpTiltT = 0; camTilt = 0;
+   }
+   vertVel = WALL_JUMP_VERT; // 강한 상승 도약 (JUMP_SPEED 8 → 11)
+   wallGrab = false;         // ─── [요구] 점프와 동시에 벽타기 상태 해제 ───
+   wallGrabHoldT = 0;        // 홀드 타이머 초기화
   }
  } else {
  if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
  vertVel -= GRAVITY * dt;
  pos.y += vertVel * dt;
  }
+ }
+ // ─── [신규] 벽 점프 후 수평 가속: 벽 반대 방향으로 강하게 튕김 ───
+ if (wallJumpBoostT > 0) {
+  wallJumpBoostT -= dt;
+  // 캐릭터 right 벡터 방향으로 추가 속도 부여 (벽 반대쪽, 짧은 시간에 점진 가속)
+  velocity.addScaledVector(right, wallJumpSide * WALL_JUMP_POWER * dt * 30 * Math.min(1, wallJumpBoostT / 0.1));
+ }
+ // ─── [신규] 카메라 롤(Roll) 원상복구 — 벽 점프 기울기 서서히 되돌리기 ───
+ if (wallJumpTiltT > 0) {
+  wallJumpTiltT -= dt;
+  if (wallJumpTiltT <= 0) camTilt = 0; // 타이머 끝나면 기울기 완전 제거
+ } else {
+  camTilt = 0;
  }
  // 바닥은 맵(그라운드 평면) 범위 안에서만 존재 → 밖은 공허로 낙하
  const half = groundSize / 2;
@@ -2907,7 +2956,18 @@ function physics(dt) {
  }
  }
  if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; } else onGround = false;
- // 포인트 발판: 윗면에 서면 포인트+1, 처음 스폰대로 복귀
+
+ // ─── [신규] 착지 구르기(Landing Roll / Camera Dip) — !onGround → onGround 엣지 감지 ───
+ if (!wasOnGround && onGround && !inWater) {
+  // 체공 시간이 오래됐거나 낙하 속도가 임계값 이상이면 카메라를 순간 내림
+  if (airTime >= LAND_AIR_TIME || vertVelPrev <= -LAND_FALL_THRESHOLD) {
+   landingDipT = LAND_DIP_TIME;   // 복구 소요 시간(초)
+   landDip = DIP_DEPTH;           // 카메라 Y를 즉시 아래로(무릎 굽힘/구르기 느낌)
+  }
+ }
+ airTime = onGround ? 0 : airTime + dt; // 공중이면 체공 시간 누적, 착지면 리셋
+ wasOnGround = onGround;                 // 다음 프레임 엣지 감지용
+
  if (onGround) {
  for (const c of colliders) {
  if (c.type !== 'point') continue;
@@ -3224,8 +3284,30 @@ function animate() {
   fistView.position.set(FIST_REST.px, FIST_REST.py, z);
   fistView.rotation.x = rx;
   if (attackAnim <= 0) { fistView.position.set(FIST_REST.px, FIST_REST.py, FIST_REST.pz); fistView.rotation.x = FIST_REST.rx; }
+ } else if (wallGrab) {
+  // 벽 잡는 손 모션: 손을 앞으로 뻗고 손가락을 벽에 걸치듯 구부림 (손에 든 블록은 손을 따라감)
+  const g = Math.min(1, wallGrabHoldT / 0.2); // 매달림 진행도
+  // 손을 정면·살짝 위로 뻗어 벽을 짚는 자세
+  fistView.position.set(0.25, -0.32, -0.85);
+  fistView.rotation.x = 0.9; // 손목을 위로 꺾어 벽면에 손바닥이 닿게
+  fistView.rotation.y = 0;
+  fistView.rotation.z = -0.15;
+  // 손가락을 구부려 벽을 갈고리처럼 감썬 자세 (progress 따라 구부림)
+  for (let i = 0; i < fingers.length; i++) {
+   fingers[i].rotation.x = -0.6 + i * 0.12 - g * 0.5; // 손가락 끝을 벽 쪽으로 휘게
+  }
+  thumb.rotation.x = 0.4; // 엄지로 벽 다른 면을 받침
  }
  if (!dialogOpen) physics(dt);
+ // ─── [신규] 월 점프 카메라 롤(Roll) + 착지 딥(Camera Dip) 실적용 ───
+ // 착지 딥: 지수 감쇠 Lerp로 카메라를 부드럽게 원위치(0)로 복구
+ if (landingDipT > 0) {
+  landingDipT -= dt;
+  landDip += (0 - landDip) * (1 - Math.pow(0.18, dt)); // 목표 0으로 부드럽게 수렴
+  if (landingDipT <= 0) landDip = 0;                    // 타이머 종료 시 완전 복구
+ }
+ pitchObject.rotation.z = camTilt;            // 벽 차기 시 카메라를 벽 반대 방향으로 기울임
+ playCam.position.y = -landDip;               // 착지 시 카메라를 아래로 내렸다가 원위치로(Lerp 복구)
  renderer.render(scene, dialogOpen ? dialogCam : playCam);
  hud.style.display = 'block'; healthEl.style.display = 'block';
  } else {
