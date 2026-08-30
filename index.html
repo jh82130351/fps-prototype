@@ -478,6 +478,9 @@ let wallGrab = false; // 현재 벽에 매달려 있나
 let wallGrabHoldT = 0; // 우클릭 홀드 시간
 let wallGrabTouching = false; // 벽에 닿아 있나 (물리에서 갱신)
 let touchJump = false; // 모바일 점프홀드(벽타기 도약용)
+// ── 백플립(닌자) ──
+let jumpChargeT = 0; let flipSpin = 0; let flipAirborne = false;
+const BACKFLIP_MAX_CHARGE = 2.0, BACKFLIP_MAX_VUP = 69, BACKFLIP_MAX_BACK = 42;
 // (rmbDown은 기존 편집 모드 전역 선언을 공유)
 function killsForNext(){ return playerLevel >= 10 ? 0 : (playerLevel+1)*5; }
 function gainKill(){
@@ -2829,7 +2832,8 @@ function physics(dt) {
  const mag = Math.min(1, move.length());
  if (move.lengthSq() > 0) move.normalize().multiplyScalar(speed * mag);
 
- velocity.lerp(move, 1 - Math.pow(0.001, dt));
+ if (!flipAirborne) velocity.lerp(move, 1 - Math.pow(0.001, dt));
+ else velocity.lerp(move, 1 - Math.pow(0.2, dt)); // 백플립 공중 모멘텀 유지
  yawObject.position.addScaledVector(velocity, dt);
 
  const pos = yawObject.position, R = 0.4, H = EYE_HEIGHT;
@@ -2870,19 +2874,30 @@ function physics(dt) {
   wallGrabHoldT = 0;
   if (!rmbDown) wallGrab = false; // 우클릭 떼면 매달림 해제
  }
- // 매달린 상태: 중력 정지, 점프로만 떨어짐
- if (wallGrab) {
-  vertVel = 0; // 중력 정지
-  pos.y += 0; // 고정
-  if (keys['Space'] || touchJump) { // 점프로 도약
-   vertVel = JUMP_SPEED * 1.2; // 살짝 높이 도약
-   wallGrab = false;
-   wallGrabHoldT = 0;
+ // ── 백플립: 닌자 + 우클릭 홀드 + (지상 or 벽)에서 점프 키 홀드→떼면 발사 ──
+ const jumpDown = keys['Space'] || touchJump;
+ const flipReady = canWallClimb && rmbDown && !dialogOpen && (onGround || wallGrab);
+ if (flipReady) {
+  if (jumpDown) { jumpChargeT = Math.min(BACKFLIP_MAX_CHARGE, jumpChargeT + dt); }
+  else if (jumpChargeT > 0) {
+   const charge = jumpChargeT / BACKFLIP_MAX_CHARGE;
+   const pitch = pitchObject.rotation.x;
+   const upFrac = Math.max(0, Math.min(1, pitch / PITCH_LIMIT));
+   const back = new THREE.Vector3(Math.sin(y), 0, Math.cos(y));
+   const hSpeed = BACKFLIP_MAX_BACK * charge * (1 - upFrac*0.7);
+   velocity.set(back.x*hSpeed, 0, back.z*hSpeed);
+   vertVel = BACKFLIP_MAX_VUP * charge * (0.35 + 0.65*upFrac);
+   onGround = false; wallGrab = false; flipAirborne = true; flipSpin = 1; jumpChargeT = 0;
   }
+ } else { jumpChargeT = 0; }
+ // 매달린 상태: 중력 정지
+ if (wallGrab) {
+  vertVel = 0; pos.y += 0;
+  if (jumpDown && !flipReady) { vertVel = JUMP_SPEED * 1.2; wallGrab = false; wallGrabHoldT = 0; }
  } else {
- if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
- vertVel -= GRAVITY * dt;
- pos.y += vertVel * dt;
+  if (onGround && keys['Space'] && !flipReady) { vertVel = JUMP_SPEED; onGround = false; }
+  vertVel -= GRAVITY * dt;
+  pos.y += vertVel * dt;
  }
  }
  // 바닥은 맵(그라운드 평면) 범위 안에서만 존재 → 밖은 공허로 낙하
@@ -2906,7 +2921,7 @@ function physics(dt) {
  }
  }
  }
- if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; } else onGround = false;
+ if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; flipAirborne = false; } else onGround = false;
  // 포인트 발판: 윗면에 서면 포인트+1, 처음 스폰대로 복귀
  if (onGround) {
  for (const c of colliders) {
@@ -3172,6 +3187,13 @@ function animate() {
  if (mode === 'play') {
  gizmo.visible = false;
  scaleGizmo.visible = false;
+ // ── 백플립 회전 연출: 카메라를 뒤로 한 바퀴(0.8초) ──
+ if (flipSpin > 0) {
+  flipSpin -= dt / 0.8;
+  const _t = Math.max(0, flipSpin);
+  playCam.rotation.x = -2 * Math.PI * (1 - _t);
+  if (flipSpin <= 0) { flipSpin = 0; playCam.rotation.x = 0; }
+ }
  if (movers.length) updateMovers(clock.getElapsedTime());
  updateRemotePlayers(dt);
  // ─── 좀비: 렌더 + 호스트 시뮬 + 전송 ───
