@@ -120,6 +120,13 @@ results.d_fns = has("function startDialog(npc)") && has("function endDialog()") 
 results.d_branch = has("if (best.type === '닌자 사범') startDialog(best); else openShop(best.type);") && has("if (dialogOpen) { return; }");
 results.d_render = has("if (!dialogOpen) physics(dt);") && has("renderer.render(scene, dialogOpen ? dialogCam : playCam);") && has("if (dialogOpen) { if(e.code==='Escape') endDialog(); return; }");
 results.d_dialog = has("showDialog('레벨이 부족하군. 5레벨이 되면 다시 오게나.', [{label:'나가기', act:endDialog}]);") && has("showDialog('자네, 닌자로 전직할 생각이 있나?', [") && has("showDialog('스킬을 배워 볼텐가?', [") && has("showDialog('15레벨이 되면 새로운 스킬을 알려주겠네.', [{label:'나가기', act:endDialog}]);");
+// ─── 닌자 벽타기 스킬 ───
+results.wg_state = has("let wallGrab = false;") && has("let wallGrabHoldT = 0;") && has("let wallGrabTouching = false;") && has("let touchJump = false;");
+results.wg_rmb = has("if(e.button===2) rmbDown=true;") && has("if(e.button===2){ rmbDown=false; if(wallGrab){ wallGrab=false; } }");
+results.wg_cond = has("const canWallClimb = (playerJob==='ninja' && skillWallClimb);") && has("wallGrabTouching = false;") && has("wallGrabTouching = true; // 벽에 닿음");
+results.wg_phys = has("if (canWallClimb && rmbDown && wallGrabTouching && !dialogOpen)") && has("if (wallGrabHoldT >= 0.2 && !wallGrab) { wallGrab = true; vertVel = 0; }") && has("if (keys['Space'] || touchJump) { // 점프로 도약") && has("vertVel = JUMP_SPEED * 1.2");
+results.wg_hud = has("wallGrab?' · 🧗벽타기':'");
+results.wg_touch = has("if (canWallClimb) rmbDown = true;") && has("rmbDown = false; if(wallGrab && !keys['Space']) wallGrab = false;");
 console.log('=== JSDOM LOAD CHECK (full) ===');
 console.log('=== JSDOM LOAD CHECK (hunting ground + zombie A) ===');
 let allPass = true;

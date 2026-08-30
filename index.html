@@ -473,6 +473,12 @@ function saveJob(){ try{ localStorage.setItem('fpsJob', playerJob); }catch(e){} 
 // 대화 시스템 상태
 let dialogOpen = false;
 let skillWallClimb = (localStorage.getItem('fpsSkillWall') === '1');
+// 벽타기 상태
+let wallGrab = false; // 현재 벽에 매달려 있나
+let wallGrabHoldT = 0; // 우클릭 홀드 시간
+let wallGrabTouching = false; // 벽에 닿아 있나 (물리에서 갱신)
+let touchJump = false; // 모바일 점프홀드(벽타기 도약용)
+// (rmbDown은 기존 편집 모드 전역 선언을 공유)
 function killsForNext(){ return playerLevel >= 10 ? 0 : (playerLevel+1)*5; }
 function gainKill(){
  if (playerLevel >= 10) return;
@@ -1432,6 +1438,8 @@ document.addEventListener('touchstart', (e) => {
    touchLookLastX = t.clientX; touchLookLastY = t.clientY;
    touchLookStartX = t.clientX; touchLookStartY = t.clientY;
    touchLookStartT = performance.now();
+   // 벽타기용 홀드 타이머 시작
+   if (canWallClimb) rmbDown = true;
    touchLookMoved = false;
   }
  }
@@ -1452,6 +1460,7 @@ document.addEventListener('touchmove', (e) => {
 }, { passive: false });
 document.addEventListener('touchend', (e) => {
  if (dialogOpen) { touchLookId = null; return; }
+ rmbDown = false; if(wallGrab && !keys['Space']) wallGrab = false;
  for (const t of e.changedTouches) {
   if (t.identifier === touchLookId) {
    const dur = performance.now() - touchLookStartT;
@@ -2141,6 +2150,10 @@ function openShop(type) {
 const shopCloseBtn = document.getElementById('shopClose');
 if (shopCloseBtn) shopCloseBtn.addEventListener('click', () => { document.getElementById('shopModal').style.display = 'none'; });
 
+// 우클릭 홀드 추적(벽타기용)
+canvas.addEventListener('mousedown', (e)=>{ if(e.button===2) rmbDown=true; });
+canvas.addEventListener('mouseup', (e)=>{ if(e.button===2){ rmbDown=false; if(wallGrab){ wallGrab=false; } } });
+
 canvas.addEventListener('mousedown', (e) => {
  if (e.button !== 2) return; // 우클릭만
  if (mode !== 'play' || !mpActive) return; // 마을(멀티)에서만
@@ -2794,6 +2807,10 @@ function respawn() {
 }
 
 function physics(dt) {
+ // 벽타기 조건: 닌자 + 스킬 습득
+ const canWallClimb = (playerJob==='ninja' && skillWallClimb);
+ // 벽에 닿아있는지 감지 (수평 충돌 발생 여부)
+ wallGrabTouching = false;
  const shift = keys['ShiftLeft'] || keys['ShiftRight'] || touchRun;
  const speed = inWater ? (shift ? WALK : WALK * WATER_FACTOR) : (shift ? RUN : WALK);
  const y = yawObject.rotation.y;
@@ -2833,6 +2850,7 @@ function physics(dt) {
  else if (m === pD) lz = -bz; else lz = bz;
  pos.x = c.cx + (lx*ca - lz*sa);
  pos.z = c.cz + (lx*sa + lz*ca);
+ wallGrabTouching = true; // 벽에 닿음
  }
  }
 
@@ -2844,9 +2862,28 @@ function physics(dt) {
  else vertVel = -SINK_SPEED; // 천천히 가라앉음
  pos.y += vertVel * dt;
  } else {
+ // 벽타기: 홀드 시간 갱신 + 매달림
+ if (canWallClimb && rmbDown && wallGrabTouching && !dialogOpen) {
+  wallGrabHoldT += dt;
+  if (wallGrabHoldT >= 0.2 && !wallGrab) { wallGrab = true; vertVel = 0; }
+ } else if (!rmbDown || !wallGrabTouching) {
+  wallGrabHoldT = 0;
+  if (!rmbDown) wallGrab = false; // 우클릭 떼면 매달림 해제
+ }
+ // 매달린 상태: 중력 정지, 점프로만 떨어짐
+ if (wallGrab) {
+  vertVel = 0; // 중력 정지
+  pos.y += 0; // 고정
+  if (keys['Space'] || touchJump) { // 점프로 도약
+   vertVel = JUMP_SPEED * 1.2; // 살짝 높이 도약
+   wallGrab = false;
+   wallGrabHoldT = 0;
+  }
+ } else {
  if (onGround && keys['Space']) { vertVel = JUMP_SPEED; onGround = false; }
  vertVel -= GRAVITY * dt;
  pos.y += vertVel * dt;
+ }
  }
  // 바닥은 맵(그라운드 평면) 범위 안에서만 존재 → 밖은 공허로 낙하
  const half = groundSize / 2;
@@ -2963,7 +3000,7 @@ function physics(dt) {
  const p = pos;
  hud.textContent = (playerNick ? playerNick + '\n' : '') + '🏆 ' + playerPoints + ' 💰 ' + gold + (mpActive ? ' 👥 ' + mpPlayerCount : '') + '\n' +
   'x:'+p.x.toFixed(1)+' z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
-  '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'')+(onCheckpoint?' · ✓체크포인트':'');
+  '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'')+(wallGrab?' · 🧗벽타기':'')+(onCheckpoint?' · ✓체크포인트':'');
 
  // 멀티플레이 위치 전송 (Firebase 동기화 중이면)
  if (mpActive && mpSyncOn) {
