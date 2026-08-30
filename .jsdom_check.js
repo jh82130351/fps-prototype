@@ -112,6 +112,14 @@ results.n_job_state = has("let playerJob = localStorage.getItem('fpsJob') || 'no
 results.n_npc = has("spawnMerchant('닌자 사범', -40, -30, 0, { skin:0x2c2c2c, shirt:0x1a1a1a, pants:0x0d0d0d })");
 results.n_open = has("type === '닌자 사범'") && has("renderNinjaShop(body);");
 results.n_render = has("function renderNinjaShop(body)") && has("if (playerJob === 'ninja')") && has("이미 <b style=\"color:#7CFC98;\">닌자</b>") && has("const canJob = (playerLevel >= 5)") && has("playerJob = 'ninja'; saveJob();");
+// ─── 닌자 사범 대화 시스템 (카메라 클로즈업 + 선택지) ───
+results.d_state = has("let dialogOpen = false;") && has("let skillWallClimb = (localStorage.getItem('fpsSkillWall') === '1');");
+results.d_cam = has("const dialogCam = new THREE.PerspectiveCamera(55, aspect(), 0.1, 1000);");
+results.d_ui = has("id=\"dialogBox\"") && has("id=\"dialogName\"") && has("id=\"dialogText\"") && has("id=\"dialogChoices\"");
+results.d_fns = has("function startDialog(npc)") && has("function endDialog()") && has("function showDialog(text, choices)") && has("function ninjaDialogNode()");
+results.d_branch = has("if (best.type === '닌자 사범') startDialog(best); else openShop(best.type);") && has("if (dialogOpen) { return; }");
+results.d_render = has("if (!dialogOpen) physics(dt);") && has("renderer.render(scene, dialogOpen ? dialogCam : playCam);") && has("if (dialogOpen) { if(e.code==='Escape') endDialog(); return; }");
+results.d_dialog = has("showDialog('레벨이 부족하군. 5레벨이 되면 다시 오게나.', [{label:'나가기', act:endDialog}]);") && has("showDialog('자네, 닌자로 전직할 생각이 있나?', [") && has("showDialog('스킬을 배워 볼텐가?', [") && has("showDialog('15레벨이 되면 새로운 스킬을 알려주겠네.', [{label:'나가기', act:endDialog}]);");
 console.log('=== JSDOM LOAD CHECK (full) ===');
 console.log('=== JSDOM LOAD CHECK (hunting ground + zombie A) ===');
 let allPass = true;

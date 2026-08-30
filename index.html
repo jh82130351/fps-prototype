@@ -193,6 +193,13 @@
  </div>
 </div>
 
+<!-- 닌자 사범 대화 UI -->
+<div id="dialogBox" style="position:fixed;left:50%;bottom:8%;transform:translateX(-50%);z-index:220;display:none;width:min(560px,92vw);background:rgba(15,20,28,0.95);border:2px solid #3a4a5a;border-radius:14px;padding:18px;color:#e6edf3;">
+ <div id="dialogName" style="color:#7CFC98;font-weight:bold;margin-bottom:8px;">닌자 사범</div>
+ <div id="dialogText" style="font-size:15px;line-height:1.6;margin-bottom:14px;"></div>
+ <div id="dialogChoices" style="display:flex;flex-direction:column;gap:8px;"></div>
+</div>
+
 <!-- 멀티플레이 채팅 UI -->
 
 <!-- 빠른 슬롯 8칸 (항상 표시, 하단 중앙) -->
@@ -463,6 +470,9 @@ function saveLevel(){ try{ localStorage.setItem('fpsLevel',String(playerLevel));
 // 직업 상태
 let playerJob = localStorage.getItem('fpsJob') || 'none'; // 'none' | 'ninja'
 function saveJob(){ try{ localStorage.setItem('fpsJob', playerJob); }catch(e){} }
+// 대화 시스템 상태
+let dialogOpen = false;
+let skillWallClimb = (localStorage.getItem('fpsSkillWall') === '1');
 function killsForNext(){ return playerLevel >= 10 ? 0 : (playerLevel+1)*5; }
 function gainKill(){
  if (playerLevel >= 10) return;
@@ -1184,6 +1194,7 @@ const aspect = () => window.innerWidth / window.innerHeight;
 const EYE_HEIGHT = 1.7;
 
 const playCam = new THREE.PerspectiveCamera(75, aspect(), 0.1, 1000);
+const dialogCam = new THREE.PerspectiveCamera(55, aspect(), 0.1, 1000);
 const yawObject = new THREE.Object3D();
 const pitchObject = new THREE.Object3D();
 yawObject.position.set(0, EYE_HEIGHT, 0);
@@ -1410,6 +1421,7 @@ btnJump.addEventListener('touchend', (e) => { e.preventDefault(); keys['Space'] 
 
 // 시점 회전: 오른쪽 반화면에서 시작한 터치 (조이스틱/점프 제외)
 document.addEventListener('touchstart', (e) => {
+ if (dialogOpen) return;
  if (!isTouch || mode !== 'play') return;
  for (const t of e.changedTouches) {
   if (t.clientX > window.innerWidth / 2 && touchLookId === null) {
@@ -1439,6 +1451,7 @@ document.addEventListener('touchmove', (e) => {
  }
 }, { passive: false });
 document.addEventListener('touchend', (e) => {
+ if (dialogOpen) { touchLookId = null; return; }
  for (const t of e.changedTouches) {
   if (t.identifier === touchLookId) {
    const dur = performance.now() - touchLookStartT;
@@ -1454,6 +1467,7 @@ window.addEventListener('keydown', (e) => {
  // 채팅 입력 중에는 게임 조작 키 처리를 하지 않음(타이핑 우선)
  const ae = document.activeElement;
  if (ae && (ae.id === 'chatInput' || ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
+ if (dialogOpen) { if(e.code==='Escape') endDialog(); return; }
  if (e.code === 'F3') { e.preventDefault(); } // 브라우저 검색 방지 + keys에 기록되게
  if (e.code === 'Space') e.preventDefault();
  if (e.code === 'Tab') { e.preventDefault(); if (mpActive) return; setMode(mode === 'play' ? 'edit' : 'play'); return; }
@@ -1584,6 +1598,7 @@ function select(p) { setSelection([p]); }
 function deselect() { setSelection([]); }
 
 canvas.addEventListener('click', () => {
+ if (dialogOpen) return;
  if (started && !isTouch && mode === 'play' && !locked) { try { const pr = canvas.requestPointerLock(); if (pr && pr.catch) pr.catch(()=>{}); } catch (err) {} }
 });
 canvas.addEventListener('mousedown', (e) => {
@@ -2056,6 +2071,56 @@ function renderNinjaShop(body){
  wrap.appendChild(btn);
  body.appendChild(wrap);
 }
+
+// ---------- 닌자 사범 대화 시스템 ----------
+function startDialog(npc){
+ dialogOpen = true;
+ // 사범 정면(-z 로컬) 월드 방향
+ const ry = npc.fig ? npc.fig.rotation.y : 0;
+ const fx = -Math.sin(ry), fz = -Math.cos(ry);
+ dialogCam.position.set(npc.x + fx*2.2, 1.7, npc.z + fz*2.2);
+ dialogCam.lookAt(npc.x, 1.95, npc.z);
+ document.exitPointerLock && document.exitPointerLock();
+ const box = document.getElementById('dialogBox'); if(box) box.style.display='block';
+ ninjaDialogNode();
+}
+function endDialog(){
+ dialogOpen = false;
+ const box = document.getElementById('dialogBox'); if(box) box.style.display='none';
+}
+function showDialog(text, choices){
+ document.getElementById('dialogText').textContent = text;
+ const c = document.getElementById('dialogChoices'); c.innerHTML='';
+ for (const ch of choices){
+  const b = document.createElement('button');
+  b.textContent = ch.label;
+  b.style.cssText='width:100%;padding:10px;border:none;border-radius:10px;font-size:14px;cursor:pointer;background:#2c3e50;color:#fff;';
+  b.onclick = (e)=>{ e.stopPropagation(); ch.act(); };
+  c.appendChild(b);
+ }
+}
+function ninjaDialogNode(){
+ if (playerJob !== 'ninja') {
+  if (playerLevel < 5) {
+   showDialog('레벨이 부족하군. 5레벨이 되면 다시 오게나.', [{label:'나가기', act:endDialog}]);
+  } else {
+   showDialog('자네, 닌자로 전직할 생각이 있나?', [
+    {label:'전직한다', act:()=>{ playerJob='ninja'; saveJob(); showDialog('좋아, 이제 자네는 닌자일세!', [{label:'나가기', act:endDialog}]); }},
+    {label:'나가기', act:endDialog}
+   ]);
+  }
+ } else {
+  if (!skillWallClimb) {
+   showDialog('스킬을 배워 볼텐가?', [
+    {label:'배운다', act:()=>{ skillWallClimb=true; try{localStorage.setItem('fpsSkillWall','1');}catch(e){} showDialog('벽타기를 익혔네! 벽에 붙어 우클릭을 길게 누르게나.', [{label:'나가기', act:endDialog}]); }},
+    {label:'나가기', act:endDialog}
+   ]);
+  } else {
+   showDialog('15레벨이 되면 새로운 스킬을 알려주겠네.', [{label:'나가기', act:endDialog}]);
+  }
+ }
+}
+
 function openShop(type) {
  document.getElementById('shopTitle').textContent = type;
  const body = document.getElementById('shopBody');
@@ -2092,12 +2157,14 @@ canvas.addEventListener('mousedown', (e) => {
    if (d < 10 && d < bestDist) { bestDist = d; best = n; } // 10m 이내, 가장 가까운
   }
  }
- if (best) openShop(best.type);
+ if (dialogOpen) { return; }
+ if (best) { if (best.type === '닌자 사범') startDialog(best); else openShop(best.type); }
 });
 
 // 좌클릭 → 공격 실행 (주먹 공격)
 canvas.addEventListener('mousedown', (e) => {
  if (e.button !== 0) return; // 좌클릭만
+ if (dialogOpen) return;
  if (mode !== 'play') return;
  if (invOpen) return; // 가방 열려있으면 무시
  doAttack();
@@ -3119,7 +3186,9 @@ function animate() {
   fistView.rotation.x = rx;
   if (attackAnim <= 0) { fistView.position.set(FIST_REST.px, FIST_REST.py, FIST_REST.pz); fistView.rotation.x = FIST_REST.rx; }
  }
- physics(dt); renderer.render(scene, playCam); hud.style.display = 'block'; healthEl.style.display = 'block';
+ if (!dialogOpen) physics(dt);
+ renderer.render(scene, dialogOpen ? dialogCam : playCam);
+ hud.style.display = 'block'; healthEl.style.display = 'block';
  } else {
  if (selected && activeTool === 'move') {
  gizmo.visible = true;
