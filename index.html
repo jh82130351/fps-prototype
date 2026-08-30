@@ -2898,7 +2898,7 @@ function physics(dt) {
  }
  if (flipReady && !flipActive && Math.abs(pitchVel) > FLICK_THRESHOLD) {
   flipActive = true; flipAngle = 0;
-  const spd = Math.min(Math.max(Math.abs(pitchVel) * 0.8, 10), 120); // 커서 빠를수록 빠르게 회전(상한 크게)
+  const spd = Math.min(Math.max(Math.abs(pitchVel) * 0.3, 8), 14); // 눈에 보이는 회전(0.45~0.8초/바퀴)
   const up = pitchVel > 0;
   flipSpinVel = up ? spd : -spd;
   if (jumpChargeT > 0) {
