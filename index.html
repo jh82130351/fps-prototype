@@ -3191,7 +3191,7 @@ function animate() {
  if (flipSpin > 0) {
   flipSpin -= dt / 0.8;
   const _t = Math.max(0, flipSpin);
-  playCam.rotation.x = -2 * Math.PI * (1 - _t);
+  playCam.rotation.x = 2 * Math.PI * (1 - _t); // 뒤로 한 바퀴(백플립)
   if (flipSpin <= 0) { flipSpin = 0; playCam.rotation.x = 0; }
  }
  if (movers.length) updateMovers(clock.getElapsedTime());
