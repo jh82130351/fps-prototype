@@ -2419,12 +2419,32 @@ function buildHitboxes() {
 function toggleHitbox() { hitboxOn = !hitboxOn; if (hitboxOn) buildHitboxes(); else clearHitboxes(); }
 
 // ---------- 인벤토리 ----------
-function slotHtml(item){
- // item: null 또는 {name, color, count}
- if(!item) return '';
+function itemIcon(item, px){
+ px = px || 24;
  const c = item.color!==undefined ? ('#'+(item.color>>>0).toString(16).padStart(6,'0').slice(-6)) : '#888';
+ if (item.throw==='shuriken'){
+ return '<svg width="'+px+'" height="'+px+'" viewBox="0 0 24 24">'
+ +'<path d="M12 1 L14 10 L23 12 L14 14 L12 23 L10 14 L1 12 L10 10 Z" fill="#c8d0d8" stroke="#8a929a" stroke-width="0.5"/>'
+ +'<circle cx="12" cy="12" r="1.6" fill="#2b2f36"/></svg>';
+ }
+ if (item.weaponId){
+ return '<svg width="'+px+'" height="'+px+'" viewBox="0 0 24 24">'
+ +'<rect x="10.5" y="2" width="3" height="13" rx="1" fill="'+c+'" stroke="#555" stroke-width="0.4"/>'
+ +'<rect x="7" y="14" width="10" height="2.2" rx="1" fill="#6b4a2b"/>'
+ +'<rect x="10.8" y="16" width="2.4" height="5" rx="1" fill="#3b2b1b"/></svg>';
+ }
+ if ((item.name||'').indexOf('고기')>=0){
+ return '<svg width="'+px+'" height="'+px+'" viewBox="0 0 24 24">'
+ +'<ellipse cx="13" cy="10" rx="8" ry="6" fill="'+c+'"/>'
+ +'<rect x="2" y="15" width="7" height="2.2" rx="1" fill="#f0ead6"/>'
+ +'<circle cx="2.5" cy="16" r="1.6" fill="#f0ead6"/></svg>';
+ }
+ return '<div style="width:'+px+'px;height:'+px+'px;border-radius:5px;background:'+c+'"></div>';
+}
+function slotHtml(item){
+ if(!item) return '';
  return '<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;">'
- + '<div style="width:24px;height:24px;border-radius:5px;background:'+c+'"></div>'
+ + itemIcon(item, 24)
  + '<div style="font-size:10px;margin-top:2px;">'+(item.name||'')+(item.count>1?(' x'+item.count):'')+'</div></div>';
 }
 function renderHotbar(){
@@ -2447,13 +2467,34 @@ function renderHotbar(){
  }
  updateHeldItem();
 }
+let heldModelGroup = null;
+function buildHeldModel(it){
+ const g = new THREE.Group();
+ if (it.throw==='shuriken'){
+  const m = makeShurikenMesh(); m.scale.set(0.6,0.6,0.6); g.add(m);
+ } else if (it.weaponId){
+  const col = it.color!==undefined?it.color:0xbbbbbb;
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.5,0.12), new THREE.MeshStandardMaterial({color:col, metalness:0.5, roughness:0.4}));
+  blade.position.y = 0.25; g.add(blade);
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.05,0.06), new THREE.MeshStandardMaterial({color:0x6b4a2b})); g.add(guard);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.18,0.05), new THREE.MeshStandardMaterial({color:0x3b2b1b})); grip.position.y = -0.12; g.add(grip);
+  g.rotation.set(0.2, 0, 0.35);
+ } else if ((it.name||'').indexOf('고기')>=0){
+  const meat = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.16,0.2), new THREE.MeshStandardMaterial({color: it.color!==undefined?it.color:0x8b3a3a})); g.add(meat);
+  const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.16,6), new THREE.MeshStandardMaterial({color:0xf0ead6})); bone.position.set(0,-0.12,0); g.add(bone);
+ } else {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.18,0.18), new THREE.MeshStandardMaterial({color: it.color!==undefined?it.color:0x8b3a3a})); g.add(b);
+ }
+ return g;
+}
 function updateHeldItem() {
  const it = inventory[selectedSlot];
+ if (heldModelGroup){ fistView.remove(heldModelGroup); heldModelGroup = null; }
+ if (heldItemView) heldItemView.visible = false; // 기존 색상 박스는 사용 안 함
  if (it && it.name) {
-  heldItemView.visible = true;
-  heldItemView.material.color.setHex(it.color !== undefined ? it.color : 0x8b3a3a);
- } else {
-  heldItemView.visible = false;
+  heldModelGroup = buildHeldModel(it);
+  heldModelGroup.position.set(0, 0.02, -0.7);
+  fistView.add(heldModelGroup);
  }
 }
 function renderInvGrid(){
