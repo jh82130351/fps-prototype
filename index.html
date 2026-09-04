@@ -1235,6 +1235,7 @@ function buildArenaWorld() {
  building(-14, -24, 12, 9, 5.5, 0x2980b9, 0x3498db, -1); // 방어구점(파랑)
  building( 14, -24, 12, 9, 5.5, 0x27ae60, 0x2ecc71, -1); // 물약점(초록)
  building( 40, -18, 12, 9, 5.5, 0xf39c12, 0xf1c40f, -1); // 잡화점(노랑)
+ building(-64, -18, 12, 9, 5.5, 0x8e44ad, 0x9b59b6, -1); // 원거리 무기점(보라)
  // 광장 위쪽(+z) 대장간: 문이 -z(광장 쪽) → dir = 1
  building( 0, 26, 14, 10, 6.5, 0x7f8c8d, 0x95a5a6, 1); // 대장간(회색)
 
@@ -1285,7 +1286,7 @@ function buildArenaWorld() {
  // 상점 상인 배치 (각 상점 문 앞, 광장을 바라보게)
  // 아래쪽 상점(광장이 +z쪽) → 상인은 +z를 보도록 rotation.y = Math.PI
  spawnMerchant('무기 상인', -40, -11, Math.PI, { skin:0xe8b88a, shirt:0xc0392b, pants:0x2c3e50 });
- spawnMerchant('원거리 상인', -40, -4, Math.PI, { skin:0xe8b88a, shirt:0x8e44ad, pants:0x4a235a }); // 무기점 앞, 원거리(수리검)
+ spawnMerchant('원거리 상인', -64, -11, Math.PI, { skin:0xe8b88a, shirt:0x8e44ad, pants:0x4a235a }); // 원거리 무기점 앞
  spawnMerchant('닌자 사범', -40, -30, 0, { skin:0x2c2c2c, shirt:0x1a1a1a, pants:0x0d0d0d }); // 무기점 옆, 검은 닌자
  spawnMerchant('방어구 상인',-14, -17, Math.PI, { skin:0xf1c27d, shirt:0x2980b9, pants:0x1b2631 });
  spawnMerchant('물약 상인', 14, -17, Math.PI, { skin:0xffdbac, shirt:0x27ae60, pants:0x145a32 });
