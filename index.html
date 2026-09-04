@@ -1285,6 +1285,7 @@ function buildArenaWorld() {
  // 상점 상인 배치 (각 상점 문 앞, 광장을 바라보게)
  // 아래쪽 상점(광장이 +z쪽) → 상인은 +z를 보도록 rotation.y = Math.PI
  spawnMerchant('무기 상인', -40, -11, Math.PI, { skin:0xe8b88a, shirt:0xc0392b, pants:0x2c3e50 });
+ spawnMerchant('원거리 상인', -40, -4, Math.PI, { skin:0xe8b88a, shirt:0x8e44ad, pants:0x4a235a }); // 무기점 앞, 원거리(수리검)
  spawnMerchant('닌자 사범', -40, -30, 0, { skin:0x2c2c2c, shirt:0x1a1a1a, pants:0x0d0d0d }); // 무기점 옆, 검은 닌자
  spawnMerchant('방어구 상인',-14, -17, Math.PI, { skin:0xf1c27d, shirt:0x2980b9, pants:0x1b2631 });
  spawnMerchant('물약 상인', 14, -17, Math.PI, { skin:0xffdbac, shirt:0x27ae60, pants:0x145a32 });
@@ -2102,6 +2103,34 @@ function buyWeapon(id){
  if(typeof flash==='function') flash(w.name + ' 구매!');
  const body=document.getElementById('shopBody'); if(body) renderWeaponShop(body); // 골드 갱신 반영
 }
+function buyShuriken(){
+ const price = 150;
+ if (gold < price) { if(typeof flash==='function') flash('골드가 부족해요'); return; }
+ gold -= price; saveGold(); updateGoldHud();
+ giveShuriken(SHURIKEN_MAX_DUR);
+ if(typeof flash==='function') flash('수리검 구매! (내구도 '+SHURIKEN_MAX_DUR+')');
+ const body=document.getElementById('shopBody'); if(body) renderRangedShop(body);
+}
+function renderRangedShop(body){
+ body.innerHTML = '<div style="margin-bottom:8px;color:#ffd700;">💰 '+gold+' G</div>';
+ const cur = (typeof shurikenItem==='function') ? shurikenItem() : null;
+ const durTxt = cur ? ('보유 내구도 '+cur.dur+'/'+SHURIKEN_MAX_DUR) : '미보유';
+ const row=document.createElement('div');
+ row.style.cssText='display:flex;align-items:center;gap:8px;margin:6px 0;padding:6px;border-radius:8px;background:rgba(255,255,255,0.05);';
+ row.innerHTML='<span style="width:18px;height:18px;background:#b8c0c8;transform:rotate(45deg);display:inline-block;border-radius:3px;"></span>'
+ +'<span style="flex:1;">수리검 <span style="font-size:11px;color:#9fb;">('+durTxt+')</span><br>'
+ +'<span style="font-size:11px;color:#9fb;">좌클릭 던지기10 · C 스킬40(쿨10s) · 부메랑</span></span>'
+ +'<span style="color:#ffd700;font-weight:bold;">150G</span>';
+ const b=document.createElement('button'); b.textContent='구매';
+ b.style.cssText='background:#8e44ad;color:#fff;border:none;border-radius:8px;padding:6px 12px;margin-left:6px;cursor:pointer;';
+ b.onclick=(e)=>{ e.stopPropagation(); buyShuriken(); };
+ row.appendChild(b); body.appendChild(row);
+ if (playerJob!=='ninja'){
+ const note=document.createElement('div'); note.style.cssText='margin-top:8px;font-size:11px;color:#f39c12;';
+ note.textContent='※ 수리검은 닌자만 사용할 수 있습니다.';
+ body.appendChild(note);
+ }
+}
 function renderWeaponShop(body){
  body.innerHTML = '<div style="margin-bottom:8px;color:#ffd700;">💰 '+gold+' G</div>';
  body.style.maxHeight = '360px'; body.style.overflowY = 'auto';
@@ -2260,6 +2289,8 @@ function openShop(type) {
   renderSellList(body);
  } else if (type === '무기 상인') {
   renderWeaponShop(body);
+ } else if (type === '원거리 상인') {
+  renderRangedShop(body);
  } else if (type === '닌자 사범') {
   renderNinjaShop(body);
  } else {
