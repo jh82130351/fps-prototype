@@ -550,7 +550,7 @@ let touchJump = false; // 모바일 점프홀드(벽타기 도약용)
 // ── 백플립(닌자) ──
 let jumpChargeT = 0; let flipAirborne = false;
 let prevPitch = 0, pitchVel = 0;
-let flipActive = false, flipAngle = 0, flipSpinVel = 0;
+let flipActive = false, flipAngle = 0, flipSpinVel = 0, flipReturnPitch = 0;
 const BACKFLIP_MAX_CHARGE = 2.0, BACKFLIP_MAX_VUP = 69, BACKFLIP_MAX_BACK = 42;
 const FLICK_THRESHOLD = 50.0; // 아주 강한 플릭에만 발동
 const CLIMB_SPEED = 4;
@@ -3045,7 +3045,7 @@ function physics(dt) {
   jumpChargeT = 0;
  }
  if (flipReady && !flipActive && Math.abs(pitchVel) > FLICK_THRESHOLD) {
-  flipActive = true; flipAngle = 0;
+  flipActive = true; flipAngle = 0; flipReturnPitch = prevPitch; // 플릭 직전 시점 기억
   const spd = Math.min(Math.max(Math.abs(pitchVel) * 0.3, 8), 14); // 눈에 보이는 회전(0.45~0.8초/바퀴)
   const up = pitchVel > 0;
   flipSpinVel = up ? spd : -spd;
@@ -3369,8 +3369,12 @@ function animate() {
  // ── 구르기 회전 연출: 플릭 속도에 비례한 각속도로 한 바퀴 ──
  if (flipActive) {
   flipAngle += flipSpinVel * dt;
-  playCam.rotation.x = flipAngle;
-  if (Math.abs(flipAngle) >= Math.PI * 2) { flipActive = false; flipAngle = 0; playCam.rotation.x = 0; }
+  pitchObject.rotation.x = flipReturnPitch; // 조준 고정(플릭으로 튄 시점 되돌림)
+  playCam.rotation.x = flipAngle; // 카메라만 공중제비
+  if (Math.abs(flipAngle) >= Math.PI * 2) {
+   flipActive = false; flipAngle = 0; playCam.rotation.x = 0;
+   pitchObject.rotation.x = flipReturnPitch; // 끝나면 원래 보던 방향
+  }
  }
  if (movers.length) updateMovers(clock.getElapsedTime());
  updateRemotePlayers(dt);
