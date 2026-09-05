@@ -2532,8 +2532,12 @@ function buildHeldModel(it){
   const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.18,0.05), new THREE.MeshStandardMaterial({color:0x3b2b1b})); grip.position.y = -0.12; g.add(grip);
   g.rotation.set(0.2, 0, 0.35);
  } else if ((it.name||'').indexOf('고기')>=0){
-  const meat = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.16,0.2), new THREE.MeshStandardMaterial({color: it.color!==undefined?it.color:0x8b3a3a})); g.add(meat);
-  const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.16,6), new THREE.MeshStandardMaterial({color:0xf0ead6})); bone.position.set(0,-0.12,0); g.add(bone);
+ // 닭다리 모양: 둥근 고깃덩이 + 뼈(블록 아님)
+ const meat = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), new THREE.MeshStandardMaterial({color: it.color!==undefined?it.color:0x8b3a3a, roughness:0.7}));
+ meat.scale.set(1, 0.9, 1); meat.position.y = 0.04; g.add(meat);
+ const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.022,0.18,6), new THREE.MeshStandardMaterial({color:0xf0ead6})); bone.position.set(0,-0.11,0); g.add(bone);
+ const knob = new THREE.Mesh(new THREE.SphereGeometry(0.038,6,6), new THREE.MeshStandardMaterial({color:0xf0ead6})); knob.position.set(0,-0.205,0); g.add(knob);
+ g.rotation.set(0.3, 0, 0.2);
  } else {
   const b = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.18,0.18), new THREE.MeshStandardMaterial({color: it.color!==undefined?it.color:0x8b3a3a})); g.add(b);
  }
