@@ -550,7 +550,7 @@ let touchJump = false; // 모바일 점프홀드(벽타기 도약용)
 // ── 백플립(닌자) ──
 let jumpChargeT = 0; let flipAirborne = false;
 let prevPitch = 0, pitchVel = 0;
-let flipActive = false, flipAngle = 0, flipSpinVel = 0, flipReturnPitch = 0;
+let flipActive = false, flipAngle = 0, flipSpinVel = 0, flipReturnPitch = 0, prevYaw = 0, flipReturnYaw = 0;
 const BACKFLIP_MAX_CHARGE = 2.0, BACKFLIP_MAX_VUP = 69, BACKFLIP_MAX_BACK = 42;
 const FLICK_THRESHOLD = 50.0; // 아주 강한 플릭에만 발동
 const CLIMB_SPEED = 4;
@@ -1602,8 +1602,10 @@ document.addEventListener('touchmove', (e) => {
    const dx = t.clientX - touchLookLastX, dy = t.clientY - touchLookLastY;
    const movedDist = Math.hypot(t.clientX - touchLookStartX, t.clientY - touchLookStartY);
    if (movedDist > 10) touchLookMoved = true; // 10px 넘게 움직이면 드래그(회전)
-   yawObject.rotation.y -= dx * 0.005;
-   pitchObject.rotation.x = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitchObject.rotation.x - dy * 0.005));
+   if (!flipActive) {
+    yawObject.rotation.y -= dx * 0.005;
+    pitchObject.rotation.x = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitchObject.rotation.x - dy * 0.005));
+   }
    touchLookLastX = t.clientX; touchLookLastY = t.clientY;
   }
  }
@@ -1692,6 +1694,7 @@ window.addEventListener('keyup', (e) => keys[e.code] = false);
 const PITCH_LIMIT = Math.PI/2 - 0.05;
 document.addEventListener('mousemove', (e) => {
  if (mode !== 'play' || !locked) return;
+ if (flipActive) return; // 구르기 중 시점 잠금
  const s = 0.0022;
  yawObject.rotation.y -= e.movementX * s;
  pitchObject.rotation.x -= e.movementY * s;
@@ -3135,7 +3138,7 @@ function physics(dt) {
   jumpChargeT = 0;
  }
  if (flipReady && !flipActive && Math.abs(pitchVel) > FLICK_THRESHOLD) {
-  flipActive = true; flipAngle = 0; flipReturnPitch = prevPitch; // 플릭 직전 시점 기억
+  flipActive = true; flipAngle = 0; flipReturnPitch = prevPitch; flipReturnYaw = prevYaw; // 플릭 직전 시점(yaw+pitch) 기억
   const spd = Math.min(Math.max(Math.abs(pitchVel) * 0.3, 8), 14); // 눈에 보이는 회전(0.45~0.8초/바퀴)
   const up = pitchVel > 0;
   flipSpinVel = up ? spd : -spd;
@@ -3285,7 +3288,7 @@ function physics(dt) {
   'x:'+p.x.toFixed(1)+' z:'+p.z.toFixed(1)+'\nspeed '+velocity.length().toFixed(1)+
   '\n'+(onGround?'ground':'air')+(inWater?' · 물속':'')+(wallGrab?' · 🧗벽타기':'')+(onCheckpoint?' · ✓체크포인트':'');
 
- prevPitch = pitchObject.rotation.x;
+ prevPitch = pitchObject.rotation.x; prevYaw = yawObject.rotation.y;
  // 멀티플레이 위치 전송 (Firebase 동기화 중이면)
  if (mpActive && mpSyncOn) {
   mpSendT += dt;
@@ -3459,11 +3462,13 @@ function animate() {
  // ── 구르기 회전 연출: 플릭 속도에 비례한 각속도로 한 바퀴 ──
  if (flipActive) {
   flipAngle += flipSpinVel * dt;
-  pitchObject.rotation.x = flipReturnPitch; // 조준 고정(플릭으로 튄 시점 되돌림)
+  yawObject.rotation.y = flipReturnYaw; // 시점 완전 고정(yaw)
+  pitchObject.rotation.x = flipReturnPitch; // 시점 완전 고정(pitch)
   playCam.rotation.x = flipAngle; // 카메라만 공중제비
   if (Math.abs(flipAngle) >= Math.PI * 2) {
    flipActive = false; flipAngle = 0; playCam.rotation.x = 0;
-   pitchObject.rotation.x = flipReturnPitch; // 끝나면 원래 보던 방향
+   yawObject.rotation.y = flipReturnYaw; // 끝나면 원래 보던 방향(yaw)
+   pitchObject.rotation.x = flipReturnPitch; // 원래 보던 방향(pitch)
   }
  }
  if (movers.length) updateMovers(clock.getElapsedTime());
