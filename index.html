@@ -3466,8 +3466,8 @@ function animate() {
  // ── 구르기 회전 연출: 플릭 속도에 비례한 각속도로 한 바퀴 ──
  if (flipActive) {
   flipAngle += flipSpinVel * dt;
-  yawObject.rotation.y = flipReturnYaw; // 시점 완전 고정(yaw)
-  pitchObject.rotation.x = flipReturnPitch; // 시점 완전 고정(pitch)
+  yawObject.rotation.y = flipReturnYaw; // yaw 고정
+  pitchObject.rotation.x = 0; // 수평 기준 → 깔끔한 세로 공중제비(대각선 방지)
   playCam.rotation.x = flipAngle; // 카메라만 공중제비
   if (Math.abs(flipAngle) >= Math.PI * 2) {
    flipActive = false; flipAngle = 0; playCam.rotation.x = 0;
