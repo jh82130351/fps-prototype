@@ -444,7 +444,7 @@ const scene = new THREE.Scene();
  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
  scene.background = tex;
 })();
-scene.fog = new THREE.Fog(0xd6e8f7, 160, 620); // 지평선 색과 맞춰 원경이 하늘로 자연스레 사라짐
+scene.fog = new THREE.Fog(0xd6e8f7, 300, 1700); // 대확장 맵: 원경(산)까지 보이게
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -557,6 +557,72 @@ function buildGrass(){
  }
  inst.castShadow=false; inst.receiveShadow=false;
  ensureWorldDecor().add(inst);
+}
+// ── 지형 장식: 나무(활엽수/침엽수)·언덕·산 (인스턴스, 콜라이더 아님) ──
+function buildTerrainScenery(){
+ const decor=ensureWorldDecor();
+ const rej=(x,z)=>{
+  const r=Math.hypot(x,z);
+  if(r<70) return true; // 마을 중심/광장
+  if(Math.abs(x)<10||Math.abs(z)<10) return true; // 십자 길
+  if(Math.abs(x)>10&&Math.abs(x)<24&&Math.abs(z)<170) return true; // 상점열
+  if(x>100&&x<240&&Math.abs(z)<80) return true; // 사냥터
+  return false;
+ };
+ const dummy=new THREE.Object3D();
+ // 나무: 밑동 공유 + 활엽수 잎 / 침엽수(트리) 콘
+ const trunkGeo=new THREE.CylinderGeometry(0.32,0.5,3.2,6);
+ const trunkMat=new THREE.MeshStandardMaterial({color:0x6b4a2c,roughness:1});
+ const leafGeo=new THREE.IcosahedronGeometry(2.2,0);
+ const leafMat=new THREE.MeshStandardMaterial({color:0x2f7d32,roughness:1,flatShading:true});
+ const pineGeo=new THREE.ConeGeometry(2.0,5.2,7);
+ const pineMat=new THREE.MeshStandardMaterial({color:0x1f5e2a,roughness:1,flatShading:true});
+ const trees=[];
+ for(let i=0;i<4000 && trees.length<520;i++){
+  const x=(Math.random()*2-1)*740, z=(Math.random()*2-1)*740;
+  if(rej(x,z)) continue;
+  trees.push({x,z,s:0.8+Math.random()*1.5,pine:Math.random()<0.5,rot:Math.random()*Math.PI});
+ }
+ const broad=trees.filter(t=>!t.pine), pines=trees.filter(t=>t.pine);
+ const trunkInst=new THREE.InstancedMesh(trunkGeo,trunkMat,trees.length||1);
+ trees.forEach((t,i)=>{ dummy.position.set(t.x,0.1+1.6*t.s,t.z); dummy.rotation.set(0,t.rot,0); dummy.scale.set(t.s,t.s,t.s); dummy.updateMatrix(); trunkInst.setMatrixAt(i,dummy.matrix); });
+ trunkInst.castShadow=true; decor.add(trunkInst);
+ const leafInst=new THREE.InstancedMesh(leafGeo,leafMat,broad.length||1);
+ broad.forEach((t,i)=>{ dummy.position.set(t.x,0.1+3.2*t.s+1.4*t.s,t.z); dummy.rotation.set(0,t.rot,0); dummy.scale.set(t.s,t.s,t.s); dummy.updateMatrix(); leafInst.setMatrixAt(i,dummy.matrix); });
+ leafInst.castShadow=true; decor.add(leafInst);
+ const pineInst=new THREE.InstancedMesh(pineGeo,pineMat,pines.length||1);
+ pines.forEach((t,i)=>{ dummy.position.set(t.x,0.1+3.2*t.s+2.6*t.s,t.z); dummy.rotation.set(0,t.rot,0); dummy.scale.set(t.s,t.s,t.s); dummy.updateMatrix(); pineInst.setMatrixAt(i,dummy.matrix); });
+ pineInst.castShadow=true; decor.add(pineInst);
+ // 언덕: 낮고 넓은 콘 (걷기범위 안, 부드러운 기복)
+ const hillGeo=new THREE.ConeGeometry(1,1,10);
+ const hillMat=new THREE.MeshStandardMaterial({color:0x5a8f42,roughness:1,flatShading:true});
+ const hills=[];
+ for(let i=0;i<600 && hills.length<46;i++){
+  const a=Math.random()*Math.PI*2, r=300+Math.random()*420;
+  const x=Math.cos(a)*r, z=Math.sin(a)*r; if(rej(x,z)) continue;
+  hills.push({x,z,rw:26+Math.random()*44,rh:8+Math.random()*16});
+ }
+ const hillInst=new THREE.InstancedMesh(hillGeo,hillMat,hills.length||1);
+ hills.forEach((h,i)=>{ dummy.position.set(h.x,h.rh/2-1,h.z); dummy.rotation.set(0,Math.random()*Math.PI,0); dummy.scale.set(h.rw,h.rh,h.rw); dummy.updateMatrix(); hillInst.setMatrixAt(i,dummy.matrix); });
+ hillInst.receiveShadow=true; decor.add(hillInst);
+ // 산: 크고 높은 콘, 걷기범위 밖 원경 배경(회녹색 + 눈)
+ const mtnGeo=new THREE.ConeGeometry(1,1,8);
+ const mtnMat=new THREE.MeshStandardMaterial({color:0x6f7b6a,roughness:1,flatShading:true});
+ const snowGeo=new THREE.ConeGeometry(1,1,8);
+ const snowMat=new THREE.MeshStandardMaterial({color:0xeaf2f6,roughness:1,flatShading:true});
+ const mtns=[];
+ for(let i=0;i<40;i++){
+  const a=(i/40)*Math.PI*2 + (Math.random()*0.1);
+  const r=840+Math.random()*90; const x=Math.cos(a)*r, z=Math.sin(a)*r;
+  mtns.push({x,z,rw:80+Math.random()*90,rh:90+Math.random()*120,rot:Math.random()*Math.PI});
+ }
+ const mtnInst=new THREE.InstancedMesh(mtnGeo,mtnMat,mtns.length);
+ const snowInst=new THREE.InstancedMesh(snowGeo,snowMat,mtns.length);
+ mtns.forEach((m,i)=>{
+  dummy.position.set(m.x,m.rh/2-2,m.z); dummy.rotation.set(0,m.rot,0); dummy.scale.set(m.rw,m.rh,m.rw); dummy.updateMatrix(); mtnInst.setMatrixAt(i,dummy.matrix);
+  dummy.position.set(m.x,m.rh*0.5-2+m.rh*0.30,m.z); dummy.rotation.set(0,m.rot,0); dummy.scale.set(m.rw*0.42,m.rh*0.42,m.rw*0.42); dummy.updateMatrix(); snowInst.setMatrixAt(i,dummy.matrix);
+ });
+ decor.add(mtnInst); decor.add(snowInst);
 }
 
 const groundSize = 200;
@@ -1291,7 +1357,7 @@ function buildArenaWorld() {
  WALL=0xe8dcc0, DOOR=0x5a3d2b, WATER=0x2e8fd8, STONE=0x95a5a6;
 
  // 바닥(넓은 풀밭)
- texGround(addPart(0, -0.4, 0, 600, 1, 600, GROUND), TEX_GRASS, 60); // 잔디 텍스처
+ texGround(addPart(0, -0.4, 0, 2000, 1, 2000, GROUND), TEX_GRASS, 60); // 잔디(대확장 2000x2000)
  // 중앙 광장(돌바닥) — 더 넓게
  texGround(addPart(0, 0.28, 0, 64, 0.3, 64, PLAZA), TEX_COBBLE, 10); // 광장 돌바닥 텍스처
  // 광장 테두리 장식(밝은 돌)
@@ -1472,6 +1538,7 @@ function buildArenaWorld() {
  // (상인은 위 상점 자동배치 루프에서 함께 배치됨)
 
  buildGrass(); // 잔디 심기(인스턴스)
+ buildTerrainScenery(); // 나무·언덕·산
  rebuildColliders();
 }
 
@@ -3316,7 +3383,7 @@ function physics(dt) {
  }
  }
  // 바닥은 맵(그라운드 평면) 범위 안에서만 존재 → 밖은 공허로 낙하
- const half = 300; // 마을 확장(600x600)에 맞춘 걷는 영역
+ const half = 760; // 맵 대확장(2000x2000)에 맞춘 걷는 영역
  let groundY = (Math.abs(pos.x) <= half && Math.abs(pos.z) <= half) ? EYE_HEIGHT : -Infinity;
  for (const c of colliders) {
  if (c.type !== 'solid' && c.type !== 'checkpoint' && c.type !== 'jump' && c.type !== 'point') continue;
