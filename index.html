@@ -567,6 +567,7 @@ function buildTerrainScenery(){
   if(Math.abs(x)<10||Math.abs(z)<10) return true; // 십자 길
   if(Math.abs(x)>10&&Math.abs(x)<24&&Math.abs(z)<170) return true; // 상점열
   if(x>100&&x<240&&Math.abs(z)<80) return true; // 사냥터
+  if(x>560&&Math.abs(z)<120) return true; // 두 번째 마을(동쪽)
   return false;
  };
  const dummy=new THREE.Object3D();
@@ -605,24 +606,32 @@ function buildTerrainScenery(){
  const hillInst=new THREE.InstancedMesh(hillGeo,hillMat,hills.length||1);
  hills.forEach((h,i)=>{ dummy.position.set(h.x,h.rh/2-1,h.z); dummy.rotation.set(0,Math.random()*Math.PI,0); dummy.scale.set(h.rw,h.rh,h.rw); dummy.updateMatrix(); hillInst.setMatrixAt(i,dummy.matrix); });
  hillInst.receiveShadow=true; decor.add(hillInst);
- // 산: 크고 높은 콘, 걷기범위 밖 원경 배경(회녹색 + 눈)
+ // 산: 크고 높은 콘(바위 회갈색) — 눈 없음, 슬로프에 나무
  const mtnGeo=new THREE.ConeGeometry(1,1,8);
- const mtnMat=new THREE.MeshStandardMaterial({color:0x6f7b6a,roughness:1,flatShading:true});
- const snowGeo=new THREE.ConeGeometry(1,1,8);
- const snowMat=new THREE.MeshStandardMaterial({color:0xeaf2f6,roughness:1,flatShading:true});
+ const mtnMat=new THREE.MeshStandardMaterial({color:0x6a6f5e,roughness:1,flatShading:true});
  const mtns=[];
  for(let i=0;i<40;i++){
-  const a=(i/40)*Math.PI*2 + (Math.random()*0.1);
+  const a=(i/40)*Math.PI*2 + (Math.random()*0.12);
   const r=840+Math.random()*90; const x=Math.cos(a)*r, z=Math.sin(a)*r;
   mtns.push({x,z,rw:80+Math.random()*90,rh:90+Math.random()*120,rot:Math.random()*Math.PI});
  }
  const mtnInst=new THREE.InstancedMesh(mtnGeo,mtnMat,mtns.length);
- const snowInst=new THREE.InstancedMesh(snowGeo,snowMat,mtns.length);
- mtns.forEach((m,i)=>{
-  dummy.position.set(m.x,m.rh/2-2,m.z); dummy.rotation.set(0,m.rot,0); dummy.scale.set(m.rw,m.rh,m.rw); dummy.updateMatrix(); mtnInst.setMatrixAt(i,dummy.matrix);
-  dummy.position.set(m.x,m.rh*0.5-2+m.rh*0.30,m.z); dummy.rotation.set(0,m.rot,0); dummy.scale.set(m.rw*0.42,m.rh*0.42,m.rw*0.42); dummy.updateMatrix(); snowInst.setMatrixAt(i,dummy.matrix);
- });
- decor.add(mtnInst); decor.add(snowInst);
+ mtns.forEach((m,i)=>{ dummy.position.set(m.x,m.rh/2-2,m.z); dummy.rotation.set(0,m.rot,0); dummy.scale.set(m.rw,m.rh,m.rw); dummy.updateMatrix(); mtnInst.setMatrixAt(i,dummy.matrix); });
+ decor.add(mtnInst);
+ // 산 슬로프의 침엽수(콘 표면 높이에 맞춰 심기)
+ const mt=[];
+ for(const m of mtns){
+  const n=9+((Math.random()*9)|0);
+  for(let k=0;k<n;k++){
+   const dd=m.rw*(0.15+Math.random()*0.72), ang=Math.random()*Math.PI*2;
+   const tx=m.x+Math.cos(ang)*dd, tz=m.z+Math.sin(ang)*dd;
+   const surfaceY=-2+m.rh*(1-dd/m.rw), ps=2.5+Math.random()*3.5;
+   mt.push({tx,tz,y:surfaceY+2.6*ps,ps,rot:Math.random()*Math.PI});
+  }
+ }
+ const mtnTreeInst=new THREE.InstancedMesh(pineGeo,pineMat,mt.length||1);
+ mt.forEach((t,i)=>{ dummy.position.set(t.tx,t.y,t.tz); dummy.rotation.set(0,t.rot,0); dummy.scale.set(t.ps,t.ps,t.ps); dummy.updateMatrix(); mtnTreeInst.setMatrixAt(i,dummy.matrix); });
+ mtnTreeInst.castShadow=false; decor.add(mtnTreeInst);
 }
 
 const groundSize = 200;
@@ -1536,6 +1545,27 @@ function buildArenaWorld() {
  addPart(138,2,-5,1.5,4,1.5,STONE); addPart(138,2,5,1.5,4,1.5,STONE); addPart(138,4.3,0,12,0.8,1.5,STONE);
 
  // (상인은 위 상점 자동배치 루프에서 함께 배치됨)
+
+ // ===== 두 번째 마을 (동쪽 x=650, 가로 길로 연결) =====
+ { const VX = 650;
+  addPart((280+622)/2, 0.20, 0, (622-280)+20, 0.3, 14, PATH); // 연결 도로
+  addPart(VX, 0.28, 0, 56, 0.3, 56, PLAZA); // 광장
+  addPart(VX, 0.30, 28, 56, 0.4, 2, 0xcfc0a0); addPart(VX, 0.30, -28, 56, 0.4, 2, 0xcfc0a0);
+  addPart(VX+28, 0.30, 0, 2, 0.4, 56, 0xcfc0a0); addPart(VX-28, 0.30, 0, 2, 0.4, 56, 0xcfc0a0);
+  addPart(VX, 0.20, 0, 14, 0.3, 200, PATH); // 마을 내부 세로 길
+  addPart(VX-30, 3, -6, 2, 6, 2, STONE); addPart(VX-30, 3, 6, 2, 6, 2, STONE); addPart(VX-30, 6.5, 0, 16, 1, 2, STONE); // 입구 석문
+  addPart(VX, 0.4, 0, 4, 0.8, 4, STONE); addPart(VX, 1.0, 0, 2, 0.6, 2, WATER, 0, 'water'); // 우물
+  const v2 = realShops.slice(0,6); let vi=0;
+  for (const side of [-1,1]) {
+   const sx = VX + side*16, dir=(side<0)?-1:1, faceRoad=(side<0)?-Math.PI/2:Math.PI/2;
+   for (const zc of [0,42,-42]){
+    const spec=v2[vi++ % v2.length];
+    buildingX(sx, zc, 10, 9, 5.5, spec.roof, spec.label, dir);
+    const mx = sx - dir*(9/2) + dir*(-1)*2.2;
+    spawnMerchant(spec.name, mx, zc, faceRoad, spec.colors);
+   }
+  }
+ }
 
  buildGrass(); // 잔디 심기(인스턴스)
  buildTerrainScenery(); // 나무·언덕·산
