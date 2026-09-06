@@ -587,7 +587,7 @@ function buildTerrainScenery(){
   if(rej(x,z)) continue;
   trees.push({x,z,s:0.8+Math.random()*1.5,pine:Math.random()<0.5,rot:Math.random()*Math.PI});
  }
- for(const t of trees) treeTrunks.push({x:t.x,z:t.z,r:0.6*t.s});
+ for(const t of trees){ const topY=(t.pine?(0.1+7.2*t.s):(0.1+5.8*t.s)), topR=(t.pine?1.0*t.s:1.8*t.s); treeTrunks.push({x:t.x,z:t.z,r:0.6*t.s,topY,topR}); }
  const broad=trees.filter(t=>!t.pine), pines=trees.filter(t=>t.pine);
  const trunkInst=new THREE.InstancedMesh(trunkGeo,trunkMat,trees.length||1);
  trees.forEach((t,i)=>{ dummy.position.set(t.x,0.1+1.6*t.s,t.z); dummy.rotation.set(0,t.rot,0); dummy.scale.set(t.s,t.s,t.s); dummy.updateMatrix(); trunkInst.setMatrixAt(i,dummy.matrix); });
@@ -3353,12 +3353,15 @@ function physics(dt) {
  }
  }
 
- // 나무 밑동 충돌(수평 밀어내기)
+ // 나무: 밑동 수평 충돌 + 닌자 벽타기 대상(잎 꼭대기 아래에서만 막고 위는 통과)
  for (const t of treeTrunks) {
   const dx = pos.x - t.x, dz = pos.z - t.z, rr = t.r + R;
   if (Math.abs(dx) > rr || Math.abs(dz) > rr) continue;
   const dd = Math.hypot(dx, dz);
-  if (dd < rr && dd > 1e-4) { const sc = rr/dd; pos.x = t.x + dx*sc; pos.z = t.z + dz*sc; }
+  if (dd < rr && dd > 1e-4 && (pos.y - EYE_HEIGHT) < t.topY - 0.3) {
+   const sc = rr/dd; pos.x = t.x + dx*sc; pos.z = t.z + dz*sc;
+   wallGrabTouching = true; // 나무 줄기도 벽타기 가능
+  }
  }
  // 수직: 물속이면 수영, 아니면 중력+점프
  const prevFeet = pos.y - EYE_HEIGHT; // 이동 전 발 높이(착지/천장 방향 판정용)
@@ -3452,6 +3455,12 @@ function physics(dt) {
   if (Math.abs(dx) > c.r || Math.abs(dz) > c.r) continue;
   const dd = Math.hypot(dx, dz);
   if (dd < c.r) { const g = (c.base + c.h*(1 - dd/c.r)) + EYE_HEIGHT; if (g > groundY) groundY = g; }
+ }
+ // 나무 잎 위 착지: 잎 꼭대기 근처/위에서만 발판(밑에서 순간이동 방지)
+ for (const t of treeTrunks) {
+  const dx = pos.x - t.x, dz = pos.z - t.z;
+  if (Math.abs(dx) > t.topR || Math.abs(dz) > t.topR) continue;
+  if (dx*dx + dz*dz < t.topR*t.topR) { const g = t.topY + EYE_HEIGHT; if (g > groundY && (pos.y - EYE_HEIGHT) >= t.topY - 1.2) groundY = g; }
  }
  if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; flipAirborne = false; } else onGround = false;
  // 포인트 발판: 윗면에 서면 포인트+1, 처음 스폰대로 복귀
