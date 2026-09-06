@@ -502,6 +502,8 @@ function paintPart(part, tex){
 }
 // ── 장식(잔디 등, 콜라이더 아님) 그룹 ──
 let worldDecor = null;
+let terrainCones = []; // 언덕/산 등반용 콘 {x,z,r,h,base}
+let treeTrunks = []; // 나무 밑동 충돌 {x,z,r}
 function ensureWorldDecor(){ if(!worldDecor){ worldDecor=new THREE.Group(); scene.add(worldDecor); } return worldDecor; }
 function clearWorldDecor(){ if(worldDecor){ for(let i=worldDecor.children.length-1;i>=0;i--){ const o=worldDecor.children[i]; worldDecor.remove(o); if(o.geometry&&o.geometry.dispose) o.geometry.dispose(); } } }
 // 잔디 잎 알파 텍스처
@@ -561,6 +563,7 @@ function buildGrass(){
 // ── 지형 장식: 나무(활엽수/침엽수)·언덕·산 (인스턴스, 콜라이더 아님) ──
 function buildTerrainScenery(){
  const decor=ensureWorldDecor();
+ terrainCones = []; treeTrunks = [];
  const rej=(x,z)=>{
   const r=Math.hypot(x,z);
   if(r<70) return true; // 마을 중심/광장
@@ -584,6 +587,7 @@ function buildTerrainScenery(){
   if(rej(x,z)) continue;
   trees.push({x,z,s:0.8+Math.random()*1.5,pine:Math.random()<0.5,rot:Math.random()*Math.PI});
  }
+ for(const t of trees) treeTrunks.push({x:t.x,z:t.z,r:0.6*t.s});
  const broad=trees.filter(t=>!t.pine), pines=trees.filter(t=>t.pine);
  const trunkInst=new THREE.InstancedMesh(trunkGeo,trunkMat,trees.length||1);
  trees.forEach((t,i)=>{ dummy.position.set(t.x,0.1+1.6*t.s,t.z); dummy.rotation.set(0,t.rot,0); dummy.scale.set(t.s,t.s,t.s); dummy.updateMatrix(); trunkInst.setMatrixAt(i,dummy.matrix); });
@@ -603,6 +607,7 @@ function buildTerrainScenery(){
   const x=Math.cos(a)*r, z=Math.sin(a)*r; if(rej(x,z)) continue;
   hills.push({x,z,rw:26+Math.random()*44,rh:8+Math.random()*16});
  }
+ for(const h of hills) terrainCones.push({x:h.x,z:h.z,r:h.rw,h:h.rh,base:-1});
  const hillInst=new THREE.InstancedMesh(hillGeo,hillMat,hills.length||1);
  hills.forEach((h,i)=>{ dummy.position.set(h.x,h.rh/2-1,h.z); dummy.rotation.set(0,Math.random()*Math.PI,0); dummy.scale.set(h.rw,h.rh,h.rw); dummy.updateMatrix(); hillInst.setMatrixAt(i,dummy.matrix); });
  hillInst.receiveShadow=true; decor.add(hillInst);
@@ -615,6 +620,7 @@ function buildTerrainScenery(){
   const r=840+Math.random()*90; const x=Math.cos(a)*r, z=Math.sin(a)*r;
   mtns.push({x,z,rw:80+Math.random()*90,rh:90+Math.random()*120,rot:Math.random()*Math.PI});
  }
+ for(const m of mtns) terrainCones.push({x:m.x,z:m.z,r:m.rw,h:m.rh,base:-2});
  const mtnInst=new THREE.InstancedMesh(mtnGeo,mtnMat,mtns.length);
  mtns.forEach((m,i)=>{ dummy.position.set(m.x,m.rh/2-2,m.z); dummy.rotation.set(0,m.rot,0); dummy.scale.set(m.rw,m.rh,m.rw); dummy.updateMatrix(); mtnInst.setMatrixAt(i,dummy.matrix); });
  decor.add(mtnInst);
@@ -3347,6 +3353,13 @@ function physics(dt) {
  }
  }
 
+ // 나무 밑동 충돌(수평 밀어내기)
+ for (const t of treeTrunks) {
+  const dx = pos.x - t.x, dz = pos.z - t.z, rr = t.r + R;
+  if (Math.abs(dx) > rr || Math.abs(dz) > rr) continue;
+  const dd = Math.hypot(dx, dz);
+  if (dd < rr && dd > 1e-4) { const sc = rr/dd; pos.x = t.x + dx*sc; pos.z = t.z + dz*sc; }
+ }
  // 수직: 물속이면 수영, 아니면 중력+점프
  const prevFeet = pos.y - EYE_HEIGHT; // 이동 전 발 높이(착지/천장 방향 판정용)
  if (inWater) {
@@ -3413,7 +3426,7 @@ function physics(dt) {
  }
  }
  // 바닥은 맵(그라운드 평면) 범위 안에서만 존재 → 밖은 공허로 낙하
- const half = 760; // 맵 대확장(2000x2000)에 맞춘 걷는 영역
+ const half = 980; // 맵 전체 보행(산 등반 도달 위해 확장)
  let groundY = (Math.abs(pos.x) <= half && Math.abs(pos.z) <= half) ? EYE_HEIGHT : -Infinity;
  for (const c of colliders) {
  if (c.type !== 'solid' && c.type !== 'checkpoint' && c.type !== 'jump' && c.type !== 'point') continue;
@@ -3432,6 +3445,13 @@ function physics(dt) {
   vertVel = 0;
  }
  }
+ }
+ // 언덕/산 등반: 콘 표면 높이로 지면 상승
+ for (const c of terrainCones) {
+  const dx = pos.x - c.x, dz = pos.z - c.z;
+  if (Math.abs(dx) > c.r || Math.abs(dz) > c.r) continue;
+  const dd = Math.hypot(dx, dz);
+  if (dd < c.r) { const g = (c.base + c.h*(1 - dd/c.r)) + EYE_HEIGHT; if (g > groundY) groundY = g; }
  }
  if (pos.y <= groundY) { pos.y = groundY; vertVel = 0; onGround = true; flipAirborne = false; } else onGround = false;
  // 포인트 발판: 윗면에 서면 포인트+1, 처음 스폰대로 복귀
