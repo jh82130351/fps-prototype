@@ -432,13 +432,28 @@ for (const k in toolBtns) toolBtns[k].onclick = () => {
 
 // ---------- Scene ----------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87b8e8);
-scene.fog = new THREE.Fog(0x87b8e8, 120, 500);
+// 하늘: 천정(진한 파랑)→지평선(옅은 파랑) 그라디언트
+(function(){
+ const c = document.createElement('canvas'); c.width = 4; c.height = 256;
+ const ctx = c.getContext('2d');
+ const g = ctx.createLinearGradient(0,0,0,256);
+ g.addColorStop(0.00, '#3f7fce');
+ g.addColorStop(0.55, '#8ab6e8');
+ g.addColorStop(1.00, '#d6e8f7');
+ ctx.fillStyle = g; ctx.fillRect(0,0,4,256);
+ const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+ scene.background = tex;
+})();
+scene.fog = new THREE.Fog(0xd6e8f7, 160, 620); // 지평선 색과 맞춰 원경이 하늘로 자연스레 사라짐
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 부드러운 그림자
+renderer.outputColorSpace = THREE.SRGBColorSpace; // 정확한 색공간
+renderer.toneMapping = THREE.ACESFilmicToneMapping; // 필름 톤매핑(색감·대비↑)
+renderer.toneMappingExposure = 1.08;
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x556677, 0.9));
 const sun = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -447,6 +462,33 @@ sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.left = -110; sun.shadow.camera.right = 110;
 sun.shadow.camera.top = 110; sun.shadow.camera.bottom = -110;
 scene.add(sun);
+// ── 절차적 반복 텍스처 헬퍼(고퀄 바닥용) ──
+function makeGroundTexture(baseHex, spotHexes, spotCount, spotMax){
+ const S=128, c=document.createElement('canvas'); c.width=c.height=S;
+ const ctx=c.getContext('2d');
+ ctx.fillStyle=baseHex; ctx.fillRect(0,0,S,S);
+ for(let i=0;i<spotCount;i++){
+  ctx.fillStyle=spotHexes[(Math.random()*spotHexes.length)|0];
+  ctx.globalAlpha=0.18+Math.random()*0.32;
+  const x=Math.random()*S, y=Math.random()*S, r=spotMax*(0.35+Math.random());
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+ }
+ ctx.globalAlpha=1;
+ const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace;
+ t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+}
+const TEX_GRASS = makeGroundTexture('#4e7d3a', ['#3f6b30','#5c8a44','#436e33','#6b9a4e'], 90, 9);
+const TEX_PATH = makeGroundTexture('#b8956a', ['#a8855c','#c6a678','#9c7b52','#cdb083'], 80, 8);
+const TEX_COBBLE= makeGroundTexture('#c7b892', ['#b3a37e','#d8cba8','#a89a76','#9c8f6d'], 110, 7);
+// 특정 바닥 파트에 반복 텍스처 입히기
+function texGround(part, tex, repeat){
+ if(!part||!part.mesh) return part;
+ const tx=tex.clone(); tx.wrapS=tx.wrapT=THREE.RepeatWrapping; tx.repeat.set(repeat,repeat);
+ tx.colorSpace=THREE.SRGBColorSpace; tx.needsUpdate=true;
+ const mats=Array.isArray(part.mesh.material)?part.mesh.material:[part.mesh.material];
+ for(const m of mats){ m.map=tx; m.color.set(0xffffff); m.roughness=0.96; m.metalness=0.0; m.needsUpdate=true; }
+ return part;
+}
 
 const groundSize = 200;
 const ground = new THREE.Mesh(
@@ -1179,9 +1221,9 @@ function buildArenaWorld() {
  WALL=0xe8dcc0, DOOR=0x5a3d2b, WATER=0x2e8fd8, STONE=0x95a5a6;
 
  // 바닥(넓은 풀밭)
- addPart(0, -0.4, 0, 600, 1, 600, GROUND); // 윗면 y=0.1 (마을 확장: 600x600)
+ texGround(addPart(0, -0.4, 0, 600, 1, 600, GROUND), TEX_GRASS, 60); // 잔디 텍스처
  // 중앙 광장(돌바닥) — 더 넓게
- addPart(0, 0.28, 0, 64, 0.3, 64, PLAZA); // 윗면 0.43
+ texGround(addPart(0, 0.28, 0, 64, 0.3, 64, PLAZA), TEX_COBBLE, 10); // 광장 돌바닥 텍스처
  // 광장 테두리 장식(밝은 돌)
  addPart(0, 0.30, 32, 64, 0.4, 2, 0xcfc0a0);
  addPart(0, 0.30, -32, 64, 0.4, 2, 0xcfc0a0);
@@ -1189,8 +1231,8 @@ function buildArenaWorld() {
  addPart(-32, 0.30, 0, 2, 0.4, 64, 0xcfc0a0);
 
  // ── 십자(+) 중앙 길 ──
- addPart(0, 0.20, 0, 14, 0.3, 560, PATH); // 세로 길(상점가): z축 -280~280
- addPart(0, 0.20, 0, 560, 0.3, 14, PATH); // 가로 길(마을 중앙): x축 -280~280 (옆마을 이동)
+ texGround(addPart(0, 0.20, 0, 14, 0.3, 560, PATH), TEX_PATH, 20); // 세로 길 흙길 텍스처
+ texGround(addPart(0, 0.20, 0, 560, 0.3, 14, PATH), TEX_PATH, 20); // 가로 길 흙길 텍스처
 
  // 건물 헬퍼: 벽 4면 + 지붕, 앞면 가운데 문 구멍. (cx,cz)중심, w×d, 높이 h, 문은 -z쪽
  function building(cx, cz, w, d, h, roofColor, label, dir) {
@@ -1308,7 +1350,7 @@ function buildArenaWorld() {
  // (울타리 제거: 마을 확장·십자 길이 지나가므로 길을 막지 않게)
 
  // 사냥터 표지(길 끝, 다음 단계에서 몬스터 배치될 곳)
- addPart(170, 0.15, 0, 130, 0.3, 130, 0x4a7c3a); // 사냥터 풀밭(5배 확장)
+ texGround(addPart(170, 0.15, 0, 130, 0.3, 130, 0x4a7c3a), TEX_GRASS, 14); // 사냥터 잔디 텍스처
  addPart(140, 2, 0, 6, 4, 0.5, 0x8d6e4a); // 사냥터 표지판 기둥
 
  // ===== 마을 장식 =====
