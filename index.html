@@ -482,11 +482,8 @@ const TEX_PATH = makeGroundTexture('#b8956a', ['#a8855c','#c6a678','#9c7b52','#c
 const TEX_COBBLE= makeGroundTexture('#c7b892', ['#b3a37e','#d8cba8','#a89a76','#9c8f6d'], 110, 7);
 // 특정 바닥 파트에 반복 텍스처 입히기
 function texGround(part, tex, repeat){
- if(!part||!part.mesh) return part;
- const tx=tex.clone(); tx.wrapS=tx.wrapT=THREE.RepeatWrapping; tx.repeat.set(repeat,repeat);
- tx.colorSpace=THREE.SRGBColorSpace; tx.needsUpdate=true;
- const mats=Array.isArray(part.mesh.material)?part.mesh.material:[part.mesh.material];
- for(const m of mats){ m.map=tx; m.color.set(0xffffff); m.roughness=0.96; m.metalness=0.0; m.needsUpdate=true; }
+ // 얼룩 텍스처 제거: 깔끔한 단색 유지(호출부 그대로 두고 여기서 무효화)
+ if(part&&part.mesh){ const mats=Array.isArray(part.mesh.material)?part.mesh.material:[part.mesh.material]; for(const m of mats){ m.roughness=0.9; m.metalness=0.0; } }
  return part;
 }
 // ── 상점용 공유 텍스처(벽/지붕/나무/돌) — 클론 없이 공유(메모리 절약) ──
@@ -500,9 +497,7 @@ const TEX_WOOD = makeSharedTex('#6b4a2c', ['#5a3e24','#7d5836','#4d3620'], 50, 6
 const TEX_STONE= makeSharedTex('#9aa0a6', ['#868c92','#b0b6bc','#7d8288'], 70, 6, 2); // 돌 토대
 // 공유 텍스처를 파트에 입힘(클론 안 함)
 function paintPart(part, tex){
- if(!part||!part.mesh) return part;
- const mats=Array.isArray(part.mesh.material)?part.mesh.material:[part.mesh.material];
- for(const m of mats){ m.map=tex; m.color.set(0xffffff); m.roughness=0.9; m.metalness=0.0; m.needsUpdate=true; }
+ // 얼룩 텍스처 제거: 단색 유지(호출부 그대로)
  return part;
 }
 // ── 장식(잔디 등, 콜라이더 아님) 그룹 ──
@@ -548,7 +543,7 @@ function buildGrass(){
   return false;
  };
  const dummy=new THREE.Object3D(); const pts=[];
- for(let i=0;i<9000 && pts.length<4800;i++){
+ for(let i=0;i<30000 && pts.length<16000;i++){
   const x=(Math.random()*2-1)*292, z=(Math.random()*2-1)*292;
   if(reject(x,z)) continue; pts.push([x,z]);
  }
