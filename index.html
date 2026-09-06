@@ -614,23 +614,40 @@ function buildTerrainScenery(){
  // 산: 크고 높은 콘(바위 회갈색) — 눈 없음, 슬로프에 나무
  const mtnGeo=new THREE.ConeGeometry(1,1,8);
  const mtnMat=new THREE.MeshStandardMaterial({color:0x6a6f5e,roughness:1,flatShading:true});
- // 산: 외곽 링(배경) + 내륙에도 흩뿌림(마을/길/사냥터/2번 마을 넉넉히 회피)
- const rejM=(x,z)=>{
-  if(rej(x,z)) return true;
-  if(Math.abs(x)<45 || Math.abs(z)<45) return true; // 십자 길/연결로 넓게 회피
-  if(x>500 && Math.abs(z)<170) return true; // 두 번째 마을 넉넉히
+ // 산: 산맥 클러스터(자연스러운 무리) + 사이사이 넓은 평지, 크기(rw)만큼 여유를 두고 길·마을 회피
+ const rejMB=(x,z,buf)=>{ // buf: 산 반지름만큼 안전 여유
+  if(Math.hypot(x,z) < 90+buf) return true; // 마을 중심/광장
+  if(Math.abs(x) < 16+buf || Math.abs(z) < 16+buf) return true; // 십자 길(반지름 반영)
+  if(x>90&&x<250&&Math.abs(z)<80+buf) return true; // 사냥터
+  if(x>560-buf && Math.abs(z)<170+buf) return true; // 두 번째 마을
   return false;
  };
  const mtns=[];
- for(let i=0;i<22;i++){ // 외곽 링
-  const a=(i/22)*Math.PI*2 + (Math.random()*0.16);
-  const r=820+Math.random()*110; const x=Math.cos(a)*r, z=Math.sin(a)*r;
-  mtns.push({x,z,rw:90+Math.random()*90,rh:110+Math.random()*120,rot:Math.random()*Math.PI});
+ const clusters=[];
+ for(let t=0;t<400 && clusters.length<13;t++){ // 산맥 중심 여러 곳(불규칙 간격)
+  const a=Math.random()*Math.PI*2, r=260+Math.random()*680;
+  const cx=Math.cos(a)*r, cz=Math.sin(a)*r;
+  if(rejMB(cx,cz,110)) continue;
+  let tooClose=false;
+  for(const c of clusters){ if(Math.hypot(cx-c.x,cz-c.z) < 300){ tooClose=true; break; } }
+  if(tooClose) continue;
+  clusters.push({x:cx,z:cz});
  }
- for(let i=0;i<600 && mtns.length<22+28;i++){ // 내륙 산(더 작게)
-  const a=Math.random()*Math.PI*2, r=280+Math.random()*470;
-  const x=Math.cos(a)*r, z=Math.sin(a)*r; if(rejM(x,z)) continue;
-  mtns.push({x,z,rw:55+Math.random()*70,rh:70+Math.random()*110,rot:Math.random()*Math.PI});
+ for(const c of clusters){
+  const n=2+((Math.random()*5)|0); // 산맥당 봉우리 2~6개(불규칙)
+  let placed=0, tries=0;
+  while(placed<n && tries<50){
+   tries++;
+   const ang=Math.random()*Math.PI*2, dist=Math.pow(Math.random(),0.7)*190; // 중심에 몰리되 퍼짐
+   const x=c.x+Math.cos(ang)*dist, z=c.z+Math.sin(ang)*dist;
+   const rw=50+Math.random()*180, rh=70+Math.random()*190; // 크기 다양화(획일함 방지)
+   if(rejMB(x,z,rw)) continue;
+   let overlapBad=false;
+   for(const m of mtns){ if(Math.hypot(x-m.x,z-m.z) < (m.rw+rw)*0.62){ overlapBad=true; break; } }
+   if(overlapBad) continue;
+   mtns.push({x,z,rw,rh,rot:Math.random()*Math.PI});
+   placed++;
+  }
  }
  for(const m of mtns) terrainCones.push({x:m.x,z:m.z,r:m.rw,h:m.rh,base:-2});
  const mtnInst=new THREE.InstancedMesh(mtnGeo,mtnMat,mtns.length);
