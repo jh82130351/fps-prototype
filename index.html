@@ -489,6 +489,66 @@ function texGround(part, tex, repeat){
  for(const m of mats){ m.map=tx; m.color.set(0xffffff); m.roughness=0.96; m.metalness=0.0; m.needsUpdate=true; }
  return part;
 }
+// ── 상점용 공유 텍스처(벽/지붕/나무/돌) — 클론 없이 공유(메모리 절약) ──
+function makeSharedTex(baseHex, spotHexes, spotCount, spotMax, rep){
+ const t=makeGroundTexture(baseHex, spotHexes, spotCount, spotMax);
+ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(rep,rep); return t;
+}
+const TEX_WALL = makeSharedTex('#e6dcc6', ['#d8ccae','#efe7d4','#cfc3a4'], 60, 6, 2); // 회벽/플라스터
+const TEX_ROOF = makeSharedTex('#b34a3a', ['#9c3f33','#c85a48','#8f3a2f'], 80, 7, 3); // 기와/지붕
+const TEX_WOOD = makeSharedTex('#6b4a2c', ['#5a3e24','#7d5836','#4d3620'], 50, 6, 2); // 나무 기둥
+const TEX_STONE= makeSharedTex('#9aa0a6', ['#868c92','#b0b6bc','#7d8288'], 70, 6, 2); // 돌 토대
+// 공유 텍스처를 파트에 입힘(클론 안 함)
+function paintPart(part, tex){
+ if(!part||!part.mesh) return part;
+ const mats=Array.isArray(part.mesh.material)?part.mesh.material:[part.mesh.material];
+ for(const m of mats){ m.map=tex; m.color.set(0xffffff); m.roughness=0.9; m.metalness=0.0; m.needsUpdate=true; }
+ return part;
+}
+// ── 장식(잔디 등, 콜라이더 아님) 그룹 ──
+let worldDecor = null;
+function ensureWorldDecor(){ if(!worldDecor){ worldDecor=new THREE.Group(); scene.add(worldDecor); } return worldDecor; }
+function clearWorldDecor(){ if(worldDecor){ for(let i=worldDecor.children.length-1;i>=0;i--){ const o=worldDecor.children[i]; worldDecor.remove(o); if(o.geometry&&o.geometry.dispose) o.geometry.dispose(); } } }
+// 잔디 잎 알파 텍스처
+function makeGrassBladeTexture(){
+ const S=64, c=document.createElement('canvas'); c.width=c.height=S;
+ const ctx=c.getContext('2d'); ctx.clearRect(0,0,S,S);
+ const cols=['#4e8b3a','#5c9a44','#3f7a30','#6aa64e'];
+ for(let i=0;i<7;i++){
+  ctx.strokeStyle=cols[(Math.random()*cols.length)|0];
+  ctx.lineWidth=2+Math.random()*2; ctx.lineCap='round';
+  const x=6+Math.random()*(S-12);
+  ctx.beginPath(); ctx.moveTo(x,S); ctx.quadraticCurveTo(x+(Math.random()*10-5),S*0.5,x+(Math.random()*14-7),6+Math.random()*10); ctx.stroke();
+ }
+ const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+// 잔디 심기: 마을 잔디 위에 인스턴스로 드문드문(길·광장·상점열 제외)
+function buildGrass(){
+ const tex=makeGrassBladeTexture();
+ const geo=new THREE.PlaneGeometry(1.1,1.1);
+ const mat=new THREE.MeshStandardMaterial({ map:tex, alphaTest:0.45, transparent:true, side:THREE.DoubleSide, roughness:1 });
+ const reject=(x,z)=>{
+  if(Math.abs(x)<34 && Math.abs(z)<34) return true; // 광장
+  if(Math.abs(x)<8 || Math.abs(z)<8) return true; // 십자 길
+  if(Math.abs(x)>10 && Math.abs(x)<22 && Math.abs(z)<170) return true; // 상점열
+  return false;
+ };
+ const dummy=new THREE.Object3D(); const pts=[];
+ for(let i=0;i<4200 && pts.length<2200;i++){
+  const x=(Math.random()*2-1)*292, z=(Math.random()*2-1)*292;
+  if(reject(x,z)) continue; pts.push([x,z]);
+ }
+ const inst=new THREE.InstancedMesh(geo, mat, pts.length);
+ for(let i=0;i<pts.length;i++){
+  const [x,z]=pts[i]; const sc=0.7+Math.random()*1.1;
+  dummy.position.set(x, 0.15+sc*0.55, z);
+  dummy.rotation.set(0, Math.random()*Math.PI, 0);
+  dummy.scale.set(sc, sc, sc); dummy.updateMatrix();
+  inst.setMatrixAt(i, dummy.matrix);
+ }
+ inst.castShadow=false; inst.receiveShadow=false;
+ ensureWorldDecor().add(inst);
+}
 
 const groundSize = 200;
 const ground = new THREE.Mesh(
@@ -1217,6 +1277,7 @@ function buildArenaWorld() {
  npcs = [];
 
  // 색
+ clearWorldDecor(); ensureWorldDecor();
  const GROUND=0x6ab04c, PLAZA=0xd9c8a0, PATH=0xb8956a, WOOD=0x8d6e4a, ROOF=0xc0392b,
  WALL=0xe8dcc0, DOOR=0x5a3d2b, WATER=0x2e8fd8, STONE=0x95a5a6;
 
@@ -1284,15 +1345,15 @@ function buildArenaWorld() {
   const fx = cx - dir * (d/2); // 문이 있는 앞면 x
   const bx = cx + dir * (d/2); // 뒷면 x
   const out = -dir; // 앞면 바깥쪽(장식이 튀어나가는 방향) 부호
-  // 뒷벽, 좌우벽
-  addPart(bx, h/2, cz, wallT, h, w, WALL);
-  addPart(cx, h/2, cz - w/2, d, h, wallT, WALL);
-  addPart(cx, h/2, cz + w/2, d, h, wallT, WALL);
+  // 뒷벽, 좌우벽 (텍스처)
+  paintPart(addPart(bx, h/2, cz, wallT, h, w, WALL), TEX_WALL);
+  paintPart(addPart(cx, h/2, cz - w/2, d, h, wallT, WALL), TEX_WALL);
+  paintPart(addPart(cx, h/2, cz + w/2, d, h, wallT, WALL), TEX_WALL);
   // 앞벽(문 쪽 x=fx): 문 구멍 + 좌우
   const doorW = 3.2, sideW = (w - doorW) / 2;
-  addPart(fx, h/2, cz - (doorW/2 + sideW/2), wallT, h, sideW, WALL);
-  addPart(fx, h/2, cz + (doorW/2 + sideW/2), wallT, h, sideW, WALL);
-  addPart(fx, h - 1, cz, wallT, 2, doorW, WALL);
+  paintPart(addPart(fx, h/2, cz - (doorW/2 + sideW/2), wallT, h, sideW, WALL), TEX_WALL);
+  paintPart(addPart(fx, h/2, cz + (doorW/2 + sideW/2), wallT, h, sideW, WALL), TEX_WALL);
+  paintPart(addPart(fx, h - 1, cz, wallT, 2, doorW, WALL), TEX_WALL);
   // 문틀
   addPart(fx + out*0.05, (h-2)/2, cz - doorW/2, 0.4, h-2, 0.3, DOOR);
   addPart(fx + out*0.05, (h-2)/2, cz + doorW/2, 0.4, h-2, 0.3, DOOR);
@@ -1304,9 +1365,23 @@ function buildArenaWorld() {
   addPart(fx + out*0.14, winY, cz + (doorW/2 + sideW/2), 0.1, 1.2, 1.2, 0xafe0ff);
   // 간판(문 위)
   addPart(fx + out*1.0, h - 2.6, cz, 2.0, 0.3, w, label);
-  // 지붕
-  addPart(cx, h + 0.3, cz, d + 1.6, 0.6, w + 1.6, roofColor);
-  addPart(cx, h + 0.9, cz, d*0.6, 0.6, w*0.6, roofColor);
+  // 돌 토대(바닥 테두리)
+  paintPart(addPart(cx, 0.35, cz, d + 1.2, 0.7, w + 1.2, STONE), TEX_STONE);
+  // 모서리 나무 기둥 4개(하프팀버 느낌)
+  for (const sx of [-1,1]) for (const sz of [-1,1]){
+   paintPart(addPart(cx + sx*(d/2 - 0.2), h/2, cz + sz*(w/2 - 0.2), 0.5, h, 0.5, WOOD), TEX_WOOD);
+  }
+  // 처마(넓은 받침) + 계단식 지붕 3단 (기와 텍스처)
+  paintPart(addPart(cx, h + 0.15, cz, d + 2.0, 0.4, w + 2.0, roofColor), TEX_ROOF);
+  for (let t=0; t<3; t++){
+   const rw = (d + 1.2) * (1 - t*0.28), rd = (w + 1.2) * (1 - t*0.28);
+   paintPart(addPart(cx, h + 0.6 + t*0.7, cz, rw, 0.55, rd, roofColor), TEX_ROOF);
+  }
+  // 용마루 캡
+  paintPart(addPart(cx, h + 0.6 + 3*0.7, cz, (d+1.2)*0.28, 0.4, (w+1.2)*0.28, roofColor), TEX_ROOF);
+  // 문 위 천막 차양(앞으로 튀어나옴)
+  addPart(fx + out*1.7, h - 2.2, cz, 2.8, 0.25, doorW + 1.4, label);
+  addPart(fx + out*2.9, h - 2.95, cz, 0.35, 1.6, doorW + 1.4, 0xffffff);
   // 문간 간판
   addPart(fx + out*0.35, h - 0.2, cz, 0.3, 1.0, doorW + 0.6, label);
  }
@@ -1384,6 +1459,7 @@ function buildArenaWorld() {
 
  // (상인은 위 상점 자동배치 루프에서 함께 배치됨)
 
+ buildGrass(); // 잔디 심기(인스턴스)
  rebuildColliders();
 }
 
