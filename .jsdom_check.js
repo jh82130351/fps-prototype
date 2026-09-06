@@ -39,7 +39,7 @@ const has = (txt) => html.includes(txt);
 // ① 사냥터 확장
 results.hunt_5x = has("addPart(170, 0.15, 0, 130, 0.3, 130, 0x4a7c3a)");
 // ② 전역 선언
-results.zombie_globals = has("let isZombieHost = false") && has("let fbZombiesRef = null") && has("const ZOMBIE_HP = 50") && has("const HUNT_CX = 170, HUNT_CZ = 0, HUNT_HALF = 60");
+results.zombie_globals = has("let isZombieHost = false") && has("let fbZombiesRef = null") && has("const ZOMBIE_HP = 6") && has("const HUNT_CX = 170, HUNT_CZ = 0, HUNT_HALF = 60");
 // ③ 호스트 선출
 results.host_elect = has("isZombieHost = (minId === myPlayerId)");
 // ④ 구독

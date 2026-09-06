@@ -2877,6 +2877,16 @@ let zombieHostAccum = 0, zombieSendAccum = 0, zombieSpawned = false;
 const ZOMBIE_HP = 6, ZOMBIE_RANGE = 2, ZOMBIE_AGGRO = 10, ZOMBIE_SPEED = 2.2, ZOMBIE_DMG = 5, ZOMBIE_COUNT = 10;
 const ELITE_HP = 200, ELITE_CHANCE = 1/80, ELITE_DMG = 40; // 엘리트: 체력200, 데미지40
 const HUNT_CX = 170, HUNT_CZ = 0, HUNT_HALF = 60;
+// ── 몬스터 레벨/스폰 안전 ──
+const MON_SAFE_R = 60; // 마을 중앙(0,0) 반경 60 안엔 몬스터 스폰 금지
+const START_HUNT_LVL = 1; // 시작 마을 사냥터 좀비는 무조건 Lv1(주먹 한방컷)
+// (x,z)가 마을 중앙 안전반경 안이면 사냥터 바깥으로 밀어냄
+function keepOutOfCenter(x, z) {
+ const d = Math.hypot(x, z);
+ if (d >= MON_SAFE_R) return { x, z };
+ const a = Math.atan2(z, x) || 0;
+ return { x: Math.cos(a) * MON_SAFE_R, z: Math.sin(a) * MON_SAFE_R };
+}
 // 좀비 처치·드롭 전역
 const PLAYER_ATK_DMG = 25; // 내 공격이 좀비에게 주는 데미지(50이면 2대)
 let fbDropsRef = null;
@@ -3358,7 +3368,8 @@ function onZombieUpdate(snap) {
   const isElite = !!d.elite;
   const fig = makeCharacter({ skin: isElite?0x2f5d2f:0x4a7c3a, shirt: isElite?0x1a3a0a:0x2d5016, pants:0x1a3009, face:4 });
   if (isElite) fig.scale.set(1.6, 1.6, 1.6); // 엘리트는 크게
-  const tag = makeNameTag(isElite?'엘리트 좀비':'좀비'); fig.add(tag);
+  const lvl = d.lvl || 1;
+  const tag = makeNameTag('Lv.'+lvl+' '+(isElite?'엘리트 좀비':'좀비')); fig.add(tag);
   scene.add(fig);
   zombieRender[id] = { fig, tx:d.x, tz:d.z, hp:d.hp, elite:isElite };
   fig.position.set(d.x, isElite?0.5:0.3, d.z);
@@ -3388,14 +3399,16 @@ function spawnZombies() {
  for (let i=0;i<ZOMBIE_COUNT;i++){
   const zid = 'z'+i;
   const elite = Math.random() < ELITE_CHANCE;
+  const rx = HUNT_CX + (Math.random()*2-1)*HUNT_HALF;
+  const rz = HUNT_CZ + (Math.random()*2-1)*HUNT_HALF;
+  const pos = keepOutOfCenter(rx, rz);
   zombieSim[zid] = {
-   x: HUNT_CX + (Math.random()*2-1)*HUNT_HALF,
-   z: HUNT_CZ + (Math.random()*2-1)*HUNT_HALF,
-   hp: elite ? ELITE_HP : ZOMBIE_HP, elite: elite, target: null, atkCd: 0
+   x: pos.x, z: pos.z,
+   hp: elite ? ELITE_HP : ZOMBIE_HP, lvl: START_HUNT_LVL, elite: elite, target: null, atkCd: 0
   };
  }
  const obj = {};
- for (const zid in zombieSim){ const s=zombieSim[zid]; obj[zid]={x:s.x,z:s.z,hp:s.hp,elite:!!s.elite,t:Date.now()}; }
+ for (const zid in zombieSim){ const s=zombieSim[zid]; obj[zid]={x:s.x,z:s.z,hp:s.hp,lvl:s.lvl,elite:!!s.elite,t:Date.now()}; }
  if (fbdb) fbdb.ref('zombies').set(obj);
 }
 function updateZombieSim(dt) {
@@ -4004,8 +4017,9 @@ function onDropUpdate(snap){
 function respawnOneZombie(){
  const zid = 'z'+Date.now().toString(36);
  const elite = Math.random() < ELITE_CHANCE;
- zombieSim[zid] = { x: HUNT_CX+(Math.random()*2-1)*HUNT_HALF, z: HUNT_CZ+(Math.random()*2-1)*HUNT_HALF, hp: elite?ELITE_HP:ZOMBIE_HP, elite:elite, target:null, atkCd:0 };
- if (fbdb) fbdb.ref('zombies/'+zid).set({ x:zombieSim[zid].x, z:zombieSim[zid].z, hp:zombieSim[zid].hp, elite:elite, t:Date.now() });
+ const pos = keepOutOfCenter(HUNT_CX+(Math.random()*2-1)*HUNT_HALF, HUNT_CZ+(Math.random()*2-1)*HUNT_HALF);
+ zombieSim[zid] = { x: pos.x, z: pos.z, hp: elite?ELITE_HP:ZOMBIE_HP, lvl: START_HUNT_LVL, elite:elite, target:null, atkCd:0 };
+ if (fbdb) fbdb.ref('zombies/'+zid).set({ x:pos.x, z:pos.z, hp:zombieSim[zid].hp, lvl:START_HUNT_LVL, elite:elite, t:Date.now() });
 }
 const DROP_TTL = 300000; // 5분(ms)
 function cleanOldDrops() {
