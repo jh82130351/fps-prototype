@@ -614,11 +614,23 @@ function buildTerrainScenery(){
  // 산: 크고 높은 콘(바위 회갈색) — 눈 없음, 슬로프에 나무
  const mtnGeo=new THREE.ConeGeometry(1,1,8);
  const mtnMat=new THREE.MeshStandardMaterial({color:0x6a6f5e,roughness:1,flatShading:true});
+ // 산: 외곽 링(배경) + 내륙에도 흩뿌림(마을/길/사냥터/2번 마을 넉넉히 회피)
+ const rejM=(x,z)=>{
+  if(rej(x,z)) return true;
+  if(Math.abs(x)<45 || Math.abs(z)<45) return true; // 십자 길/연결로 넓게 회피
+  if(x>500 && Math.abs(z)<170) return true; // 두 번째 마을 넉넉히
+  return false;
+ };
  const mtns=[];
- for(let i=0;i<40;i++){
-  const a=(i/40)*Math.PI*2 + (Math.random()*0.12);
-  const r=840+Math.random()*90; const x=Math.cos(a)*r, z=Math.sin(a)*r;
-  mtns.push({x,z,rw:80+Math.random()*90,rh:90+Math.random()*120,rot:Math.random()*Math.PI});
+ for(let i=0;i<22;i++){ // 외곽 링
+  const a=(i/22)*Math.PI*2 + (Math.random()*0.16);
+  const r=820+Math.random()*110; const x=Math.cos(a)*r, z=Math.sin(a)*r;
+  mtns.push({x,z,rw:90+Math.random()*90,rh:110+Math.random()*120,rot:Math.random()*Math.PI});
+ }
+ for(let i=0;i<600 && mtns.length<22+28;i++){ // 내륙 산(더 작게)
+  const a=Math.random()*Math.PI*2, r=280+Math.random()*470;
+  const x=Math.cos(a)*r, z=Math.sin(a)*r; if(rejM(x,z)) continue;
+  mtns.push({x,z,rw:55+Math.random()*70,rh:70+Math.random()*110,rot:Math.random()*Math.PI});
  }
  for(const m of mtns) terrainCones.push({x:m.x,z:m.z,r:m.rw,h:m.rh,base:-2});
  const mtnInst=new THREE.InstancedMesh(mtnGeo,mtnMat,mtns.length);
@@ -627,9 +639,9 @@ function buildTerrainScenery(){
  // 산 슬로프의 침엽수(콘 표면 높이에 맞춰 심기)
  const mt=[];
  for(const m of mtns){
-  const n=9+((Math.random()*9)|0);
+  const n=30+((Math.random()*30)|0);
   for(let k=0;k<n;k++){
-   const dd=m.rw*(0.15+Math.random()*0.72), ang=Math.random()*Math.PI*2;
+   const dd=m.rw*(0.08+Math.random()*0.84), ang=Math.random()*Math.PI*2;
    const tx=m.x+Math.cos(ang)*dd, tz=m.z+Math.sin(ang)*dd;
    const surfaceY=-2+m.rh*(1-dd/m.rw), ps=2.5+Math.random()*3.5;
    mt.push({tx,tz,y:surfaceY+2.6*ps,ps,rot:Math.random()*Math.PI});
